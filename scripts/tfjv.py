@@ -1,5 +1,4 @@
 """TFJVファイル操作の共通モジュール。"""
-import glob
 import os
 
 VENUE_ABBR: dict[str, str] = {
@@ -68,9 +67,8 @@ def read_marks(dat_path: str, race_no: int) -> dict[int, str]:
 
 def find_kek_com_file(base_dir: str, venue: str, year2: str, tfjv_code: str) -> str | None:
     """KC*.DAT のパスを返す。存在しない場合は None。"""
-    pattern = os.path.join(base_dir, "KEK_COM", f"20{year2}", f"KC{venue}{year2}{tfjv_code}.DAT")
-    matches = glob.glob(pattern)
-    return matches[0] if matches else None
+    path = os.path.join(base_dir, "KEK_COM", f"20{year2}", f"KC{venue}{year2}{tfjv_code}.DAT")
+    return path if os.path.isfile(path) else None
 
 
 def read_kek_comments(
