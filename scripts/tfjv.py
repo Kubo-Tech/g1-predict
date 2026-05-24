@@ -36,11 +36,17 @@ def race_code_to_tfjv(race_code: str) -> tuple[str, str, str]:
 
 
 def um_dat_path(race_code: str, base_dir: str) -> str:
-    """UM*.DAT のフルパスを返す。"""
+    """UM*.DAT のフルパスを返す。
+
+    Raises:
+        ValueError: 未対応の競馬場コードの場合。
+    """
     year2 = race_code[2:4]
     kai = int(race_code[10:12])
     venue = race_code[8:10]
-    abbr = VENUE_ABBR[venue]
+    abbr = VENUE_ABBR.get(venue)
+    if abbr is None:
+        raise ValueError(f"Unsupported venue code: {venue!r}")
     filename = f"UM{year2}{kai}{abbr}.DAT"
     return os.path.join(base_dir, filename)
 

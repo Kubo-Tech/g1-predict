@@ -26,3 +26,10 @@ def test_um_dat_path_constructs_correct_filename(
     base_dir = "/base"
     result = um_dat_path(race_code, base_dir)
     assert result == os.path.join(base_dir, expected_filename)
+
+
+# 準正常系
+def test_um_dat_path_raises_for_unsupported_venue() -> None:
+    """未対応の競馬場コードで ValueError が発生する。"""
+    with pytest.raises(ValueError, match="Unsupported venue code"):
+        um_dat_path("2026010101010101", "/base")  # venue="01" は未対応
