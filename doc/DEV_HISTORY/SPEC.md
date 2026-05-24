@@ -51,13 +51,10 @@ g1-predict/
 
 ### TFJVファイル
 
-ローカルの `C:\TFJV\MY_DATA\` をコンテナ起動時にボリュームマウントする。
+ローカルの `C:\TFJV\MY_DATA\` をコンテナ起動時にボリュームマウントする。  
+`docker-compose.yml` で `C:/TFJV/MY_DATA:/KeibaAI/repos/g1-predict/MY_DATA` としてマウント済み。
 
-```
-docker run ... -v C:\TFJV\MY_DATA:/tfjv_data ...
-```
-
-スクリプト内のベースパスは環境変数 `TFJV_DATA_DIR` で設定する（デフォルト: `/tfjv_data`）。
+スクリプト内のベースパスは環境変数 `TFJV_DATA_DIR` で設定する（デフォルト: `/KeibaAI/repos/g1-predict/MY_DATA`）。
 
 #### race_code 体系
 
