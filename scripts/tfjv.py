@@ -26,7 +26,7 @@ MARK_LINE = 4
 
 
 def race_code_to_tfjv(race_code: str) -> tuple[str, str, str]:
-    """16桁 race_code を (競馬場コード, YY, 開催コード16進2桁) に変換する。"""
+    """16桁 race_code を (競馬場コード, YY, 開催コード16進) に変換する。"""
     venue = race_code[8:10]
     year2 = race_code[2:4]
     kai = int(race_code[10:12])
