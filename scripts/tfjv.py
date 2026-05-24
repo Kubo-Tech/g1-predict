@@ -60,7 +60,7 @@ def read_marks(dat_path: str, race_no: int) -> dict[int, str]:
     marks = {}
     for i in range(21):
         two_bytes = mark_line[i * 2 : i * 2 + 2]
-        mark = MARK_BYTES.get(bytes(two_bytes))
+        mark = MARK_BYTES.get(two_bytes)
         if mark:
             marks[i + 1] = mark
     return marks
