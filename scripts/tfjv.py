@@ -107,7 +107,11 @@ def write_kek_comment(
 
     Raises:
         FileNotFoundError: 対象の KEK_COM ファイルが存在しない場合。
+        ValueError: コメントに二重引用符または改行が含まれる場合。
     """
+    if '"' in comment:
+        raise ValueError(f"Comment must not contain double quotes: {comment!r}")
+    comment = comment.replace("\r", "").replace("\n", "")
     fpath = find_kek_com_file(base_dir, venue, year2, tfjv_code)
     if fpath is None:
         raise FileNotFoundError(f"KEK_COM file not found: {venue}{year2}{tfjv_code}")
