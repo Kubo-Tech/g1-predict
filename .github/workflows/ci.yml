@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'scripts/**'
+      - 'test/**'
+      - 'pytest.ini'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'scripts/**'
+      - 'test/**'
+      - 'pytest.ini'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dev dependencies
+        run: |
+          pip install \
+            isort \
+            flake8 \
+            flake8-docstrings \
+            flake8-annotations \
+            pep8-naming \
+            darglint \
+            mypy \
+            pytest
+
+      - name: isort
+        run: isort --profile=black --line-length=100 --check-only --diff scripts/ test/
+
+      - name: flake8
+        run: |
+          flake8 scripts/ \
+            --max-line-length=100 \
+            --ignore=E203,W503,ANN101,ANN204,ANN401,D105,D107,D403,D415,DAR101,DAR201,DAR402 \
+            --select=E,W,F,N,D \
+            --docstring-convention=google
+
+      - name: mypy
+        run: mypy scripts/ --ignore-missing-imports
+
+      - name: pytest
+        run: pytest
