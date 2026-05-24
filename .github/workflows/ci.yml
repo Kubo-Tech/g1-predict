@@ -55,4 +55,4 @@ jobs:
         run: mypy scripts/ --ignore-missing-imports
 
       - name: pytest
-        run: pytest
+        run: pytest test/unit/scripts/tfjv
