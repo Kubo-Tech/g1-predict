@@ -7,6 +7,7 @@ on:
       - 'scripts/**'
       - 'test/**'
       - 'pytest.ini'
+      - 'requirements*.txt'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, develop]
@@ -14,6 +15,7 @@ on:
       - 'scripts/**'
       - 'test/**'
       - 'pytest.ini'
+      - 'requirements*.txt'
       - '.github/workflows/ci.yml'
 
 jobs:
