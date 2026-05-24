@@ -15,18 +15,11 @@
 
 ### ◎{Umaban}{HorseName}
 
-#### Good
-
-#### Bad
 
 ### ○{Umaban}{HorseName}
 
-#### Good
-
-#### Bad
 
 ### ▲{Umaban}{HorseName}
+...
 
-#### Good
-
-#### Bad
+## 買い目
