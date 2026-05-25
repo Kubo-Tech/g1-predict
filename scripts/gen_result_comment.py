@@ -1,4 +1,5 @@
 """結果定型文を KEK_COM へ追記するスクリプト。"""
+
 import argparse
 import os
 from typing import Any
@@ -21,7 +22,7 @@ def generate_result_comments(race_code: str, base_dir: str) -> None:
     """
     di = DataInterface("mykeibadb")
     race_info = di.get_race_basic_info(race_code)
-    race_name = race_info["競走名本題"].iloc[0]
+    race_name = race_info["競走名略称6文字"].iloc[0]
     result_df = di.get_result(race_code)
     venue, year2, tfjv_code = race_code_to_tfjv(race_code)
     race_no = int(race_code[14:16])
