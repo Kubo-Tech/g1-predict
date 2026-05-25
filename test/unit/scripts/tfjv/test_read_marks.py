@@ -11,7 +11,7 @@ def _build_um_dat(marks: dict[int, bytes]) -> bytes:
         if i == MARK_LINE:
             content = bytearray(b"\x20\x20" * 21)
             for umaban, mark_bytes in marks.items():
-                slot = umaban - 1
+                slot = umaban + 2
                 content[slot * 2] = mark_bytes[0]
                 content[slot * 2 + 1] = mark_bytes[1]
             lines.append(bytes(content) + b"\r\n")

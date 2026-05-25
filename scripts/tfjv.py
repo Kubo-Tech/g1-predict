@@ -53,7 +53,7 @@ def um_dat_record_no(race_code: str) -> int:
     day = int(race_code[6:8])
     race_no = int(race_code[14:16])
     weekday = date(year, month, day).weekday()  # 5=土曜, 6=日曜
-    return (weekday - 5) * 12 + race_no
+    return (weekday - 5) * 9 + race_no
 
 
 def um_dat_path(race_code: str, base_dir: str) -> str:
@@ -79,11 +79,11 @@ def read_marks(dat_path: str, race_no: int) -> dict[int, str]:
     rec = data[(race_no - 1) * RECORD_SIZE : race_no * RECORD_SIZE]
     mark_line = rec[MARK_LINE * LINE_WIDTH : MARK_LINE * LINE_WIDTH + 42]
     marks = {}
-    for i in range(21):
+    for i in range(3, 21):
         two_bytes = mark_line[i * 2 : i * 2 + 2]
         mark = MARK_BYTES.get(two_bytes)
         if mark:
-            marks[i + 1] = mark
+            marks[i - 2] = mark
     return marks
 
 
