@@ -52,8 +52,8 @@ def test_generate_result_comments_gap_format(
     mock_di = _make_mock_di(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2},
-            {"確定着順": 2, "タイム差": time_diff, "着差コード1": margin_code, "馬番": 1},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": time_diff, "着差コード1": margin_code, "馬番": 1, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -72,8 +72,8 @@ def test_generate_result_comments_no_suffix_daisa(
     mock_di = _make_mock_di(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2},
-            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "T__", "馬番": 1},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "T__", "馬番": 1, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -92,8 +92,8 @@ def test_generate_result_comments_no_suffix_dochaku(
     mock_di = _make_mock_di(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2},
-            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "D__", "馬番": 1},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "D__", "馬番": 1, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -112,9 +112,9 @@ def test_generate_result_comments_writes_all_horses(
     mock_di = _make_mock_di(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": -0.1, "着差コード1": float("nan"), "馬番": 2},
-            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 1},
-            {"確定着順": 3, "タイム差": 0.5, "着差コード1": "_34", "馬番": 3},
+            {"確定着順": 1, "タイム差": -0.1, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 3, "タイム差": 0.5, "着差コード1": "_34", "馬番": 3, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -125,3 +125,122 @@ def test_generate_result_comments_writes_all_horses(
     assert "1着" in lines[0]
     assert "2着" in lines[1]
     assert "3着" in lines[2]
+
+
+@pytest.mark.parametrize(
+    "ijo_code, expected_name",
+    [
+        ("1", "出走取消"),
+        ("2", "発走除外"),
+        ("3", "競走除外"),
+        ("4", "競走中止"),
+    ],
+)
+def test_generate_result_comments_abnormal_code(
+    tmp_path: pytest.TempPathFactory,
+    ijo_code: str,
+    expected_name: str,
+) -> None:
+    """異常区分コード1〜4の馬はコード名称のみのコメントが生成される。"""
+    base_dir = _make_kek_com(tmp_path, "05", "26", "11")
+    mock_di = _make_mock_di(
+        "天皇賞春",
+        [
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 2, "異常区分コード": "0"},
+            {
+                "確定着順": float("nan"),
+                "タイム差": float("nan"),
+                "着差コード1": float("nan"),
+                "馬番": 3,
+                "異常区分コード": ijo_code,
+            },
+        ],
+    )
+    with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
+        generate_result_comments("2026013105010110", base_dir)
+
+    lines = _read_kek_com(base_dir, "05", "26", "11")
+    assert len(lines) == 3
+    assert any(f'[天皇賞春] {expected_name}"' in line for line in lines)
+    assert not any(
+        f'[天皇賞春] {expected_name}' in line and "着。" in line for line in lines
+    )
+
+
+def test_generate_result_comments_normal_horses_unaffected_by_abnormal(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """異常区分馬が混在しても正常馬には着順コメントが生成される。"""
+    base_dir = _make_kek_com(tmp_path, "05", "26", "11")
+    mock_di = _make_mock_di(
+        "天皇賞春",
+        [
+            {"確定着順": 1, "タイム差": 0.1, "着差コード1": "_34", "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 2, "異常区分コード": "0"},
+            {
+                "確定着順": float("nan"),
+                "タイム差": float("nan"),
+                "着差コード1": float("nan"),
+                "馬番": 3,
+                "異常区分コード": "4",
+            },
+        ],
+    )
+    with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
+        generate_result_comments("2026013105010110", base_dir)
+
+    lines = _read_kek_com(base_dir, "05", "26", "11")
+    assert len(lines) == 3
+    assert any("1着。" in line for line in lines)
+    assert any("2着。" in line for line in lines)
+    assert any("競走中止" in line for line in lines)
+
+
+def test_generate_result_comments_missing_ijo_column(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """異常区分コード列が存在しない場合は正常馬として処理される。"""
+    base_dir = _make_kek_com(tmp_path, "05", "26", "11")
+    mock_di = _make_mock_di(
+        "クロッカスステークス",
+        [
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 1},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 2},
+        ],
+    )
+    with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
+        generate_result_comments("2026013105010110", base_dir)
+
+    lines = _read_kek_com(base_dir, "05", "26", "11")
+    assert len(lines) == 2
+    assert any("1着。" in line for line in lines)
+    assert any("2着。" in line for line in lines)
+
+
+def test_generate_result_comments_numeric_ijo_code(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """数値型（float）の異常区分コードでも正しく異常馬として処理される。"""
+    base_dir = _make_kek_com(tmp_path, "05", "26", "11")
+    mock_di = _make_mock_di(
+        "クロッカスステークス",
+        [
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 2, "異常区分コード": "0"},
+            {
+                "確定着順": float("nan"),
+                "タイム差": float("nan"),
+                "着差コード1": float("nan"),
+                "馬番": 3,
+                "異常区分コード": 4.0,
+            },
+        ],
+    )
+    with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
+        generate_result_comments("2026013105010110", base_dir)
+
+    lines = _read_kek_com(base_dir, "05", "26", "11")
+    assert len(lines) == 3
+    assert any('競走中止"' in line for line in lines)
+    assert not any("着。" in line and "競走中止" in line for line in lines)

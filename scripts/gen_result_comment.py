@@ -6,12 +6,13 @@ from typing import Any
 
 import pandas as pd
 from keiba_data_interface import DataInterface
-from mykeibadb.code_converter import convert_chakusa_code
+from mykeibadb.code_converter import convert_chakusa_code, convert_ijo_kubun_code
 
 from scripts.tfjv import race_code_to_tfjv, write_kek_comment
 
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 _NO_SUFFIX = {"大差", "同着"}
+_ABNORMAL_CODES = {"1", "2", "3", "4"}
 
 
 def generate_result_comments(race_code: str, base_dir: str) -> None:
@@ -33,16 +34,21 @@ def generate_result_comments(race_code: str, base_dir: str) -> None:
     second_margin_code = second["着差コード1"]
 
     for _, row in result_df.iterrows():
-        chakusa = int(row["確定着順"])
-        if chakusa == 1:
-            time_diff = second_time_diff
-            margin_code = second_margin_code
-        else:
-            time_diff = float(row["タイム差"])
-            margin_code = row["着差コード1"]
         umaban = int(row["馬番"])
-        gap = _determine_gap(time_diff, margin_code)
-        comment = f"[{race_name}] {gap}{chakusa}着。"
+        raw = row.get("異常区分コード")
+        ijo_code = str(int(float(raw))) if pd.notna(raw) else "0"
+        if ijo_code in _ABNORMAL_CODES:
+            comment = f"[{race_name}] {convert_ijo_kubun_code(ijo_code)}"
+        else:
+            chakusa = int(row["確定着順"])
+            if chakusa == 1:
+                time_diff = second_time_diff
+                margin_code = second_margin_code
+            else:
+                time_diff = float(row["タイム差"])
+                margin_code = row["着差コード1"]
+            gap = _determine_gap(time_diff, margin_code)
+            comment = f"[{race_name}] {gap}{chakusa}着。"
         write_kek_comment(base_dir, venue, year2, tfjv_code, race_no, umaban, comment)
 
 
