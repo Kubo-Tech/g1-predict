@@ -28,14 +28,7 @@ def generate_predict(race_code: str) -> None:
 
     points = _load_points(race_name)
     marks_section = _build_marks_section(entry_df)
-
-    content = (
-        f"# {race_name}{year}\n\n"
-        f"{points}\n\n"
-        f"{marks_section}\n\n"
-        f"## 見解\n\n"
-        f"## 買い目\n"
-    )
+    content = _render_from_template(race_name, year, points, marks_section)
 
     nn = _next_serial(year, _PUBLIC_DIR)
     year_dir = os.path.join(_PUBLIC_DIR, year)
@@ -79,6 +72,24 @@ def _build_marks_section(entry_df: pd.DataFrame) -> str:
         horse_name = str(row["馬名"])
         lines.append(f"{umaban}{horse_name}  ")
     return "\n".join(lines)
+
+
+def _render_from_template(
+    race_name: str, year: str, points_section: str, marks_section: str
+) -> str:
+    template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE.md")
+    with open(template_path, encoding="utf-8") as f:
+        content = f.read()
+    content = content.replace("{RaceName}", race_name).replace("{Year}", year)
+    content = _replace_section(content, "## ポイント", points_section)
+    content = _replace_section(content, "## 印", marks_section)
+    content = _replace_section(content, "## 見解", "## 見解")
+    return content
+
+
+def _replace_section(content: str, header: str, new_section: str) -> str:
+    pattern = re.compile(rf"(?ms)^{re.escape(header)}\n.*?(?=^## |\Z)")
+    return pattern.sub(new_section.rstrip("\n") + "\n\n", content)
 
 
 if __name__ == "__main__":

@@ -33,6 +33,17 @@ def dirs(tmp_path: pytest.TempPathFactory) -> tuple[str, str]:
     public_dir = str(tmp_path / "public")  # type: ignore[operator]
     templates_dir = str(tmp_path / "templates")  # type: ignore[operator]
     os.makedirs(os.path.join(templates_dir, "points"))
+    with open(os.path.join(templates_dir, "TEMPLATE.md"), "w", encoding="utf-8") as f:
+        f.write(
+            "# {RaceName}{Year}\n\n"
+            "## ポイント\n\n"
+            "- \n\n"
+            "## 印\n\n"
+            "◎{Umaban}{HorseName}  \n\n"
+            "## 見解\n\n"
+            "### ◎{Umaban}{HorseName}\n\n"
+            "## 買い目\n"
+        )
     return public_dir, templates_dir
 
 
