@@ -415,6 +415,39 @@ def test_generate_predict_uses_default_points_when_template_missing(
     assert "先行有利" not in content
 
 
+def test_generate_predict_insight_deduplicates_postponed_race(
+    dirs: tuple[str, str],
+) -> None:
+    """延期によりMMDDのみ異なる同一レースのコメントは1回だけ出力される。"""
+    public_dir, templates_dir = dirs
+    horses = [{"馬番": 1, "馬名": "ホースA", "血統登録番号": "2020100001"}]
+    marks = {1: "◎"}
+    mock_di = _make_mock_di(horses=horses)
+    mock_di.get_past_performances.return_value = pd.DataFrame(
+        {
+            "レースコード": [
+                "2025050205021011",  # 元日程
+                "2025060205021011",  # 延期1回目（MMDDのみ異なる同一レース）
+                "2025070205021011",  # 延期2回目
+            ],
+            "馬番": [1, 1, 1],
+        }
+    )
+    mock_di.get_race_basic_info.side_effect = [
+        pd.DataFrame({"競走名本題": ["天皇賞春"], "開催年": ["2026"], "グレードコード": ["A"]}),
+        pd.DataFrame({"競走名本題": ["きさらぎ賞"], "開催年": ["2025"], "グレードコード": ["C"]}),
+    ]
+    _run(
+        mock_di,
+        public_dir,
+        templates_dir,
+        marks=marks,
+        kek_comments_per_call=[{1: "[きさらぎ賞] 好走。"}],
+    )
+    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    assert content.count("きさらぎ賞好走。") == 1
+
+
 # 正常系
 def test_generate_predict_uses_default_data_dir_when_env_not_set(
     dirs: tuple[str, str], monkeypatch: pytest.MonkeyPatch
