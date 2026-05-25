@@ -9,7 +9,13 @@ import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 
-from scripts.tfjv import race_code_to_tfjv, read_kek_comments, read_marks, um_dat_path
+from scripts.tfjv import (
+    race_code_to_tfjv,
+    read_kek_comments,
+    read_marks,
+    um_dat_path,
+    um_dat_record_no,
+)
 
 load_dotenv(find_dotenv())
 
@@ -48,9 +54,8 @@ def generate_predict(race_code: str) -> None:
 
     entry_df = di.get_entry(race_code)
 
-    race_no = int(race_code[14:16])
     dat_path = um_dat_path(race_code, tfjv_data_dir)
-    marks = read_marks(dat_path, race_no)
+    marks = read_marks(dat_path, um_dat_record_no(race_code))
 
     points = _load_points(race_name)
     marks_section = _build_marks_section(marks, entry_df)
