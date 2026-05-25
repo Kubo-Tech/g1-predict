@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_chakusa_code
+
 from scripts.tfjv import race_code_to_tfjv, write_kek_comment
 
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
