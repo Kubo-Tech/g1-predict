@@ -1,7 +1,7 @@
 """read_marks の単体テスト。"""
 import pytest
 
-from scripts.tfjv import LINE_WIDTH, MARK_BYTES, MARK_LINE, RECORD_SIZE, read_marks
+from scripts.tfjv import MARK_LINE, read_marks
 
 
 def _build_um_dat(marks: dict[int, bytes]) -> bytes:

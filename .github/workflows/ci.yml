@@ -39,6 +39,7 @@ jobs:
             darglint \
             mypy \
             pytest
+          pip install -r requirements.txt
 
       - name: isort
         run: isort --profile=black --line-length=100 --check-only --diff scripts/ test/
@@ -55,4 +56,4 @@ jobs:
         run: mypy scripts/ --ignore-missing-imports
 
       - name: pytest
-        run: pytest
+        run: pytest test/unit
