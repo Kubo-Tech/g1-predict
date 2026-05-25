@@ -6,7 +6,6 @@ from typing import Any
 import pandas as pd
 from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_chakusa_code
-
 from scripts.tfjv import race_code_to_tfjv, write_kek_comment
 
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
@@ -27,10 +26,18 @@ def generate_result_comments(race_code: str, base_dir: str) -> None:
     venue, year2, tfjv_code = race_code_to_tfjv(race_code)
     race_no = int(race_code[14:16])
 
+    second = result_df[result_df["確定着順"] == 2].iloc[0]
+    second_time_diff = float(second["タイム差"])
+    second_margin_code = second["着差コード1"]
+
     for _, row in result_df.iterrows():
         chakusa = int(row["確定着順"])
-        time_diff = float(row["タイム差"])
-        margin_code = row["着差コード1"]
+        if chakusa == 1:
+            time_diff = second_time_diff
+            margin_code = second_margin_code
+        else:
+            time_diff = float(row["タイム差"])
+            margin_code = row["着差コード1"]
         umaban = int(row["馬番"])
         gap = _determine_gap(time_diff, margin_code)
         comment = f"[{race_name}] {gap}{chakusa}着。"
