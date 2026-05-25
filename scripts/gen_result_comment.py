@@ -35,7 +35,8 @@ def generate_result_comments(race_code: str, base_dir: str) -> None:
 
     for _, row in result_df.iterrows():
         umaban = int(row["馬番"])
-        ijo_code = str(row["異常区分コード"]) if pd.notna(row["異常区分コード"]) else "0"
+        raw = row.get("異常区分コード")
+        ijo_code = str(int(float(raw))) if pd.notna(raw) else "0"
         if ijo_code in _ABNORMAL_CODES:
             comment = f"[{race_name}] {convert_ijo_kubun_code(ijo_code)}"
         else:
