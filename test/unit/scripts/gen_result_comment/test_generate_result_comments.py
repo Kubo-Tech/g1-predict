@@ -26,7 +26,8 @@ def _make_mock_di(race_name: str, result_rows: list[dict]) -> MagicMock:
 def _read_kek_com(base_dir: str, venue: str, year2: str, tfjv_code: str) -> list[str]:
     """KEK_COM ファイルの行一覧を返す。"""
     fpath = f"{base_dir}/KEK_COM/20{year2}/KC{venue}{year2}{tfjv_code}.DAT"
-    return open(fpath, "rb").read().decode("shift_jis").splitlines()
+    with open(fpath, "rb") as f:
+        return f.read().decode("shift_jis").splitlines()
 
 
 # 正常系
