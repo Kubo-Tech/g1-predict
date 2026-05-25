@@ -5,13 +5,13 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from scripts.gen_predict import generate_predict
+from scripts.gen_predict import _DEFAULT_DATA_DIR, generate_predict
 
 
 def _make_mock_di(
     race_name: str = "天皇賞春",
     year: str = "2026",
-    horses: list[dict] | None = None,
+    horses: list[dict[str, object]] | None = None,
 ) -> MagicMock:
     """DataInterface のモックを生成する。"""
     if horses is None:
@@ -415,11 +415,11 @@ def test_generate_predict_uses_default_points_when_template_missing(
     assert "先行有利" not in content
 
 
-# 準正常系
-def test_generate_predict_raises_when_tfjv_data_dir_not_set(
+# 正常系
+def test_generate_predict_uses_default_data_dir_when_env_not_set(
     dirs: tuple[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """TFJV_DATA_DIR が設定されていない場合 EnvironmentError が発生する。"""
+    """TFJV_DATA_DIR が設定されていない場合、デフォルトのデータディレクトリが使われる。"""
     public_dir, templates_dir = dirs
     mock_di = _make_mock_di()
     monkeypatch.delenv("TFJV_DATA_DIR", raising=False)
@@ -427,6 +427,10 @@ def test_generate_predict_raises_when_tfjv_data_dir_not_set(
         patch("scripts.gen_predict.DataInterface", return_value=mock_di),
         patch("scripts.gen_predict._PUBLIC_DIR", public_dir),
         patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
-        pytest.raises(EnvironmentError),
+        patch("scripts.gen_predict.read_marks", return_value={}) as mock_read_marks,
+        patch("scripts.gen_predict.read_kek_comments", return_value={}),
+        patch("scripts.gen_predict.um_dat_path", return_value="/fake/path") as mock_um_dat_path,
     ):
         generate_predict("2026013105010110")
+        mock_um_dat_path.assert_called_once_with("2026013105010110", _DEFAULT_DATA_DIR)
+        mock_read_marks.assert_called_once_with("/fake/path", 10)

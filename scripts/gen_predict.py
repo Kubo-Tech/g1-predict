@@ -6,13 +6,17 @@ import os
 import re
 
 import pandas as pd
+from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 
 from scripts.tfjv import race_code_to_tfjv, read_kek_comments, read_marks, um_dat_path
 
+load_dotenv(find_dotenv())
+
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
 _TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
+_DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
 _MARK_ORDER = ["◎", "○", "▲", "△", "注", "☆"]
 
@@ -34,13 +38,8 @@ def generate_predict(race_code: str) -> None:
 
     Args:
         race_code: 16桁 JRA-VAN 形式の race_code。
-
-    Raises:
-        EnvironmentError: TFJV_DATA_DIR が設定されていない場合。
     """
-    tfjv_data_dir = os.environ.get("TFJV_DATA_DIR")
-    if tfjv_data_dir is None:
-        raise EnvironmentError("TFJV_DATA_DIR environment variable is not set")
+    tfjv_data_dir = os.environ.get("TFJV_DATA_DIR", _DEFAULT_DATA_DIR)
 
     di = DataInterface("mykeibadb")
     race_info = di.get_race_basic_info(race_code)
