@@ -135,8 +135,12 @@ def _build_insight_section(
         lines.append("")
 
         past_df = di.get_past_performances(horse_id)
+        seen_race_codes: set[str] = set()
         for idx, (_, past_row) in enumerate(past_df.iterrows()):
             past_race_code = str(past_row["レースコード"])
+            if past_race_code in seen_race_codes:
+                continue
+            seen_race_codes.add(past_race_code)
             past_umaban = int(past_row["馬番"])
             past_race_no = int(past_race_code[14:16])
 
