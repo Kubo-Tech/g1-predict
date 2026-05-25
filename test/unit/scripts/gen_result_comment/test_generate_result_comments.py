@@ -18,7 +18,7 @@ def _make_kek_com(tmp_path: pytest.TempPathFactory, venue: str, year2: str, tfjv
 def _make_mock_di(race_name: str, result_rows: list[dict]) -> MagicMock:
     """DataInterface のモックを生成する。"""
     mock_di = MagicMock()
-    mock_di.get_race_basic_info.return_value = pd.DataFrame({"競走名本題": [race_name]})
+    mock_di.get_race_basic_info.return_value = pd.DataFrame({"競走名略称6文字": [race_name]})
     mock_di.get_result.return_value = pd.DataFrame(result_rows)
     return mock_di
 
@@ -51,13 +51,16 @@ def test_generate_result_comments_gap_format(
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
     mock_di = _make_mock_di(
         "クロッカスステークス",
-        [{"確定着順": 1, "タイム差": time_diff, "着差コード1": margin_code, "馬番": 2}],
+        [
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2},
+            {"確定着順": 2, "タイム差": time_diff, "着差コード1": margin_code, "馬番": 1},
+        ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
         generate_result_comments("2026013105010110", base_dir)
 
     lines = _read_kek_com(base_dir, "05", "26", "11")
-    assert len(lines) == 1
+    assert len(lines) == 2
     assert f'[クロッカスステークス] {expected_gap}1着。"' in lines[0]
 
 
@@ -68,7 +71,10 @@ def test_generate_result_comments_no_suffix_daisa(
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
     mock_di = _make_mock_di(
         "クロッカスステークス",
-        [{"確定着順": 1, "タイム差": 0.0, "着差コード1": "T__", "馬番": 2}],
+        [
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2},
+            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "T__", "馬番": 1},
+        ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
         generate_result_comments("2026013105010110", base_dir)
@@ -85,7 +91,10 @@ def test_generate_result_comments_no_suffix_dochaku(
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
     mock_di = _make_mock_di(
         "クロッカスステークス",
-        [{"確定着順": 1, "タイム差": 0.0, "着差コード1": "D__", "馬番": 2}],
+        [
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2},
+            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "D__", "馬番": 1},
+        ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
         generate_result_comments("2026013105010110", base_dir)
