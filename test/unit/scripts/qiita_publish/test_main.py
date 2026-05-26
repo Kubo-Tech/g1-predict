@@ -209,7 +209,7 @@ def test_main_retries_post_on_429(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 
 def test_main_raises_after_max_retries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """MAX_RETRIES 回リトライしても 429 が続く場合 HTTPError が発生する。"""
+    """MAX_ATTEMPTS 回試行しても 429 が続く場合 HTTPError が発生する。"""
     year_dir = tmp_path / "2026"
     path = _make_article(year_dir, "01_天皇賞春.md", "# content\n")
     monkeypatch.setattr(sys, "argv", ["qiita_publish.py", str(path)])
