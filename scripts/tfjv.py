@@ -43,7 +43,7 @@ def race_code_to_tfjv(race_code: str) -> tuple[str, str, str]:
 def um_dat_record_no(race_code: str) -> int:
     """UM*.DAT ファイル内のレコード番号（1始まり）を返す。
 
-    UM*.DAT は土曜（rec 1-12）・日曜（rec 13-24）の順にレコードが格納される。
+    UM*.DAT は土曜（rec = race_no）・日曜（rec = 9 + race_no）の順に格納される。
 
     Args:
         race_code: 16桁 JRA-VAN 形式の race_code。
