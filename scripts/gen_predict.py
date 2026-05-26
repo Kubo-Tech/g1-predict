@@ -165,6 +165,8 @@ def _build_insight_section(
 
 def _parse_kek_comment(comment: str) -> tuple[str, str]:
     if comment.startswith("["):
+        if "]" not in comment:
+            raise ValueError(f"Invalid kek comment format (missing ']'): {comment!r}")
         end = comment.index("]")
         race_name = comment[1:end]
         body = comment[end + 1 :].lstrip(" ")
