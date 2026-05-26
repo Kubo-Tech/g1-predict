@@ -14,7 +14,7 @@ import requests
 _QIITA_API_BASE: str = "https://qiita.com/api/v2"
 _TAGS: list[dict[str, str]] = [{"name": "競馬"}, {"name": "G1"}, {"name": "予想"}]
 _REQUEST_TIMEOUT: int = 30
-_MAX_RETRIES: int = 3
+_MAX_ATTEMPTS: int = 3
 _RETRY_WAIT: int = 60
 
 
@@ -101,14 +101,14 @@ def _save_ids(ids_path: Path, ids: dict[str, str]) -> None:
 
 def _request_with_retry(fn: Callable[[], Any]) -> Any:
     resp = fn()
-    for i in range(1, _MAX_RETRIES):
+    for i in range(1, _MAX_ATTEMPTS):
         if resp.status_code != 429:
             break
         try:
             wait = int(resp.headers.get("Retry-After", _RETRY_WAIT))
         except (ValueError, TypeError):
             wait = _RETRY_WAIT
-        print(f"Rate limited. Waiting {wait}s (retry {i}/{_MAX_RETRIES - 1})...")
+        print(f"Rate limited. Waiting {wait}s (retry {i}/{_MAX_ATTEMPTS - 1})...")
         time.sleep(wait)
         resp = fn()
     resp.raise_for_status()
