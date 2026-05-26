@@ -1,6 +1,7 @@
 """TFJVファイル操作の共通モジュール。"""
 
 import os
+from datetime import date
 
 VENUE_ABBR: dict[str, str] = {
     "01": "札",
@@ -39,6 +40,22 @@ def race_code_to_tfjv(race_code: str) -> tuple[str, str, str]:
     return venue, year2, tfjv_code
 
 
+def um_dat_record_no(race_code: str) -> int:
+    """UM*.DAT ファイル内のレコード番号（1始まり）を返す。
+
+    UM*.DAT は土曜（rec = race_no）・日曜（rec = 9 + race_no）の順に格納される。
+
+    Args:
+        race_code: 16桁 JRA-VAN 形式の race_code。
+    """
+    year = int(f"20{race_code[2:4]}")
+    month = int(race_code[4:6])
+    day = int(race_code[6:8])
+    race_no = int(race_code[14:16])
+    weekday = date(year, month, day).weekday()  # 5=土曜, 6=日曜
+    return (weekday - 5) * 9 + race_no
+
+
 def um_dat_path(race_code: str, base_dir: str) -> str:
     """UM*.DAT のフルパスを返す。
 
@@ -55,18 +72,18 @@ def um_dat_path(race_code: str, base_dir: str) -> str:
     return os.path.join(base_dir, filename)
 
 
-def read_marks(dat_path: str, race_no: int) -> dict[int, str]:
-    """race_no（1始まり）の印を {馬番: 印記号} で返す。"""
+def read_marks(dat_path: str, record_no: int) -> dict[int, str]:
+    """record_no（1始まり）の印を {馬番: 印記号} で返す。"""
     with open(dat_path, "rb") as f:
         data = f.read()
-    rec = data[(race_no - 1) * RECORD_SIZE : race_no * RECORD_SIZE]
+    rec = data[(record_no - 1) * RECORD_SIZE : record_no * RECORD_SIZE]
     mark_line = rec[MARK_LINE * LINE_WIDTH : MARK_LINE * LINE_WIDTH + 42]
     marks = {}
-    for i in range(21):
+    for i in range(3, 21):
         two_bytes = mark_line[i * 2 : i * 2 + 2]
         mark = MARK_BYTES.get(two_bytes)
         if mark:
-            marks[i + 1] = mark
+            marks[i - 2] = mark
     return marks
 
 

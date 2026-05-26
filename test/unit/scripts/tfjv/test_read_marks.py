@@ -11,7 +11,7 @@ def _build_um_dat(marks: dict[int, bytes]) -> bytes:
         if i == MARK_LINE:
             content = bytearray(b"\x20\x20" * 21)
             for umaban, mark_bytes in marks.items():
-                slot = umaban - 1
+                slot = umaban + 2
                 content[slot * 2] = mark_bytes[0]
                 content[slot * 2 + 1] = mark_bytes[1]
             lines.append(bytes(content) + b"\r\n")
@@ -31,7 +31,7 @@ def test_read_marks_returns_marked_horses(tmp_path: pytest.TempPathFactory) -> N
     dat = tmp_path / "UM261東.DAT"  # type: ignore[operator]
     dat.write_bytes(_build_um_dat(marks_input))
 
-    result = read_marks(str(dat), race_no=1)
+    result = read_marks(str(dat), record_no=1)
 
     assert result == {1: "◎", 3: "○", 5: "▲"}
 
@@ -41,17 +41,17 @@ def test_read_marks_returns_empty_when_no_marks(tmp_path: pytest.TempPathFactory
     dat = tmp_path / "UM261東.DAT"  # type: ignore[operator]
     dat.write_bytes(_build_um_dat({}))
 
-    result = read_marks(str(dat), race_no=1)
+    result = read_marks(str(dat), record_no=1)
 
     assert result == {}
 
 
 def test_read_marks_reads_correct_race_record(tmp_path: pytest.TempPathFactory) -> None:
-    """指定した race_no のレコードのみを読む。"""
+    """指定した record_no のレコードのみを読む。"""
     dat = tmp_path / "UM261東.DAT"  # type: ignore[operator]
-    record1 = _build_um_dat({2: bytes([0x81, 0x9D])})  # race_no=1: 2番◎
-    record2 = _build_um_dat({7: bytes([0x81, 0x9B])})  # race_no=2: 7番○
+    record1 = _build_um_dat({2: bytes([0x81, 0x9D])})  # record_no=1: 2番◎
+    record2 = _build_um_dat({7: bytes([0x81, 0x9B])})  # record_no=2: 7番○
     dat.write_bytes(record1 + record2)
 
-    assert read_marks(str(dat), race_no=1) == {2: "◎"}
-    assert read_marks(str(dat), race_no=2) == {7: "○"}
+    assert read_marks(str(dat), record_no=1) == {2: "◎"}
+    assert read_marks(str(dat), record_no=2) == {7: "○"}
