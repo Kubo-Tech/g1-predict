@@ -110,6 +110,7 @@ def _patch(item_id: str, payload: dict[str, Any], headers: dict[str, str]) -> No
         f"{_QIITA_API_BASE}/items/{item_id}",
         json=payload,
         headers=headers,
+        timeout=_REQUEST_TIMEOUT,
     )
     resp.raise_for_status()
     print(f"Updated: {payload['title']} (id={item_id})")

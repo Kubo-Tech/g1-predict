@@ -189,6 +189,15 @@ def test_main_post_uses_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert mock_post.call_args.kwargs["timeout"] is not None
 
 
+def test_main_patch_uses_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PATCH リクエストにタイムアウトが設定されている。"""
+    year_dir = tmp_path / "2026"
+    path = _make_article(year_dir, "01_天皇賞春.md", "# content\n")
+    _make_ids_file(year_dir, {"01_天皇賞春.md": "existing_id"})
+    _, mock_patch = _run(monkeypatch, [str(path)])
+    assert mock_patch.call_args.kwargs["timeout"] is not None
+
+
 # 準正常系
 def test_main_raises_when_token_not_set(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
