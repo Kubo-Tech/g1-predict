@@ -181,6 +181,14 @@ def test_main_handles_malformed_frontmatter(
     assert payload["body"] == content
 
 
+def test_main_post_uses_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST リクエストにタイムアウトが設定されている。"""
+    year_dir = tmp_path / "2026"
+    path = _make_article(year_dir, "01_天皇賞春.md", "# content\n")
+    mock_post, _ = _run(monkeypatch, [str(path)])
+    assert mock_post.call_args.kwargs["timeout"] is not None
+
+
 # 準正常系
 def test_main_raises_when_token_not_set(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

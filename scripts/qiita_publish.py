@@ -11,6 +11,7 @@ import requests
 
 _QIITA_API_BASE: str = "https://qiita.com/api/v2"
 _TAGS: list[dict[str, str]] = [{"name": "競馬"}, {"name": "G1"}, {"name": "予想"}]
+_REQUEST_TIMEOUT: int = 30
 
 
 def main() -> None:
@@ -95,7 +96,9 @@ def _save_ids(ids_path: Path, ids: dict[str, str]) -> None:
 
 
 def _post(payload: dict[str, Any], headers: dict[str, str]) -> str:
-    resp = requests.post(f"{_QIITA_API_BASE}/items", json=payload, headers=headers)
+    resp = requests.post(
+        f"{_QIITA_API_BASE}/items", json=payload, headers=headers, timeout=_REQUEST_TIMEOUT
+    )
     resp.raise_for_status()
     item_id: str = resp.json()["id"]
     print(f"Posted: {payload['title']} (id={item_id})")
