@@ -72,11 +72,11 @@ def um_dat_path(race_code: str, base_dir: str) -> str:
     return os.path.join(base_dir, filename)
 
 
-def read_marks(dat_path: str, race_no: int) -> dict[int, str]:
-    """race_no（1始まり）の印を {馬番: 印記号} で返す。"""
+def read_marks(dat_path: str, record_no: int) -> dict[int, str]:
+    """record_no（1始まり）の印を {馬番: 印記号} で返す。"""
     with open(dat_path, "rb") as f:
         data = f.read()
-    rec = data[(race_no - 1) * RECORD_SIZE : race_no * RECORD_SIZE]
+    rec = data[(record_no - 1) * RECORD_SIZE : record_no * RECORD_SIZE]
     mark_line = rec[MARK_LINE * LINE_WIDTH : MARK_LINE * LINE_WIDTH + 42]
     marks = {}
     for i in range(3, 21):
