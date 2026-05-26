@@ -29,7 +29,15 @@ def _load_ids_file(year_dir: Path) -> dict[str, str]:
 
 def _mock_post_resp(item_id: str = "abc123") -> MagicMock:
     resp = MagicMock()
+    resp.status_code = 200
     resp.json.return_value = {"id": item_id}
+    return resp
+
+
+def _mock_rate_limit_resp() -> MagicMock:
+    resp = MagicMock()
+    resp.status_code = 429
+    resp.headers = {}
     return resp
 
 
@@ -45,6 +53,7 @@ def _run(
     if post_response is None:
         post_response = _mock_post_resp()
     patch_response = MagicMock()
+    patch_response.status_code = 200
     with (
         patch("scripts.qiita_publish.requests.post", return_value=post_response) as mock_post,
         patch("scripts.qiita_publish.requests.patch", return_value=patch_response) as mock_patch,
@@ -179,6 +188,40 @@ def test_main_handles_malformed_frontmatter(
     payload = mock_post.call_args.kwargs["json"]
     assert payload["title"] == "天皇賞春2026"
     assert payload["body"] == content
+
+
+def test_main_retries_post_on_429(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST が 429 を返した後リトライして成功する。"""
+    year_dir = tmp_path / "2026"
+    path = _make_article(year_dir, "01_天皇賞春.md", "# content\n")
+    monkeypatch.setattr(sys, "argv", ["qiita_publish.py", str(path)])
+    monkeypatch.setenv("QIITA_ACCESS_TOKEN", "fake_token")
+    with (
+        patch(
+            "scripts.qiita_publish.requests.post",
+            side_effect=[_mock_rate_limit_resp(), _mock_post_resp("retry_id")],
+        ),
+        patch("scripts.qiita_publish.time.sleep") as mock_sleep,
+    ):
+        main()
+    mock_sleep.assert_called_once()
+    assert _load_ids_file(year_dir)["01_天皇賞春.md"] == "retry_id"
+
+
+def test_main_raises_after_max_retries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """MAX_ATTEMPTS 回試行しても 429 が続く場合 HTTPError が発生する。"""
+    year_dir = tmp_path / "2026"
+    path = _make_article(year_dir, "01_天皇賞春.md", "# content\n")
+    monkeypatch.setattr(sys, "argv", ["qiita_publish.py", str(path)])
+    monkeypatch.setenv("QIITA_ACCESS_TOKEN", "fake_token")
+    rate_limit_resp = _mock_rate_limit_resp()
+    rate_limit_resp.raise_for_status.side_effect = requests_mod.HTTPError("429")
+    with (
+        patch("scripts.qiita_publish.requests.post", return_value=rate_limit_resp),
+        patch("scripts.qiita_publish.time.sleep"),
+    ):
+        with pytest.raises(requests_mod.HTTPError):
+            main()
 
 
 def test_main_post_uses_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
