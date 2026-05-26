@@ -104,7 +104,10 @@ def _request_with_retry(fn: Callable[[], Any]) -> Any:
     for i in range(1, _MAX_RETRIES):
         if resp.status_code != 429:
             break
-        wait = int(resp.headers.get("Retry-After", _RETRY_WAIT))
+        try:
+            wait = int(resp.headers.get("Retry-After", _RETRY_WAIT))
+        except (ValueError, TypeError):
+            wait = _RETRY_WAIT
         print(f"Rate limited. Waiting {wait}s (retry {i}/{_MAX_RETRIES - 1})...")
         time.sleep(wait)
         resp = fn()
