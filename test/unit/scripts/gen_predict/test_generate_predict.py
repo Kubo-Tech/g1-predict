@@ -213,7 +213,7 @@ def test_generate_predict_insight_section_past_comment_zenzensou(
     mock_di = _make_mock_di(horses=horses)
     mock_di.get_past_performances.return_value = pd.DataFrame(
         {
-            "レースコード": ["2025060205021011", "2025050205021011"],
+            "レースコード": ["2025060205021011", "2025060205011011"],
             "馬番": [5, 5],
         }
     )
@@ -243,9 +243,9 @@ def test_generate_predict_insight_section_ordinal_3plus(
     mock_di.get_past_performances.return_value = pd.DataFrame(
         {
             "レースコード": [
-                "2025070205021011",
+                "2025060205031011",
                 "2025060205021011",
-                "2025050205021011",
+                "2025060205011011",
             ],
             "馬番": [1, 1, 1],
         }
@@ -275,7 +275,7 @@ def test_generate_predict_insight_race_without_comment_counted_in_ordinal(
     mock_di = _make_mock_di(horses=horses)
     mock_di.get_past_performances.return_value = pd.DataFrame(
         {
-            "レースコード": ["2025060205021011", "2025050205021011"],
+            "レースコード": ["2025060205021011", "2025060205011011"],
             "馬番": [3, 3],
         }
     )
