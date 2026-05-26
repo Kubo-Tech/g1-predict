@@ -1,0 +1,26 @@
+# バイトコード
+__pycache__/
+*.py[cod]
+
+# パッケージング
+build/
+dist/
+*.egg-info/
+
+# テスト・カバレッジ
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# 型チェック
+.mypy_cache/
+
+# 仮想環境
+.venv/
+venv/
+
+# 環境変数
+.env
+
+# TFJVデータ（ボリュームマウント）
+MY_DATA/

@@ -1,0 +1,145 @@
+"""TFJVファイル操作の共通モジュール。"""
+
+import os
+from datetime import date
+
+VENUE_ABBR: dict[str, str] = {
+    "01": "札",
+    "02": "函",
+    "03": "福",
+    "04": "新",
+    "05": "東",
+    "06": "中",
+    "07": "名",
+    "08": "京",
+    "09": "阪",
+    "10": "小",
+}
+
+MARK_BYTES: dict[bytes, str] = {
+    bytes([0x81, 0x9D]): "◎",
+    bytes([0x81, 0x9B]): "○",
+    bytes([0x81, 0xA3]): "▲",
+    bytes([0x81, 0xA2]): "△",
+    bytes([0x92, 0x8D]): "注",
+    bytes([0x81, 0x99]): "☆",
+}
+
+RECORD_SIZE = 264
+LINE_WIDTH = 44
+MARK_LINE = 4
+
+
+def race_code_to_tfjv(race_code: str) -> tuple[str, str, str]:
+    """16桁 race_code を (競馬場コード, YY, 開催コード16進) に変換する。"""
+    venue = race_code[8:10]
+    year2 = race_code[2:4]
+    kai = int(race_code[10:12])
+    nichi = int(race_code[12:14])
+    tfjv_code = f"{kai:X}{nichi:X}"
+    return venue, year2, tfjv_code
+
+
+def um_dat_record_no(race_code: str) -> int:
+    """UM*.DAT ファイル内のレコード番号（1始まり）を返す。
+
+    UM*.DAT は土曜（rec = race_no）・日曜（rec = 9 + race_no）の順に格納される。
+
+    Args:
+        race_code: 16桁 JRA-VAN 形式の race_code。
+    """
+    year = int(f"20{race_code[2:4]}")
+    month = int(race_code[4:6])
+    day = int(race_code[6:8])
+    race_no = int(race_code[14:16])
+    weekday = date(year, month, day).weekday()  # 5=土曜, 6=日曜
+    return (weekday - 5) * 9 + race_no
+
+
+def um_dat_path(race_code: str, base_dir: str) -> str:
+    """UM*.DAT のフルパスを返す。
+
+    Raises:
+        ValueError: 未対応の競馬場コードの場合。
+    """
+    year2 = race_code[2:4]
+    kai = int(race_code[10:12])
+    venue = race_code[8:10]
+    abbr = VENUE_ABBR.get(venue)
+    if abbr is None:
+        raise ValueError(f"Unsupported venue code: {venue!r}")
+    filename = f"UM{year2}{kai}{abbr}.DAT"
+    return os.path.join(base_dir, filename)
+
+
+def read_marks(dat_path: str, record_no: int) -> dict[int, str]:
+    """record_no（1始まり）の印を {馬番: 印記号} で返す。"""
+    with open(dat_path, "rb") as f:
+        data = f.read()
+    rec = data[(record_no - 1) * RECORD_SIZE : record_no * RECORD_SIZE]
+    mark_line = rec[MARK_LINE * LINE_WIDTH : MARK_LINE * LINE_WIDTH + 42]
+    marks = {}
+    for i in range(3, 21):
+        two_bytes = mark_line[i * 2 : i * 2 + 2]
+        mark = MARK_BYTES.get(two_bytes)
+        if mark:
+            marks[i - 2] = mark
+    return marks
+
+
+def find_kek_com_file(base_dir: str, venue: str, year2: str, tfjv_code: str) -> str | None:
+    """KC*.DAT のパスを返す。存在しない場合は None。"""
+    path = os.path.join(base_dir, "KEK_COM", f"20{year2}", f"KC{venue}{year2}{tfjv_code}.DAT")
+    return path if os.path.isfile(path) else None
+
+
+def read_kek_comments(
+    base_dir: str, venue: str, year2: str, tfjv_code: str, race_no: int
+) -> dict[int, str]:
+    """指定レースの全馬コメントを {馬番: コメント} で返す。"""
+    fpath = find_kek_com_file(base_dir, venue, year2, tfjv_code)
+    if fpath is None:
+        return {}
+    with open(fpath, "rb") as f:
+        data = f.read()
+    text = data.decode("shift_jis", errors="replace")
+    rr = f"{race_no:02d}"
+    prefix = f"{venue}{year2}{tfjv_code}{rr}"
+    result = {}
+    for line in text.splitlines():
+        if not line.startswith(prefix):
+            continue
+        comma = line.index(",")
+        hh = int(line[len(prefix) : len(prefix) + 2])
+        comment = line[comma + 1 :].strip('"')
+        result[hh] = comment
+    return result
+
+
+def write_kek_comment(
+    base_dir: str,
+    venue: str,
+    year2: str,
+    tfjv_code: str,
+    race_no: int,
+    umaban: int,
+    comment: str,
+) -> None:
+    """KEK_COM に1行追記する。
+
+    Raises:
+        FileNotFoundError: 対象の KEK_COM ファイルが存在しない場合。
+        ValueError: コメントに二重引用符または改行が含まれる場合。
+    """
+    if '"' in comment:
+        raise ValueError(f"Comment must not contain double quotes: {comment!r}")
+    comment = comment.replace("\r", "").replace("\n", "")
+    fpath = find_kek_com_file(base_dir, venue, year2, tfjv_code)
+    if fpath is None:
+        raise FileNotFoundError(f"KEK_COM file not found: {venue}{year2}{tfjv_code}")
+    rr = f"{race_no:02d}"
+    hh = f"{umaban:02d}"
+    key = f"{venue}{year2}{tfjv_code}{rr}{hh}"
+    entry = f'{key},"{comment}"\r\n'
+    with open(fpath, "ab") as f:
+        f.write(entry.encode("shift_jis"))

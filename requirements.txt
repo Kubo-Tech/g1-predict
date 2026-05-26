@@ -1,0 +1,4 @@
+git+https://github.com/KeibaAI-developer/keiba-data-interface.git
+git+https://github.com/KeibaAI-developer/mykeibadb-python.git
+python-dotenv
+requests
