@@ -15,5 +15,5 @@ from scripts.tfjv import um_dat_record_no
     ],
 )
 def test_um_dat_record_no_returns_correct_record_no(race_code: str, expected: int) -> None:
-    """土曜は race_no そのまま、日曜は 12+race_no のレコード番号を返す。"""
+    """土曜は race_no そのまま、日曜は 9+race_no のレコード番号を返す。"""
     assert um_dat_record_no(race_code) == expected
