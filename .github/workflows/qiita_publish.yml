@@ -25,9 +25,14 @@ jobs:
         env:
           QIITA_ACCESS_TOKEN: ${{ secrets.QIITA_ACCESS_TOKEN }}
         run: |
-          CHANGED=$(git -c core.quotepath=false diff --name-only HEAD~1 HEAD -- 'public/**/*.md')
+          BEFORE="${{ github.event.before }}"
+          SHA="${{ github.sha }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+          fi
+          CHANGED=$(git -c core.quotepath=false diff --name-only --diff-filter=AM "$BEFORE" "$SHA" -- 'public/**/*.md')
           while IFS= read -r f; do
-            python scripts/qiita_publish.py "$f"
+            [ -n "$f" ] && python scripts/qiita_publish.py "$f"
           done <<< "$CHANGED"
 
       - name: Commit .qiita_ids.json
