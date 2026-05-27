@@ -7,12 +7,12 @@ python -m scripts.gen_predict --race-code <16桁 race_code>
 
 import argparse
 import os
-import re
 
 import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 
+from scripts.md_utils import replace_section
 from scripts.tfjv import (
     race_code_to_tfjv,
     read_kek_comments,
@@ -186,15 +186,10 @@ def _render_from_template(
     with open(template_path, encoding="utf-8") as f:
         content = f.read()
     content = content.replace("{RaceName}", race_name).replace("{Year}", year)
-    content = _replace_section(content, "## ポイント", points_section)
-    content = _replace_section(content, "## 印", marks_section)
-    content = _replace_section(content, "## 見解", insight_section)
+    content = replace_section(content, "## ポイント", points_section)
+    content = replace_section(content, "## 印", marks_section)
+    content = replace_section(content, "## 見解", insight_section)
     return content
-
-
-def _replace_section(content: str, header: str, new_section: str) -> str:
-    pattern = re.compile(rf"(?ms)^{re.escape(header)}\n.*?(?=^## |\Z)")
-    return pattern.sub(new_section.rstrip("\n") + "\n\n", content)
 
 
 if __name__ == "__main__":

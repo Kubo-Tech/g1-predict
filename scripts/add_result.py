@@ -8,13 +8,13 @@ python -m scripts.add_result --race-code <16桁 race_code>
 import argparse
 import glob
 import os
-import re
 
 import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_ijo_kubun_code
 
+from scripts.md_utils import replace_section
 from scripts.tfjv import (
     race_code_to_tfjv,
     read_kek_comments,
@@ -66,8 +66,8 @@ def add_result(race_code: str) -> None:
     with open(md_path, encoding="utf-8") as f:
         content = f.read()
 
-    content = _replace_section(content, "## 結果", result_section)
-    content = _replace_section(content, "## 回顧", review_section)
+    content = replace_section(content, "## 結果", result_section)
+    content = replace_section(content, "## 回顧", review_section)
 
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(content)
@@ -170,11 +170,6 @@ def _extract_comment_body(raw_comment: str) -> str:
 
 def _format_comment_body(comment: str) -> str:
     return comment.replace("。", "。  \n").rstrip("\n")
-
-
-def _replace_section(content: str, header: str, new_section: str) -> str:
-    pattern = re.compile(rf"(?ms)^{re.escape(header)}\n.*?(?=^## |\Z)")
-    return pattern.sub(new_section.rstrip("\n") + "\n\n", content)
 
 
 if __name__ == "__main__":
