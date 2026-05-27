@@ -449,4 +449,4 @@ def test_generate_predict_uses_default_data_dir_when_env_not_set(
     ):
         generate_predict("2026013105010110")
         mock_um_dat_path.assert_called_once_with("2026013105010110", _DEFAULT_DATA_DIR)
-        mock_read_marks.assert_called_once_with("/fake/path", 10)
+        mock_read_marks.assert_called_once_with("/fake/path", 1)
