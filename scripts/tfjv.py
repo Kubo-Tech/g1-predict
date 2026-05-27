@@ -1,7 +1,6 @@
 """TFJVファイル操作の共通モジュール。"""
 
 import os
-from datetime import date
 
 VENUE_ABBR: dict[str, str] = {
     "01": "札",
@@ -23,6 +22,7 @@ MARK_BYTES: dict[bytes, str] = {
     bytes([0x81, 0xA2]): "△",
     bytes([0x92, 0x8D]): "注",
     bytes([0x81, 0x99]): "☆",
+    bytes([0x81, 0x9F]): "◆",
 }
 
 RECORD_SIZE = 264
@@ -43,17 +43,14 @@ def race_code_to_tfjv(race_code: str) -> tuple[str, str, str]:
 def um_dat_record_no(race_code: str) -> int:
     """UM*.DAT ファイル内のレコード番号（1始まり）を返す。
 
-    UM*.DAT は土曜（rec = race_no）・日曜（rec = 9 + race_no）の順に格納される。
+    レコード番号 = 2 * nichi + race_no - 11。
 
     Args:
         race_code: 16桁 JRA-VAN 形式の race_code。
     """
-    year = int(f"20{race_code[2:4]}")
-    month = int(race_code[4:6])
-    day = int(race_code[6:8])
+    nichi = int(race_code[12:14])
     race_no = int(race_code[14:16])
-    weekday = date(year, month, day).weekday()  # 5=土曜, 6=日曜
-    return (weekday - 5) * 9 + race_no
+    return 2 * nichi + race_no - 11
 
 
 def um_dat_path(race_code: str, base_dir: str) -> str:

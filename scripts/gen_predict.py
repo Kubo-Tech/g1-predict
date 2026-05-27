@@ -1,7 +1,11 @@
-"""予想記事ベースを生成するスクリプト。"""
+"""予想記事ベースを生成するスクリプト。
+
+コマンド:
+cd path/to/g1-predict
+python -m scripts.gen_predict --race-code <16桁 race_code>
+"""
 
 import argparse
-import glob
 import os
 import re
 
@@ -62,10 +66,9 @@ def generate_predict(race_code: str) -> None:
     insight_section = _build_insight_section(marks, entry_df, di, tfjv_data_dir)
     content = _render_from_template(race_name, year, points, marks_section, insight_section)
 
-    nn = _next_serial(year, _PUBLIC_DIR)
     year_dir = os.path.join(_PUBLIC_DIR, year)
     os.makedirs(year_dir, exist_ok=True)
-    output_path = os.path.join(year_dir, f"{nn}_{race_name}.md")
+    output_path = os.path.join(year_dir, f"{race_code}_{race_name}.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"Generated: {output_path}")
@@ -77,16 +80,6 @@ def main() -> None:
     parser.add_argument("--race-code", required=True, help="16桁 race_code")
     args = parser.parse_args()
     generate_predict(args.race_code)
-
-
-def _next_serial(year: str, public_dir: str) -> str:
-    files = glob.glob(os.path.join(public_dir, year, "*.md"))
-    nums = [
-        int(m.group(1))
-        for f in files
-        if (m := re.match(r"(\d+)_", os.path.basename(f)))
-    ]
-    return f"{max(nums) + 1:02d}" if nums else "01"
 
 
 def _load_points(race_name: str) -> str:
