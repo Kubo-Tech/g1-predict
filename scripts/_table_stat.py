@@ -3,6 +3,7 @@
 from typing import Any
 
 import pandas as pd
+
 from scripts._table_data_cache import TableDataCache
 from scripts._table_utils import aggregate_stat, filter_by_horse, is_na, stat_result, to_cell_value
 

@@ -7,6 +7,7 @@ from keiba_data_interface.providers.mykeibadb_converters.convert_race_basic_info
 )
 from keiba_data_interface.schema.columns import RACE_BASIC_INFO_COLUMNS
 from mykeibadb import MasterGetter, RaceGetter, ShussobetsuGetter
+
 from scripts._table_utils import DIRT_TRACK_CODES, SHIBA_TRACK_CODES, year_range
 
 

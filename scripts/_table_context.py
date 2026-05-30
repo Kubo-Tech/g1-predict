@@ -4,6 +4,7 @@ from typing import Any
 
 import pandas as pd
 from keiba_data_interface import DataInterface
+
 from scripts._table_data_cache import TableDataCache
 from scripts._table_stat import (
     kishu_continuity,

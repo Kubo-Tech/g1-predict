@@ -15,6 +15,7 @@ from keiba_data_interface import DataInterface
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
+
 from scripts._table_context import TableContext
 from scripts._table_utils import HEADER_FILL, WAKU_FILLS, apply_color_rules, is_na, to_cell_value
 
