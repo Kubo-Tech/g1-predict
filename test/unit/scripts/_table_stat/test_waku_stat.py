@@ -60,3 +60,11 @@ def test_waku_stat_returns_none_when_hist_empty(mock_cache: MagicMock) -> None:
     mock_cache.get_umagoto_df.return_value = make_umagoto_row(_HORSE_ID, wakuban=3)
     mock_cache.get_course_umagoto_df.return_value = pd.DataFrame()
     assert waku_stat(_HORSE_ID, _SOURCE_BASE, mock_cache) is None
+
+
+def test_waku_stat_zero_chakujun_not_counted_as_top3(mock_cache: MagicMock) -> None:
+    """kakutei_chakujun=0（着順未確定）はtop3にカウントしない。"""
+    mock_cache.get_umagoto_df.return_value = make_umagoto_row(_HORSE_ID, wakuban=3)
+    mock_cache.get_course_umagoto_df.return_value = _hist_df([3, 3], [0, 11])
+    result = waku_stat(_HORSE_ID, {**_SOURCE_BASE, "stat": "top3"}, mock_cache)
+    assert result == 0

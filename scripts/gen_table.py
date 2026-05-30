@@ -70,10 +70,6 @@ def main() -> None:
     generate_table(args.race_code)
 
 
-if __name__ == "__main__":
-    main()
-
-
 def _write_xlsx(
     rows: list[dict[str, Any]],
     col_configs: list[dict[str, Any]],
@@ -141,3 +137,7 @@ def _write_xlsx(
     wb.save(output_path)
     print(f"生成完了: {output_path}")
     return output_path
+
+
+if __name__ == "__main__":
+    main()
