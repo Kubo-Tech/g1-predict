@@ -139,6 +139,7 @@ def _build_insight_section(
             if race_key in seen_race_codes:
                 continue
             seen_race_codes.add(race_key)
+            count += 1
             past_umaban = int(past_row["馬番"])
             past_race_no = int(past_race_code[14:16])
 
@@ -154,7 +155,6 @@ def _build_insight_section(
 
             comment = comments[past_umaban]
             race_name, body = _parse_kek_comment(comment)
-            count += 1
             ordinal = _format_ordinal(count)
             lines.append(f"{ordinal}{grade}{race_name}{body}  ")
 
