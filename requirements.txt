@@ -1,4 +1,6 @@
 git+https://github.com/KeibaAI-developer/keiba-data-interface.git
 git+https://github.com/KeibaAI-developer/mykeibadb-python.git
+openpyxl
 python-dotenv
+pyyaml
 requests
