@@ -39,3 +39,15 @@ def test_aggregate_stat_without_chakujun_column() -> None:
     """kakutei_chakujunカラムがなくてもゼロ系統計を返す。"""
     df = pd.DataFrame({"other_col": [1, 2, 3]})
     assert aggregate_stat(df, "wins") == 0
+
+
+def test_aggregate_stat_zero_chakujun_not_counted_as_top3() -> None:
+    """kakutei_chakujun=0（着順未確定）はtop3にカウントしない。"""
+    df = pd.DataFrame({"kakutei_chakujun": [0, 0, 11]})
+    assert aggregate_stat(df, "top3") == 0
+
+
+def test_aggregate_stat_zero_chakujun_not_counted_as_win() -> None:
+    """kakutei_chakujun=0（着順未確定）はwinsにカウントしない。"""
+    df = pd.DataFrame({"kakutei_chakujun": [0, 0]})
+    assert aggregate_stat(df, "wins") == 0

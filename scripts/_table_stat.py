@@ -52,7 +52,7 @@ def waku_stat(horse_id: str, source: dict[str, Any], cache: TableDataCache) -> A
         waku_df.get("kakutei_chakujun", pd.Series(dtype="float64")), errors="coerce"
     )
     wins = int((kakutei == 1).sum())
-    top3 = int((kakutei <= 3).sum())
+    top3 = int(((kakutei >= 1) & (kakutei <= 3)).sum())
     return stat_result(stat, wins, top3, total)
 
 
