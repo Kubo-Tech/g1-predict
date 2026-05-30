@@ -11,7 +11,6 @@ import os
 import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
-
 from scripts.md_utils import replace_section
 from scripts.tfjv import (
     race_code_to_tfjv,
@@ -28,7 +27,7 @@ _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
 _TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
-_MARK_ORDER = ["◎", "○", "▲", "△", "注", "☆"]
+_MARK_ORDER = ["◎", "○", "▲", "△", "◆", "☆", "注"]
 
 _GRADE_CODE_DISPLAY: dict[str, str] = {
     "A": "G1",
@@ -63,7 +62,7 @@ def generate_predict(race_code: str) -> None:
 
     points = _load_points(race_name)
     marks_section = _build_marks_section(marks, entry_df)
-    insight_section = _build_insight_section(marks, entry_df, di, tfjv_data_dir)
+    insight_section = _build_insight_section(marks, entry_df, di, tfjv_data_dir, race_code)
     content = _render_from_template(race_name, year, points, marks_section, insight_section)
 
     year_dir = os.path.join(_PUBLIC_DIR, year)
@@ -113,6 +112,7 @@ def _build_insight_section(
     entry_df: pd.DataFrame,
     di: DataInterface,
     tfjv_data_dir: str,
+    race_code: str,
 ) -> str:
     horse_map = {
         int(row["馬番"]): (str(row["馬名"]), str(row["血統登録番号"]))
@@ -129,8 +129,11 @@ def _build_insight_section(
 
         past_df = di.get_past_performances(horse_id)
         seen_race_codes: set[str] = set()
-        for idx, (_, past_row) in enumerate(past_df.iterrows()):
+        count = 0
+        for _, past_row in past_df.iterrows():
             past_race_code = str(past_row["レースコード"])
+            if past_race_code >= race_code:
+                continue
             race_key = past_race_code[:4] + past_race_code[8:]
             if race_key in seen_race_codes:
                 continue
@@ -150,8 +153,9 @@ def _build_insight_section(
 
             comment = comments[past_umaban]
             race_name, body = _parse_kek_comment(comment)
-            ordinal = _format_ordinal(idx + 1)
-            lines.append(f"{ordinal}{grade}{race_name}{body}")
+            count += 1
+            ordinal = _format_ordinal(count)
+            lines.append(f"{ordinal}{grade}{race_name}{body}  ")
 
     return "\n".join(lines)
 
