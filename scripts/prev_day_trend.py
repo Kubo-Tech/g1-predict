@@ -114,6 +114,9 @@ def _get_prev_day_matched_races(
     keibajo_mask = raw["keibajo_code"].astype(str).str.strip() == keibajo_code
     raw = raw[keibajo_mask]
 
+    if raw.empty:
+        return raw
+
     # 障害コード（51-59）を除外し、平地の芝ダのみ対象とする
     barrier_codes = {str(code) for code in range(51, 60)}
     not_barrier = ~raw["track_code"].apply(lambda tc: str(tc).strip() in barrier_codes)
