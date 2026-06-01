@@ -279,8 +279,12 @@ def test_build_prev_day_trend_section_multiple_races_sorted_by_race_bango() -> N
     })
     race_3_info = _make_prev_race_info(race_no=3, condition_name="3R条件")
     race_8_info = _make_prev_race_info(race_no=8, condition_name="8R条件")
+    race_info_map = {
+        "2026050405010103": race_3_info,
+        "2026050405010108": race_8_info,
+    }
     mock_di = MagicMock()
-    mock_di.get_race_basic_info.side_effect = [race_3_info, race_8_info]
+    mock_di.get_race_basic_info.side_effect = lambda rc: race_info_map[rc]
     mock_di.get_result.return_value = _make_result_df()
 
     result = _call(raw_shosai=raw, mock_di=mock_di)
