@@ -4,6 +4,8 @@
 
 - 
 
+## 前日の傾向
+
 ## 印
 
 ◎{Umaban}{HorseName}  

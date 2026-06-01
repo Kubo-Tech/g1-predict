@@ -13,6 +13,7 @@ from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 
 from scripts.md_utils import replace_section
+from scripts.prev_day_trend import GRADE_CODE_DISPLAY, build_prev_day_trend_section
 from scripts.tfjv import (
     race_code_to_tfjv,
     read_kek_comments,
@@ -29,18 +30,6 @@ _TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
 _MARK_ORDER = ["◎", "○", "▲", "△", "◆", "☆", "注"]
-
-_GRADE_CODE_DISPLAY: dict[str, str] = {
-    "A": "G1",
-    "B": "G2",
-    "C": "G3",
-    "D": "重賞",
-    "E": "特別",
-    "F": "J・G1",
-    "G": "J・G2",
-    "H": "J・G3",
-    "L": "L",
-}
 
 
 def generate_predict(race_code: str) -> None:
@@ -62,9 +51,11 @@ def generate_predict(race_code: str) -> None:
     marks = read_marks(dat_path, um_dat_record_no(race_code))
 
     points = _load_points(race_name)
+    trend_section = build_prev_day_trend_section(race_code, race_info, di)
     marks_section = _build_marks_section(marks, entry_df)
     insight_section = _build_insight_section(marks, entry_df, di, tfjv_data_dir, race_code)
-    content = _render_from_template(race_name, year, points, marks_section, insight_section)
+    args = (race_name, year, points, trend_section, marks_section, insight_section)
+    content = _render_from_template(*args)
 
     year_dir = os.path.join(_PUBLIC_DIR, year)
     os.makedirs(year_dir, exist_ok=True)
@@ -151,7 +142,7 @@ def _build_insight_section(
 
             past_race_info = di.get_race_basic_info(past_race_code)
             grade_code = str(past_race_info["グレードコード"].iloc[0])
-            grade = _GRADE_CODE_DISPLAY.get(grade_code, "")
+            grade = GRADE_CODE_DISPLAY.get(grade_code, "")
 
             comment = comments[past_umaban]
             race_name, body = _parse_kek_comment(comment)
@@ -184,6 +175,7 @@ def _render_from_template(
     race_name: str,
     year: str,
     points_section: str,
+    trend_section: str,
     marks_section: str,
     insight_section: str,
 ) -> str:
@@ -192,6 +184,7 @@ def _render_from_template(
         content = f.read()
     content = content.replace("{RaceName}", race_name).replace("{Year}", year)
     content = replace_section(content, "## ポイント", points_section)
+    content = replace_section(content, "## 前日の傾向", trend_section)
     content = replace_section(content, "## 印", marks_section)
     content = replace_section(content, "## 見解", insight_section)
     return content
