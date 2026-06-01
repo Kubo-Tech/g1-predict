@@ -8,7 +8,7 @@ import pandas as pd
 from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_chakusa_code, convert_ijo_kubun_code
 
-from scripts.tfjv import race_code_to_tfjv, write_kek_comment
+from g1_predict.modules.utils.tfjv import race_code_to_tfjv, write_kek_comment
 
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 _NO_SUFFIX = {"大差", "同着"}

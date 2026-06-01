@@ -14,8 +14,8 @@ from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_ijo_kubun_code
 
-from scripts.md_utils import replace_section
-from scripts.tfjv import (
+from g1_predict.modules.utils.md_utils import replace_section
+from g1_predict.modules.utils.tfjv import (
     race_code_to_tfjv,
     read_kek_comments,
     read_marks,
