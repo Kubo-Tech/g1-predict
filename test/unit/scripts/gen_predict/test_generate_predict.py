@@ -41,6 +41,7 @@ def dirs(tmp_path: pytest.TempPathFactory) -> tuple[str, str]:
             "# {RaceName}{Year}\n\n"
             "## ポイント\n\n"
             "- \n\n"
+            "## 前日の傾向\n\n"
             "## 印\n\n"
             "◎{Umaban}{HorseName}  \n\n"
             "## 見解\n\n"
@@ -347,6 +348,28 @@ def test_generate_predict_insight_section_no_grade_for_general_race(
     )
     content = _read_output(public_dir, "2026", "2026013105010110_天皇賞春.md")
     assert "前走一般戦凡走。" in content
+
+
+def test_generate_predict_prev_day_trend_section_content_is_embedded(
+    dirs: tuple[str, str],
+) -> None:
+    """build_prev_day_trend_section の戻り値が前日の傾向セクションに埋め込まれる。"""
+    public_dir, templates_dir = dirs
+    with (
+        patch("scripts.gen_predict.DataInterface", return_value=_make_mock_di()),
+        patch("scripts.gen_predict._PUBLIC_DIR", public_dir),
+        patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
+        patch("scripts.gen_predict.read_marks", return_value={}),
+        patch("scripts.gen_predict.read_kek_comments", return_value={}),
+        patch(
+            "scripts.gen_predict.build_prev_day_trend_section",
+            return_value="## 前日の傾向\n\nダート先行有利\n",
+        ),
+        patch.dict("os.environ", {"TFJV_DATA_DIR": "/tmp/fake_tfjv"}),
+    ):
+        generate_predict("2026013105010110")
+    content = _read_output(public_dir, "2026", "2026013105010110_天皇賞春.md")
+    assert "ダート先行有利" in content
 
 
 def test_generate_predict_has_insight_section(dirs: tuple[str, str]) -> None:
