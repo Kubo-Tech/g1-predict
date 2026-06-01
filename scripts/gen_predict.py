@@ -11,6 +11,7 @@ import os
 import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
+
 from scripts.md_utils import replace_section
 from scripts.prev_day_trend import GRADE_CODE_DISPLAY, build_prev_day_trend_section
 from scripts.tfjv import (
