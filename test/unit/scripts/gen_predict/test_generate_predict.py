@@ -1,5 +1,6 @@
 """generate_predict の単体テスト。"""
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -31,10 +32,10 @@ def _make_mock_di(
 
 
 @pytest.fixture
-def dirs(tmp_path: pytest.TempPathFactory) -> tuple[str, str]:
+def dirs(tmp_path: Path) -> tuple[str, str]:
     """public・templates ディレクトリを用意する。"""
-    public_dir = str(tmp_path / "public")  # type: ignore[operator]
-    templates_dir = str(tmp_path / "templates")  # type: ignore[operator]
+    public_dir = str(tmp_path / "public")
+    templates_dir = str(tmp_path / "templates")
     os.makedirs(os.path.join(templates_dir, "points"))
     with open(os.path.join(templates_dir, "TEMPLATE_PREDICT.md"), "w", encoding="utf-8") as f:
         f.write(
