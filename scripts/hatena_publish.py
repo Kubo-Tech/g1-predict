@@ -16,7 +16,7 @@ from xml.etree import ElementTree
 import requests
 import yaml
 
-_FOTOLIFE_POST_URL = "http://f.hatena.ne.jp/atom/post"
+_FOTOLIFE_POST_URL = "https://f.hatena.ne.jp/atom/post"
 _ATOM_NS = "http://www.w3.org/2005/Atom"
 _APP_NS = "http://www.w3.org/2007/app"
 _HATENA_NS = "http://www.hatena.ne.jp/info/xmlns#"
