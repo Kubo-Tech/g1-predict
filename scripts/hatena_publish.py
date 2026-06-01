@@ -150,14 +150,19 @@ def main() -> None:
 def _get_changed_md_files(repo_dir: Path) -> list[Path]:
     """git diffで変更されたpublic配下のMarkdownファイルを取得する
 
+    環境変数 BEFORE_SHA / AFTER_SHA が設定されている場合はその範囲を使用する。
+    未設定の場合は HEAD~1..HEAD を使用する。
+
     Args:
         repo_dir (Path): リポジトリルートディレクトリ
 
     Returns:
         list[Path]: 変更されたMarkdownファイルの絶対パスリスト
     """
+    before_sha = os.environ.get("BEFORE_SHA", "HEAD~1")
+    after_sha = os.environ.get("AFTER_SHA", "HEAD")
     result = subprocess.run(
-        ["git", "diff", "HEAD~1", "HEAD", "--name-only", "--diff-filter=AM"],
+        ["git", "diff", f"{before_sha}...{after_sha}", "--name-only", "--diff-filter=AM"],
         capture_output=True,
         text=True,
         check=True,
