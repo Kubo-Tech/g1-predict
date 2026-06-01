@@ -1,0 +1,40 @@
+name: Hatena Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**/*.md'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Publish to Hatena Blog
+        env:
+          HATENA_ID: ${{ secrets.HATENA_ID }}
+          HATENA_BLOG_ID: ${{ secrets.HATENA_BLOG_ID }}
+          HATENA_API_KEY: ${{ secrets.HATENA_API_KEY }}
+        run: python -m scripts.hatena_publish
+
+      - name: Commit and push state files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          find public -name ".hatena_entry_ids.json" | xargs -r git add
+          git diff --cached --quiet && echo "変更なし" || (git commit -m "chore: update hatena entry ids" && git push)
