@@ -147,6 +147,20 @@ def main() -> None:
 # private
 
 
+def _remove_h1(content: str) -> str:
+    """MarkdownコンテンツからH1見出し行を除去する
+
+    Args:
+        content (str): Markdownコンテンツ
+
+    Returns:
+        str: H1見出し行を除去したコンテンツ
+    """
+    lines = content.splitlines(keepends=True)
+    filtered = [line for line in lines if not line.startswith("# ")]
+    return "".join(filtered).lstrip("\n")
+
+
 def _get_changed_md_files(repo_dir: Path) -> list[Path]:
     """git diffで変更されたpublic配下のMarkdownファイルを取得する
 
@@ -430,8 +444,11 @@ def _publish_md(
     content = md_path.read_text(encoding="utf-8")
     title = extract_title(content)
     categories = load_categories(config_path, md_path.stem)
+    content_without_h1 = _remove_h1(content)
 
-    content_with_urls = _replace_image_paths(content, md_path, public_dir, state, config, logger)
+    content_with_urls = _replace_image_paths(
+        content_without_h1, md_path, public_dir, state, config, logger
+    )
     _save_state(state_path, state)
 
     xml = _build_entry_xml(title, content_with_urls, categories)
