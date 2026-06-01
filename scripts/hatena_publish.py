@@ -105,9 +105,11 @@ def load_categories(config_path: Path, stem: str) -> list[str]:
     with open(config_path, encoding="utf-8") as f:
         config: dict[str, object] = yaml.safe_load(f) or {}
     categories: dict[str, list[str]] = config.get("categories", {})  # type: ignore[assignment]
-    if stem not in categories:
-        raise KeyError(f"カテゴリ設定が見つかりません: {stem}")
-    return categories[stem]
+    if stem in categories:
+        return categories[stem]
+    if "default" in categories:
+        return categories["default"]
+    raise KeyError(f"カテゴリ設定が見つかりません: {stem}")
 
 
 def main() -> None:
