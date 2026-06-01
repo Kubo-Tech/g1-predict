@@ -22,6 +22,8 @@ _APP_NS = "http://www.w3.org/2007/app"
 _HATENA_NS = "http://www.hatena.ne.jp/info/xmlns#"
 _DC_NS = "http://purl.org/dc/elements/1.1/"
 
+_REQUEST_TIMEOUT = 30
+
 _CONTENT_TYPES: dict[str, str] = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -225,7 +227,9 @@ def _upload_image(img_path: Path, config: HatenaConfig, logger: logging.Logger) 
     headers = {"Content-Type": "application/xml", "X-WSSE": wsse}
 
     logger.info("画像アップロード: %s", img_path.name)
-    response = requests.post(_FOTOLIFE_POST_URL, data=xml_body.encode("utf-8"), headers=headers)
+    response = requests.post(
+        _FOTOLIFE_POST_URL, data=xml_body.encode("utf-8"), headers=headers, timeout=_REQUEST_TIMEOUT
+    )
     if response.status_code != 201:
         logger.error("画像アップロード失敗: %s %s", response.status_code, response.text)
         raise RuntimeError(f"画像アップロード失敗: {response.status_code}")
@@ -336,7 +340,9 @@ def _post_entry(xml: str, config: HatenaConfig, logger: logging.Logger) -> str:
     auth = (config.hatena_id, config.api_key)
 
     logger.info("エントリ投稿: %s", url)
-    response = requests.post(url, data=xml.encode("utf-8"), headers=headers, auth=auth)
+    response = requests.post(
+        url, data=xml.encode("utf-8"), headers=headers, auth=auth, timeout=_REQUEST_TIMEOUT
+    )
     if response.status_code != 201:
         logger.error("エントリ投稿失敗: %s %s", response.status_code, response.text)
         raise RuntimeError(f"エントリ投稿失敗: {response.status_code}")
@@ -365,7 +371,9 @@ def _put_entry(
     auth = (config.hatena_id, config.api_key)
 
     logger.info("エントリ更新: %s", url)
-    response = requests.put(url, data=xml.encode("utf-8"), headers=headers, auth=auth)
+    response = requests.put(
+        url, data=xml.encode("utf-8"), headers=headers, auth=auth, timeout=_REQUEST_TIMEOUT
+    )
     if response.status_code != 200:
         logger.error("エントリ更新失敗: %s %s", response.status_code, response.text)
         raise RuntimeError(f"エントリ更新失敗: {response.status_code}")
