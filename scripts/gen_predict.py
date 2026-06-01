@@ -61,8 +61,9 @@ def generate_predict(race_code: str) -> None:
     content = _render_from_template(*args)
 
     year_dir = os.path.join(_PUBLIC_DIR, year)
-    os.makedirs(year_dir, exist_ok=True)
-    output_path = os.path.join(year_dir, f"{race_code}_{race_name}.md")
+    race_dir = os.path.join(year_dir, f"{race_code}_{race_name}")
+    os.makedirs(race_dir, exist_ok=True)
+    output_path = os.path.join(race_dir, "予想.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"Generated: {output_path}")
@@ -182,7 +183,7 @@ def _render_from_template(
     marks_section: str,
     insight_section: str,
 ) -> str:
-    template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE.md")
+    template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_PREDICT.md")
     with open(template_path, encoding="utf-8") as f:
         content = f.read()
     content = content.replace("{RaceName}", race_name).replace("{Year}", year)
