@@ -72,6 +72,7 @@ def _run(
         patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
         patch("scripts.gen_predict.read_marks", return_value=marks),
         patch("scripts.gen_predict.read_kek_comments", side_effect=_fake_read_kek_comments),
+        patch("scripts.gen_predict.build_prev_day_trend_section", return_value="## 前日の傾向\n"),
         patch.dict("os.environ", {"TFJV_DATA_DIR": "/tmp/fake_tfjv"}),
     ):
         generate_predict(race_code)
@@ -445,6 +446,7 @@ def test_generate_predict_uses_default_data_dir_when_env_not_set(
         patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
         patch("scripts.gen_predict.read_marks", return_value={}) as mock_read_marks,
         patch("scripts.gen_predict.read_kek_comments", return_value={}),
+        patch("scripts.gen_predict.build_prev_day_trend_section", return_value="## 前日の傾向\n"),
         patch("scripts.gen_predict.um_dat_path", return_value="/fake/path") as mock_um_dat_path,
     ):
         generate_predict("2026013105010110")
