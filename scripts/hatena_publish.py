@@ -162,7 +162,10 @@ def _get_changed_md_files(repo_dir: Path) -> list[Path]:
     before_sha = os.environ.get("BEFORE_SHA", "HEAD~1")
     after_sha = os.environ.get("AFTER_SHA", "HEAD")
     result = subprocess.run(
-        ["git", "diff", f"{before_sha}...{after_sha}", "--name-only", "--diff-filter=AM"],
+        [
+            "git", "-c", "core.quotepath=false",
+            "diff", f"{before_sha}...{after_sha}", "--name-only", "--diff-filter=AM",
+        ],
         capture_output=True,
         text=True,
         check=True,
