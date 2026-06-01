@@ -101,8 +101,8 @@ def load_categories(config_path: Path, stem: str) -> list[str]:
         KeyError: stemに対応するカテゴリが設定ファイルに存在しない場合
     """
     with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-    categories: dict[str, list[str]] = config.get("categories", {})
+        config: dict[str, object] = yaml.safe_load(f) or {}
+    categories: dict[str, list[str]] = config.get("categories", {})  # type: ignore[assignment]
     if stem not in categories:
         raise KeyError(f"カテゴリ設定が見つかりません: {stem}")
     return categories[stem]
