@@ -128,11 +128,13 @@ def main() -> None:
 
     files_by_year: dict[str, list[Path]] = {}
     for md_path in changed_files:
-        year = md_path.relative_to(public_dir).parts[0]
+        rel_parts = md_path.relative_to(public_dir).parts
+        year = rel_parts[0] if len(rel_parts) >= 2 else ""
         files_by_year.setdefault(year, []).append(md_path)
 
     for year, files in files_by_year.items():
-        state_path = public_dir / year / ".hatena_entry_ids.json"
+        state_dir = public_dir / year if year else public_dir
+        state_path = state_dir / ".hatena_entry_ids.json"
         state = _load_state(state_path)
         for md_path in files:
             _publish_md(md_path, public_dir, config_path, state_path, state, config, logger)
