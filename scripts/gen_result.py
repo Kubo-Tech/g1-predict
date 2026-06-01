@@ -1,12 +1,11 @@
-"""既存の予想記事 md に結果・回顧セクションを書き込むスクリプト。
+"""結果記事を生成するスクリプト。
 
 コマンド:
 cd path/to/g1-predict
-python -m scripts.add_result --race-code <16桁 race_code>
+python -m scripts.gen_result --race-code <16桁 race_code>
 """
 
 import argparse
-import glob
 import os
 
 import pandas as pd
@@ -27,23 +26,25 @@ load_dotenv(find_dotenv())
 
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
+_TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
 _ABNORMAL_CODES = {"1", "2", "3", "4"}
 
 
-def add_result(race_code: str) -> None:
-    """指定レースの結果・回顧セクションを予想記事 md に書き込む。
+def generate_result(race_code: str) -> None:
+    """指定レースの結果記事を生成する。
 
     Args:
         race_code: 16桁 JRA-VAN 形式の race_code。
-
-    Raises:
-        FileNotFoundError: 対応する md ファイルが存在しない場合。
     """
     tfjv_data_dir = os.environ.get("TFJV_DATA_DIR", _DEFAULT_DATA_DIR)
 
     di = DataInterface("mykeibadb")
+    race_info = di.get_race_basic_info(race_code)
+    race_name = str(race_info["競走名本題"].iloc[0])
+    year = str(race_info["開催年"].iloc[0])
+
     result_df = di.get_result(race_code)
 
     dat_path = um_dat_path(race_code, tfjv_data_dir)
@@ -56,30 +57,23 @@ def add_result(race_code: str) -> None:
     result_section = _build_result_section(result_df, marks)
     review_section = _build_review_section(result_df, marks, comments)
 
-    year = race_code[:4]
-    pattern = os.path.join(_PUBLIC_DIR, year, f"{race_code}_*.md")
-    matches = glob.glob(pattern)
-    if not matches:
-        raise FileNotFoundError(f"No md file found for race_code: {race_code}")
-    md_path = matches[0]
+    content = _render_from_template(race_name, year, result_section, review_section)
 
-    with open(md_path, encoding="utf-8") as f:
-        content = f.read()
-
-    content = replace_section(content, "## 結果", result_section)
-    content = replace_section(content, "## 回顧", review_section)
-
-    with open(md_path, "w", encoding="utf-8") as f:
+    year_dir = os.path.join(_PUBLIC_DIR, year)
+    race_dir = os.path.join(year_dir, f"{race_code}_{race_name}")
+    os.makedirs(race_dir, exist_ok=True)
+    output_path = os.path.join(race_dir, "結果.md")
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
-    print(f"Updated: {md_path}")
+    print(f"Generated: {output_path}")
 
 
 def main() -> None:
     """エントリポイント。"""
-    parser = argparse.ArgumentParser(description="結果・回顧セクションを予想記事 md に書き込む")
+    parser = argparse.ArgumentParser(description="結果記事を生成する")
     parser.add_argument("--race-code", required=True, help="16桁 race_code")
     args = parser.parse_args()
-    add_result(args.race_code)
+    generate_result(args.race_code)
 
 
 def _build_result_section(result_df: pd.DataFrame, marks: dict[int, str]) -> str:
@@ -131,6 +125,21 @@ def _build_review_section(
         lines.append(_format_comment_body(comment))
 
     return "\n".join(lines)
+
+
+def _render_from_template(
+    race_name: str,
+    year: str,
+    result_section: str,
+    review_section: str,
+) -> str:
+    template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_RESULT.md")
+    with open(template_path, encoding="utf-8") as f:
+        content = f.read()
+    content = content.replace("{RaceName}", race_name).replace("{Year}", year)
+    content = replace_section(content, "## 結果", result_section)
+    content = replace_section(content, "## 回顧", review_section)
+    return content
 
 
 def _get_normal_rows(result_df: pd.DataFrame) -> pd.DataFrame:
