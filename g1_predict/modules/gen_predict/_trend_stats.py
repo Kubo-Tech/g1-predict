@@ -134,13 +134,13 @@ def _compute_value(
         keibajo_code = str(src.get("keibajo_code", "")).strip() or None
         count = 0
         for _, row in hist.iterrows():
+            rc = str(row.get("race_code", "")).strip()
             if grade_codes is not None:
-                rc = str(row.get("race_code", "")).strip()
                 grade = db.shosai.get(rc, {}).get("grade_code", "")
                 if grade not in grade_codes:
                     continue
             if keibajo_code is not None:
-                if str(row.get("keibajo_code", "")).strip() != keibajo_code:
+                if db.shosai.get(rc, {}).get("keibajo_code", "") != keibajo_code:
                     continue
             raw_val = row.get("kakutei_chakujun")
             chakujun = pd.to_numeric(raw_val, errors="coerce") if raw_val is not None else None
