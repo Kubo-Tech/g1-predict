@@ -93,7 +93,7 @@ def _build_trend_sections(
     if not os.path.isfile(config_path):
         return {}
     with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+        config = yaml.safe_load(f) or {}
     trends_config = config.get("trends")
     if not trends_config:
         return {}
