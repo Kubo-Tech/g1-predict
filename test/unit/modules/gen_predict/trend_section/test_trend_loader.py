@@ -1,7 +1,9 @@
 """_trend_loader の単体テスト。"""
 
 from g1_predict.modules.gen_predict._trend_loader import (
-    _is_valid_race_code, extract_sire_condition_sources)
+    _is_valid_race_code,
+    extract_sire_condition_sources,
+)
 
 # --- _is_valid_race_code ---
 

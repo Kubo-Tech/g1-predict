@@ -2,12 +2,15 @@
 
 import pandas as pd
 
-from g1_predict.modules.gen_predict._trend_models import (OTHER_LABEL,
-                                                          TREND_YEARS, Db,
-                                                          RowStats)
+from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, Db, RowStats
 from g1_predict.modules.gen_predict._trend_renderer import (
-    _aggregate_other_stats, _format_percent, _format_rate, _format_table_row,
-    _get_dynamic_labels, build_category_section)
+    _aggregate_other_stats,
+    _format_percent,
+    _format_rate,
+    _format_table_row,
+    _get_dynamic_labels,
+    build_category_section,
+)
 
 # --- _format_percent ---
 

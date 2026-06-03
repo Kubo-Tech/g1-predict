@@ -4,8 +4,15 @@ import pandas as pd
 
 from g1_predict.modules.gen_predict._trend_models import Db, sire_cache_key
 from g1_predict.modules.gen_predict._trend_stats import (
-    _build_payout_lookup, _classify, _compute_boolean_labels, _compute_value,
-    _history_before, _match_op, _safe_int, compute_stats)
+    _build_payout_lookup,
+    _classify,
+    _compute_boolean_labels,
+    _compute_value,
+    _history_before,
+    _match_op,
+    _safe_int,
+    compute_stats,
+)
 
 # --- _safe_int ---
 
