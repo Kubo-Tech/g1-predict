@@ -171,7 +171,8 @@ def _compute_value(
         for _, row in sorted_h.iterrows():
             ijo = str(row.get("ijo_kubun_code", "0")).strip()
             if ijo not in ("1", "2", "3"):
-                venue = str(row.get("keibajo_code", "")).strip() or None
+                rc = str(row.get("race_code", "")).strip()
+                venue = db.shosai.get(rc, {}).get("keibajo_code") or None
                 if allowed is not None and venue not in allowed:
                     return OTHER_LABEL
                 return venue
