@@ -30,7 +30,7 @@ def build_category_section(
         if db.matched_years < TREND_YEARS
         else ""
     )
-    header = f"## {category_name}\n\n過去{TREND_YEARS}年{category_name[:3]}に関する傾向"
+    header = f"## {category_name}\n\n過去{TREND_YEARS}年{category_name}に関する傾向"
     if note:
         header += f"\n{note}"
 
