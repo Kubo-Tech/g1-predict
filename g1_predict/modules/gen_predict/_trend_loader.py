@@ -6,7 +6,7 @@ import pandas as pd
 from keiba_data_interface import DataInterface
 from mykeibadb import MasterGetter, RaceGetter
 
-from g1_predict.modules.gen_table.table_utils import SHIBA_TRACK_CODES, year_range
+from g1_predict.modules.gen_table.table_utils import DIRT_TRACK_CODES, SHIBA_TRACK_CODES, year_range
 
 from ._trend_models import SIRE_YEARS, TREND_YEARS, Db, sire_cache_key
 
@@ -37,9 +37,7 @@ def load_db(
     kyori = int(race_info["距離"].iloc[0])
     shiba_da = str(race_info["芝ダ"].iloc[0])
     tokubetsu_kyoso_bango = str(race_info["特別競走番号"].iloc[0]).strip().zfill(4)
-    track_codes = SHIBA_TRACK_CODES if shiba_da == "芝" else frozenset(
-        {str(c) for c in range(23, 30)}
-    )
+    track_codes = SHIBA_TRACK_CODES if shiba_da == "芝" else DIRT_TRACK_CODES
 
     rg = RaceGetter()
     mg = MasterGetter()
