@@ -9,6 +9,7 @@ import argparse
 import os
 
 import pandas as pd
+import yaml
 from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 
@@ -16,6 +17,7 @@ from g1_predict.modules.gen_predict.prev_day_trend import (
     GRADE_CODE_DISPLAY,
     build_prev_day_trend_section,
 )
+from g1_predict.modules.gen_predict.trend_section import build_trend_sections
 from g1_predict.modules.utils.md_utils import replace_section
 from g1_predict.modules.utils.tfjv import (
     race_code_to_tfjv,
@@ -30,6 +32,7 @@ load_dotenv(find_dotenv())
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
 _TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
+_CONFIGS_DIR = os.path.join(_REPO_DIR, "configs")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
 _MARK_ORDER = ["◎", "○", "▲", "△", "◆", "☆", "注"]
@@ -39,7 +42,7 @@ def generate_predict(race_code: str) -> None:
     """指定レースの予想記事ベースを生成する。
 
     Args:
-        race_code: 16桁 JRA-VAN 形式の race_code。
+        race_code (str): 16桁 JRA-VAN 形式の race_code。
     """
     tfjv_data_dir = os.environ.get("TFJV_DATA_DIR", _DEFAULT_DATA_DIR)
 
@@ -57,7 +60,10 @@ def generate_predict(race_code: str) -> None:
     trend_section = build_prev_day_trend_section(race_code, race_info, di)
     marks_section = _build_marks_section(marks, entry_df)
     insight_section = _build_insight_section(marks, entry_df, di, tfjv_data_dir, race_code)
-    args = (race_name, year, points, trend_section, marks_section, insight_section)
+    trend_sections_map = _build_trend_sections(race_code, race_name, race_info, di)
+    args = (
+        race_name, year, points, trend_section, marks_section, insight_section, trend_sections_map
+    )
     content = _render_from_template(*args)
 
     year_dir = os.path.join(_PUBLIC_DIR, year)
@@ -75,6 +81,23 @@ def main() -> None:
     parser.add_argument("--race-code", required=True, help="16桁 race_code")
     args = parser.parse_args()
     generate_predict(args.race_code)
+
+
+def _build_trend_sections(
+    race_code: str,
+    race_name: str,
+    race_info: pd.DataFrame,
+    di: DataInterface,
+) -> dict[str, str]:
+    config_path = os.path.join(_CONFIGS_DIR, f"{race_name}.yml")
+    if not os.path.isfile(config_path):
+        return {}
+    with open(config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    trends_config = config.get("trends")
+    if not trends_config:
+        return {}
+    return build_trend_sections(race_code, race_info, trends_config, di)
 
 
 def _load_points(race_name: str) -> str:
@@ -182,6 +205,7 @@ def _render_from_template(
     trend_section: str,
     marks_section: str,
     insight_section: str,
+    trend_sections_map: dict[str, str],
 ) -> str:
     template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_PREDICT.md")
     with open(template_path, encoding="utf-8") as f:
@@ -189,7 +213,11 @@ def _render_from_template(
     content = content.replace("{RaceName}", race_name).replace("{Year}", year)
     content = replace_section(content, "## ポイント", points_section)
     content = replace_section(content, "## 前日の傾向", trend_section)
-    content = replace_section(content, "## 印", marks_section)
+    if trend_sections_map:
+        combined_trends = "\n\n".join(trend_sections_map.values())
+        content = replace_section(content, "## 印", combined_trends + "\n\n" + marks_section)
+    else:
+        content = replace_section(content, "## 印", marks_section)
     content = replace_section(content, "## 見解", insight_section)
     return content
 
