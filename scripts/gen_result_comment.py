@@ -5,7 +5,7 @@ import os
 from typing import Any
 
 import pandas as pd
-from keiba_data_interface import DataInterface
+from mykeibadb import RaceGetter
 from mykeibadb.code_converter import convert_chakusa_code, convert_ijo_kubun_code
 
 from scripts.tfjv import race_code_to_tfjv, write_kek_comment
@@ -22,31 +22,32 @@ def generate_result_comments(race_code: str, base_dir: str) -> None:
         race_code: 16桁 JRA-VAN 形式の race_code。
         base_dir: TFJV データディレクトリのパス。
     """
-    di = DataInterface("mykeibadb")
-    race_info = di.get_race_basic_info(race_code)
-    race_name = race_info["競走名略称6文字"].iloc[0]
-    result_df = di.get_result(race_code)
+    race_getter = RaceGetter()
+    race_shosai = race_getter.get_race_shosai(race_code=race_code, convert_codes=False)
+    race_name = str(race_shosai["kyosomei_ryakusho_6"].iloc[0]).strip()
+    result_raw = race_getter.get_umagoto_race_joho(race_code=race_code, convert_codes=False)
+    result_raw = result_raw.sort_values("kakutei_chakujun").reset_index(drop=True)
     venue, year2, tfjv_code = race_code_to_tfjv(race_code)
     race_no = int(race_code[14:16])
 
-    second = result_df[result_df["確定着順"] == 2].iloc[0]
-    second_time_diff = float(second["タイム差"])
-    second_margin_code = second["着差コード1"]
+    second = result_raw[result_raw["kakutei_chakujun"] == 2].iloc[0]
+    second_time_diff = float(second["time_sa"])
+    second_margin_code = second["chakusa_code1"]
 
-    for _, row in result_df.iterrows():
-        umaban = int(row["馬番"])
-        raw = row.get("異常区分コード")
+    for _, row in result_raw.iterrows():
+        umaban = int(row["umaban"])
+        raw = row.get("ijo_kubun_code")
         ijo_code = str(int(float(raw))) if pd.notna(raw) else "0"
         if ijo_code in _ABNORMAL_CODES:
             comment = f"[{race_name}] {convert_ijo_kubun_code(ijo_code)}"
         else:
-            chakusa = int(row["確定着順"])
+            chakusa = int(row["kakutei_chakujun"])
             if chakusa == 1:
                 time_diff = second_time_diff
                 margin_code = second_margin_code
             else:
-                time_diff = float(row["タイム差"])
-                margin_code = row["着差コード1"]
+                time_diff = float(row["time_sa"])
+                margin_code = row["chakusa_code1"]
             gap = _determine_gap(time_diff, margin_code)
             comment = f"[{race_name}] {gap}{chakusa}着。"
         write_kek_comment(base_dir, venue, year2, tfjv_code, race_no, umaban, comment)

@@ -7,7 +7,7 @@ import re
 
 import pandas as pd
 from dotenv import find_dotenv, load_dotenv
-from keiba_data_interface import DataInterface
+from mykeibadb import RaceGetter
 
 from scripts.tfjv import (
     race_code_to_tfjv,
@@ -47,19 +47,20 @@ def generate_predict(race_code: str) -> None:
     """
     tfjv_data_dir = os.environ.get("TFJV_DATA_DIR", _DEFAULT_DATA_DIR)
 
-    di = DataInterface("mykeibadb")
-    race_info = di.get_race_basic_info(race_code)
-    race_name = str(race_info["競走名本題"].iloc[0])
-    year = str(race_info["開催年"].iloc[0])
+    race_getter = RaceGetter()
+    race_shosai = race_getter.get_race_shosai(race_code=race_code, convert_codes=False)
+    race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
+    year = str(race_shosai["kaisai_nen"].iloc[0]).strip()
 
-    entry_df = di.get_entry(race_code)
+    entry_raw = race_getter.get_umagoto_race_joho(race_code=race_code, convert_codes=False)
+    entry_raw = entry_raw.sort_values("umaban").reset_index(drop=True)
 
     dat_path = um_dat_path(race_code, tfjv_data_dir)
     marks = read_marks(dat_path, um_dat_record_no(race_code))
 
     points = _load_points(race_name)
-    marks_section = _build_marks_section(marks, entry_df)
-    insight_section = _build_insight_section(marks, entry_df, di, tfjv_data_dir)
+    marks_section = _build_marks_section(marks, entry_raw)
+    insight_section = _build_insight_section(marks, entry_raw, race_getter, tfjv_data_dir)
     content = _render_from_template(race_name, year, points, marks_section, insight_section)
 
     nn = _next_serial(year, _PUBLIC_DIR)
@@ -107,8 +108,8 @@ def _sort_marks(marks: dict[int, str]) -> list[tuple[int, str]]:
     )
 
 
-def _build_marks_section(marks: dict[int, str], entry_df: pd.DataFrame) -> str:
-    horse_map = {int(row["馬番"]): str(row["馬名"]) for _, row in entry_df.iterrows()}
+def _build_marks_section(marks: dict[int, str], entry_raw: pd.DataFrame) -> str:
+    horse_map = {int(row["umaban"]): str(row["bamei"]).strip() for _, row in entry_raw.iterrows()}
     lines = ["## 印", ""]
     for umaban, mark in _sort_marks(marks):
         lines.append(f"{mark}{umaban}{horse_map[umaban]}  ")
@@ -117,13 +118,13 @@ def _build_marks_section(marks: dict[int, str], entry_df: pd.DataFrame) -> str:
 
 def _build_insight_section(
     marks: dict[int, str],
-    entry_df: pd.DataFrame,
-    di: DataInterface,
+    entry_raw: pd.DataFrame,
+    race_getter: RaceGetter,
     tfjv_data_dir: str,
 ) -> str:
     horse_map = {
-        int(row["馬番"]): (str(row["馬名"]), str(row["血統登録番号"]))
-        for _, row in entry_df.iterrows()
+        int(row["umaban"]): (str(row["bamei"]).strip(), str(row["ketto_toroku_bango"]))
+        for _, row in entry_raw.iterrows()
     }
     marked = _sort_marks(marks)
     lines: list[str] = ["## 見解"]
@@ -134,15 +135,18 @@ def _build_insight_section(
         lines.append(f"### {mark}{umaban}{horse_name}")
         lines.append("")
 
-        past_df = di.get_past_performances(horse_id)
+        past_raw = race_getter.get_umagoto_race_joho(
+            ketto_toroku_bango=horse_id, convert_codes=False
+        )
+        past_raw = past_raw.sort_values("race_code", ascending=False).reset_index(drop=True)
         seen_race_codes: set[str] = set()
-        for idx, (_, past_row) in enumerate(past_df.iterrows()):
-            past_race_code = str(past_row["レースコード"])
+        for idx, (_, past_row) in enumerate(past_raw.iterrows()):
+            past_race_code = str(past_row["race_code"])
             race_key = past_race_code[:4] + past_race_code[8:]
             if race_key in seen_race_codes:
                 continue
             seen_race_codes.add(race_key)
-            past_umaban = int(past_row["馬番"])
+            past_umaban = int(past_row["umaban"])
             past_race_no = int(past_race_code[14:16])
 
             venue, year2, tfjv_code = race_code_to_tfjv(past_race_code)
@@ -151,8 +155,10 @@ def _build_insight_section(
             if past_umaban not in comments:
                 continue
 
-            past_race_info = di.get_race_basic_info(past_race_code)
-            grade_code = str(past_race_info["グレードコード"].iloc[0])
+            past_shosai = race_getter.get_race_shosai(
+                race_code=past_race_code, convert_codes=False
+            )
+            grade_code = str(past_shosai["grade_code"].iloc[0]).strip()
             grade = _GRADE_CODE_DISPLAY.get(grade_code, "")
 
             comment = comments[past_umaban]
