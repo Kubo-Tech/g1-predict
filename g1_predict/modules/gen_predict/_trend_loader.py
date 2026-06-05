@@ -3,19 +3,18 @@
 from typing import Any
 
 import pandas as pd
-from keiba_data_interface import DataInterface
 from mykeibadb import MasterGetter, RaceGetter
 
 from g1_predict.modules.gen_table.table_utils import DIRT_TRACK_CODES, SHIBA_TRACK_CODES, year_range
 
 from ._trend_models import SIRE_YEARS, TREND_YEARS, Db, sire_cache_key
+from .prev_day_trend import TRACK_CODE_TO_SHIBA_DA
 
 
 def load_db(
     race_code: str,
     race_info: pd.DataFrame,
     race_year: int,
-    di: DataInterface,
     sire_sources: list[dict[str, Any]],
 ) -> Db:
     """傾向計算に必要なデータを一括取得して Db を返す。
@@ -25,18 +24,18 @@ def load_db(
 
     Args:
         race_code (str): 対象レースの16桁レースコード。
-        race_info (pd.DataFrame): 対象レースの基本情報DataFrame。
+        race_info (pd.DataFrame): 対象レースの基本情報DataFrame（raw英語カラム名）。
         race_year (int): 開催年。
-        di (DataInterface): DataInterfaceインスタンス。
         sire_sources (list[dict[str, Any]]): sire_race_condition_finisher の source 設定リスト。
 
     Returns:
         Db: 取得データをまとめたインスタンス。
     """
-    keibajo_code = str(race_info["競馬場コード"].iloc[0]).strip()
-    kyori = int(race_info["距離"].iloc[0])
-    shiba_da = str(race_info["芝ダ"].iloc[0])
-    tokubetsu_kyoso_bango = str(race_info["特別競走番号"].iloc[0]).strip().zfill(4)
+    keibajo_code = str(race_info["keibajo_code"].iloc[0]).strip()
+    kyori = int(race_info["kyori"].iloc[0])
+    track_code = str(race_info["track_code"].iloc[0]).strip()
+    shiba_da = TRACK_CODE_TO_SHIBA_DA.get(track_code, "")
+    tokubetsu_kyoso_bango = str(race_info["tokubetsu_kyoso_bango"].iloc[0]).strip().zfill(4)
     track_codes = SHIBA_TRACK_CODES if shiba_da == "芝" else DIRT_TRACK_CODES
 
     rg = RaceGetter()
@@ -49,20 +48,17 @@ def load_db(
     results: dict[str, pd.DataFrame] = {}
     payoffs: dict[str, pd.Series | None] = {}
     for rc in past_race_codes:
-        result_df = di.get_result(rc)
+        result_df = rg.get_umagoto_race_joho(race_code=rc, convert_codes=False)
         results[rc] = result_df
-        try:
-            payoff_df = di.get_payoff(rc)
-            payoffs[rc] = payoff_df.iloc[0] if not payoff_df.empty else None
-        except Exception:
-            payoffs[rc] = None
+        payoff_df = rg.get_haraimodoshi(race_code=rc, convert_codes=False)
+        payoffs[rc] = payoff_df.iloc[0] if not payoff_df.empty else None
 
     all_horse_ids: list[str] = []
     seen: set[str] = set()
     for result_df in results.values():
-        if result_df.empty or "血統登録番号" not in result_df.columns:
+        if result_df.empty or "ketto_toroku_bango" not in result_df.columns:
             continue
-        for v in result_df["血統登録番号"].dropna():
+        for v in result_df["ketto_toroku_bango"].dropna():
             hid = str(v).strip()
             if hid and hid not in seen:
                 seen.add(hid)

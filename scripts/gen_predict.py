@@ -57,10 +57,14 @@ def generate_predict(race_code: str) -> None:
     dat_path = um_dat_path(race_code, tfjv_data_dir)
     marks = read_marks(dat_path, um_dat_record_no(race_code))
 
+    trend_section = build_prev_day_trend_section(race_code, race_shosai)
+    trend_sections_map = _build_trend_sections(race_code, race_name, race_shosai)
     points = _load_points(race_name)
     marks_section = _build_marks_section(marks, entry_raw)
     insight_section = _build_insight_section(marks, entry_raw, race_getter, tfjv_data_dir)
-    content = _render_from_template(race_name, year, points, marks_section, insight_section)
+    content = _render_from_template(
+        race_name, year, points, trend_section, marks_section, insight_section, trend_sections_map
+    )
 
     year_dir = os.path.join(_PUBLIC_DIR, year)
     race_dir = os.path.join(year_dir, f"{race_code}_{race_name}")
@@ -83,7 +87,6 @@ def _build_trend_sections(
     race_code: str,
     race_name: str,
     race_info: pd.DataFrame,
-    di: DataInterface,
 ) -> dict[str, str]:
     config_path = os.path.join(_CONFIGS_DIR, f"{race_name}.yml")
     if not os.path.isfile(config_path):
@@ -93,7 +96,7 @@ def _build_trend_sections(
     trends_config = config.get("trends")
     if not trends_config:
         return {}
-    return build_trend_sections(race_code, race_info, trends_config, di)
+    return build_trend_sections(race_code, race_info, trends_config)
 
 
 def _load_points(race_name: str) -> str:
@@ -127,7 +130,6 @@ def _build_insight_section(
     entry_raw: pd.DataFrame,
     race_getter: RaceGetter,
     tfjv_data_dir: str,
-    race_code: str,
 ) -> str:
     horse_map = {
         int(row["umaban"]): (str(row["bamei"]).strip(), str(row["ketto_toroku_bango"]))
@@ -147,7 +149,8 @@ def _build_insight_section(
         )
         past_raw = past_raw.sort_values("race_code", ascending=False).reset_index(drop=True)
         seen_race_codes: set[str] = set()
-        for idx, (_, past_row) in enumerate(past_raw.iterrows()):
+        count = 0
+        for _, past_row in past_raw.iterrows():
             past_race_code = str(past_row["race_code"])
             race_key = past_race_code[:4] + past_race_code[8:]
             if race_key in seen_race_codes:
@@ -166,12 +169,13 @@ def _build_insight_section(
                 race_code=past_race_code, convert_codes=False
             )
             grade_code = str(past_shosai["grade_code"].iloc[0]).strip()
-            grade = _GRADE_CODE_DISPLAY.get(grade_code, "")
+            grade = GRADE_CODE_DISPLAY.get(grade_code, "")
 
             comment = comments[past_umaban]
-            race_name, body = _parse_kek_comment(comment)
+            race_name_str, body = _parse_kek_comment(comment)
+            count += 1
             ordinal = _format_ordinal(count)
-            lines.append(f"{ordinal}{grade}{race_name}{body}  ")
+            lines.append(f"{ordinal}{grade}{race_name_str}{body}  ")
 
     return "\n".join(lines)
 
