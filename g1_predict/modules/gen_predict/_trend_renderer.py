@@ -2,47 +2,47 @@
 
 from typing import Any
 
-from ._trend_models import OTHER_LABEL, TREND_YEARS, Db, RowStats
+from mykeibadb.analytics import RaceCondition
+from mykeibadb.connection import ConnectionManager
+
+from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
 from ._trend_stats import compute_stats
 
 
 def build_category_section(
     category_name: str,
     metrics: list[dict[str, Any]],
-    db: Db,
+    manager: ConnectionManager,
+    condition: RaceCondition,
 ) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
 
     ## カテゴリ名 から始まり、各 metric の h3 テーブルと
     ## 比較表 プレースホルダーを含む文字列を返す。
-    コース一致年数が TREND_YEARS に満たない場合は注釈を追加する。
 
     Args:
         category_name (str): カテゴリ名（例: "出走馬傾向"）。
         metrics (list[dict[str, Any]]): カテゴリ内の metric 設定リスト。
-        db (Db): 取得済みデータを保持するインスタンス。
+        manager (ConnectionManager): DB接続マネージャ。
+        condition (RaceCondition): レース絞り込み条件。
 
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
     """
-    note = (
-        f"（コースが一致する{db.matched_years}年分のみ対象）"
-        if db.matched_years < TREND_YEARS
-        else ""
-    )
     header = f"## {category_name}\n\n過去{TREND_YEARS}年{category_name}に関する傾向"
-    if note:
-        header += f"\n{note}"
 
-    metric_sections = []
-    for metric_cfg in metrics:
-        metric_sections.append(_build_metric_section(metric_cfg, db))
-
+    metric_sections = [
+        _build_metric_section(metric_cfg, manager, condition) for metric_cfg in metrics
+    ]
     metric_sections.append("### 比較表\n")
     return header + "\n\n" + "\n\n".join(metric_sections)
 
 
-def _build_metric_section(metric_cfg: dict[str, Any], db: Db) -> str:
+def _build_metric_section(
+    metric_cfg: dict[str, Any],
+    manager: ConnectionManager,
+    condition: RaceCondition,
+) -> str:
     """1 metric 分の h3 テーブルセクション文字列を生成する。
 
     rows.type に応じてラベル一覧を決定し、各行の集計値から
@@ -50,7 +50,8 @@ def _build_metric_section(metric_cfg: dict[str, Any], db: Db) -> str:
 
     Args:
         metric_cfg (dict[str, Any]): metric の YAML 設定dict。
-        db (Db): 取得済みデータを保持するインスタンス。
+        manager (ConnectionManager): DB接続マネージャ。
+        condition (RaceCondition): レース絞り込み条件。
 
     Returns:
         str: ### ヘッダーから始まる Markdown テーブル文字列。
@@ -58,7 +59,7 @@ def _build_metric_section(metric_cfg: dict[str, Any], db: Db) -> str:
     metric_name = metric_cfg["name"]
     rows_cfg = metric_cfg["rows"]
 
-    stats_map = compute_stats(metric_cfg, db)
+    stats_map = compute_stats(metric_cfg, manager, condition)
 
     if rows_cfg["type"] == "dynamic":
         top_n = rows_cfg.get("top_n")
@@ -120,7 +121,7 @@ def _aggregate_other_stats(
     stats_map: dict[str, RowStats],
     top_labels: set[str],
 ) -> RowStats:
-    """top_labels に含まれないラベルの集計値を合算して返す。
+    """top_labels に含まれないラベルの集計値を加重平均で合算して返す。
 
     dynamic 型の「その他」行を生成するために使用する。
 
@@ -132,6 +133,8 @@ def _aggregate_other_stats(
         RowStats: top_labels 以外の全ラベルを合算した集計値。
     """
     other = RowStats()
+    tansho_sum = 0.0
+    fukusho_sum = 0.0
     for label, s in stats_map.items():
         if label in top_labels:
             continue
@@ -139,9 +142,12 @@ def _aggregate_other_stats(
         other.second += s.second
         other.third += s.third
         other.fourth_plus += s.fourth_plus
-        other.tansho_total += s.tansho_total
-        other.fukusho_total += s.fukusho_total
+        tansho_sum += s.tansho_kaishuu * s.total
+        fukusho_sum += s.fukusho_kaishuu * s.total
         other.total += s.total
+    if other.total > 0:
+        other.tansho_kaishuu = tansho_sum / other.total
+        other.fukusho_kaishuu = fukusho_sum / other.total
     return other
 
 
@@ -157,8 +163,8 @@ def _format_table_row(label: str, s: RowStats) -> str:
     """
     win_str = _format_percent(s.first, s.total)
     place_str = _format_percent(s.first + s.second + s.third, s.total)
-    tansho_str = _format_rate(s.tansho_total, s.total)
-    fukusho_str = _format_rate(s.fukusho_total, s.total)
+    tansho_str = f"{round(s.tansho_kaishuu)}%" if s.total > 0 else "-"
+    fukusho_str = f"{round(s.fukusho_kaishuu)}%" if s.total > 0 else "-"
     return (
         f"| {label} | {s.first}頭 | {s.second}頭 | {s.third}頭 | {s.fourth_plus}頭"
         f" | {win_str} | {place_str} | {tansho_str} | {fukusho_str} |"
@@ -181,22 +187,3 @@ def _format_percent(count: int, total: int) -> str:
     if total == 0:
         return "-"
     return f"{round(count / total * 100)}%"
-
-
-def _format_rate(payout_total: int, total: int) -> str:
-    """回収率を百分率文字列に変換する。
-
-    total が 0 の場合はデータなしを示す "-" を返す。
-    計算式: round(payout_total / total) %
-
-    Args:
-        payout_total (int): 払戻金の合計（円）。
-        total (int): 対象馬の総頭数。
-
-    Returns:
-        str: "N%" 形式の文字列。total が 0 の場合は "-"。
-    """
-    if total == 0:
-        return "-"
-    rate = round(payout_total / total)
-    return f"{rate}%"

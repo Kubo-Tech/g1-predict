@@ -1,16 +1,28 @@
 """_trend_renderer の単体テスト。"""
 
-import pandas as pd
+from unittest.mock import MagicMock, patch
 
-from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, Db, RowStats
+from mykeibadb.analytics import RaceCondition
+
+from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
 from g1_predict.modules.gen_predict._trend_renderer import (
     _aggregate_other_stats,
     _format_percent,
-    _format_rate,
     _format_table_row,
     _get_dynamic_labels,
     build_category_section,
 )
+
+
+def _make_manager() -> MagicMock:
+    """ConnectionManager のモックを生成する。"""
+    return MagicMock()
+
+
+def _make_condition() -> RaceCondition:
+    """テスト用 RaceCondition を生成する。"""
+    return RaceCondition(keibajo_code="05", kyori=2400, year_from="2016", year_to="2025")
+
 
 # --- _format_percent ---
 
@@ -38,29 +50,6 @@ def test_format_percent_rounds() -> None:
 def test_format_percent_all() -> None:
     """100% を正しく返す。"""
     assert _format_percent(3, 3) == "100%"
-
-
-# --- _format_rate ---
-
-
-def test_format_rate_total_zero() -> None:
-    """Total が 0 の場合は "-" を返す。"""
-    assert _format_rate(0, 0) == "-"
-
-
-def test_format_rate_basic() -> None:
-    """回収率 100% を正しく返す。"""
-    assert _format_rate(300, 3) == "100%"
-
-
-def test_format_rate_rounds() -> None:
-    """四捨五入して返す。"""
-    assert _format_rate(100, 3) == "33%"
-
-
-def test_format_rate_low() -> None:
-    """低い回収率を正しく返す。"""
-    assert _format_rate(50, 10) == "5%"
 
 
 # --- _get_dynamic_labels ---
@@ -133,15 +122,16 @@ def test_aggregate_other_stats_all_in_top_labels() -> None:
     assert other.total == 0
 
 
-def test_aggregate_other_stats_payout() -> None:
-    """払戻金も正しく合算する。"""
+def test_aggregate_other_stats_weighted_kaishuu() -> None:
+    """回収率が加重平均で合算される。"""
     stats_map = {
-        "A": RowStats(tansho_total=1000, fukusho_total=500, total=2),
-        "B": RowStats(tansho_total=800, fukusho_total=300, total=2),
+        "A": RowStats(tansho_kaishuu=100.0, fukusho_kaishuu=80.0, total=10),
+        "B": RowStats(tansho_kaishuu=60.0, fukusho_kaishuu=40.0, total=10),
     }
-    other = _aggregate_other_stats(stats_map, top_labels={"A"})
-    assert other.tansho_total == 800
-    assert other.fukusho_total == 300
+    other = _aggregate_other_stats(stats_map, top_labels=set())
+    assert other.tansho_kaishuu == 80.0
+    assert other.fukusho_kaishuu == 60.0
+    assert other.total == 20
 
 
 # --- _format_table_row ---
@@ -155,13 +145,14 @@ def test_format_table_row_basic() -> None:
         third=1,
         fourth_plus=6,
         total=10,
-        tansho_total=2000,
-        fukusho_total=600,
+        tansho_kaishuu=80.0,
+        fukusho_kaishuu=60.0,
     )
     row = _format_table_row("東京", s)
     assert row.startswith("| 東京 |")
     assert "2頭" in row
     assert "20%" in row
+    assert "80%" in row
 
 
 def test_format_table_row_zero_total() -> None:
@@ -173,20 +164,6 @@ def test_format_table_row_zero_total() -> None:
 
 
 # --- build_category_section ---
-
-
-def _make_empty_db(matched_years: int = TREND_YEARS) -> Db:
-    """空の Db インスタンスを生成する。"""
-    return Db(
-        past_race_codes=[],
-        results={},
-        payoffs={},
-        history=pd.DataFrame(),
-        shosai={},
-        kyosoba={},
-        sire_finisher_sets={},
-        matched_years=matched_years,
-    )
 
 
 def _make_fixed_metric_cfg(name: str = "枠番") -> dict:
@@ -204,45 +181,69 @@ def _make_fixed_metric_cfg(name: str = "枠番") -> dict:
     }
 
 
+def _empty_stats_map(_metric_cfg: object, _manager: object, _condition: object) -> dict:
+    """空の stats_map を返すモック。"""
+    return {}
+
+
 def test_build_category_section_has_header() -> None:
     """## カテゴリ名 ヘッダーで始まる。"""
-    db = _make_empty_db()
-    result = build_category_section("出走馬傾向", [_make_fixed_metric_cfg()], db)
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        side_effect=_empty_stats_map,
+    ):
+        result = build_category_section(
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+        )
     assert result.startswith("## 出走馬傾向")
 
 
 def test_build_category_section_has_hikaku_table() -> None:
     """### 比較表 プレースホルダーを含む。"""
-    db = _make_empty_db()
-    result = build_category_section("出走馬傾向", [_make_fixed_metric_cfg()], db)
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        side_effect=_empty_stats_map,
+    ):
+        result = build_category_section(
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+        )
     assert "### 比較表" in result
 
 
 def test_build_category_section_has_metric_header() -> None:
     """Metric 名の h3 ヘッダーを含む。"""
-    db = _make_empty_db()
-    result = build_category_section(
-        "出走馬傾向", [_make_fixed_metric_cfg("枠番")], db
-    )
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        side_effect=_empty_stats_map,
+    ):
+        result = build_category_section(
+            "出走馬傾向",
+            [_make_fixed_metric_cfg("枠番")],
+            _make_manager(),
+            _make_condition(),
+        )
     assert "### 枠番" in result
-
-
-def test_build_category_section_note_when_few_years() -> None:
-    """TREND_YEARS 未満の場合、年数注釈を付ける。"""
-    db = _make_empty_db(matched_years=3)
-    result = build_category_section("出走馬傾向", [_make_fixed_metric_cfg()], db)
-    assert "3年分のみ対象" in result
-
-
-def test_build_category_section_no_note_when_full_years() -> None:
-    """TREND_YEARS 年分あれば注釈なし。"""
-    db = _make_empty_db(matched_years=TREND_YEARS)
-    result = build_category_section("出走馬傾向", [_make_fixed_metric_cfg()], db)
-    assert "のみ対象" not in result
 
 
 def test_build_category_section_hikaku_table_at_end() -> None:
     """### 比較表 が末尾に配置される。"""
-    db = _make_empty_db()
-    result = build_category_section("出走馬傾向", [_make_fixed_metric_cfg()], db)
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        side_effect=_empty_stats_map,
+    ):
+        result = build_category_section(
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+        )
     assert result.rstrip().endswith("### 比較表")
+
+
+def test_build_category_section_trend_years_in_header() -> None:
+    """過去N年の記述がヘッダーに含まれる。"""
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        side_effect=_empty_stats_map,
+    ):
+        result = build_category_section(
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+        )
+    assert f"過去{TREND_YEARS}年" in result
