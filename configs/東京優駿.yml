@@ -1,0 +1,538 @@
+race_name: 東京優駿
+
+columns:
+  - name: 勝利数
+    source:
+      type: past_count
+      filters:
+        - field: 確定着順
+          op: "=="
+          value: 1
+    color_rules:
+      - condition:
+          op: ">="
+          value: 3
+        color: yellow
+
+  - name: 重賞勝利数
+    source:
+      type: past_count
+      filters:
+        - field: グレードコード
+          op: in
+          value: ["A", "B", "C"]
+        - field: 確定着順
+          op: "=="
+          value: 1
+    color_rules:
+      - condition:
+          op: ">="
+          value: 1
+        color: yellow
+
+  - name: 東京勝利数
+    source:
+      type: past_count
+      filters:
+        - field: 競馬場コード
+          op: "=="
+          value: "05"
+        - field: 確定着順
+          op: "=="
+          value: 1
+    color_rules:
+      - condition:
+          op: ">="
+          value: 1
+        color: yellow
+
+  - name: 前走レース
+    source:
+      type: past_field
+      field: 競走名本題
+      index: 0
+    color_rules:
+      - condition:
+          op: "=="
+          value: "皐月賞"
+        color: yellow
+
+  - name: デビュー
+    source:
+      type: debut_field
+      field: 競馬場コード
+      filters:
+        - field: 異常区分コード
+          op: not_in
+          value: ["1", "2", "3"]
+    display_map:
+      "01": 札幌
+      "02": 函館
+      "03": 福島
+      "04": 新潟
+      "05": 東京
+      "06": 中山
+      "07": 中京
+      "08": 京都
+      "09": 阪神
+      "10": 小倉
+    color_rules:
+      - condition:
+          op: "=="
+          value: "05"
+        color: yellow
+
+  - name: キャリア
+    source:
+      type: past_count
+      filters:
+        - field: 異常区分コード
+          op: not_in
+          value: ["1", "2", "3"]
+    color_rules:
+      - condition:
+          op: "=="
+          value: 4
+        color: yellow
+      - condition:
+          op: "=="
+          value: 5
+        color: yellow
+
+  - name: 枠勝率
+    source:
+      type: waku_stat
+      stat: win_rate
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 10
+      course_kubun: "C"
+      first_week_only: true
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.125
+        color: yellow
+
+  - name: 枠複勝率
+    source:
+      type: waku_stat
+      stat: top3_rate
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 10
+      course_kubun: "C"
+      first_week_only: true
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.375
+        color: yellow
+
+  - name: 脚質
+    source:
+      type: recent_umagoto_field
+      field: kyakushitsu
+    color_rules:
+      - condition:
+          op: in
+          value: ["逃", "先"]
+        color: yellow
+
+  - name: 騎手名
+    source:
+      type: entry_field
+      field: 騎手名略称
+
+  - name: 継続
+    source:
+      type: kishu_continuity
+    color_rules:
+      - condition:
+          op: "=="
+          value: "継続"
+        color: yellow
+
+  - name: 騎手コース勝率
+    source:
+      type: kishu_course_stat
+      stat: win_rate
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.15
+        color: yellow
+
+  - name: 騎手コース勝利数
+    source:
+      type: kishu_course_stat
+      stat: wins
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+    color_rules:
+      - condition:
+          op: ">="
+          value: 10
+        color: yellow
+
+  - name: 騎手コース複勝率
+    source:
+      type: kishu_course_stat
+      stat: top3_rate
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.30
+        color: yellow
+
+  - name: 騎手コース3着内数
+    source:
+      type: kishu_course_stat
+      stat: top3
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+    color_rules:
+      - condition:
+          op: ">="
+          value: 30
+        color: yellow
+
+  - name: 生産者名
+    source:
+      type: kyosoba_field
+      field: seisanshamei_hojinkaku_nashi
+
+  - name: 生産者ダービー勝率
+    source:
+      type: seisansha_race_stat
+      stat: win_rate
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.05
+        color: yellow
+
+  - name: 生産者ダービー勝利数
+    source:
+      type: seisansha_race_stat
+      stat: wins
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 1
+        color: yellow
+
+  - name: 生産者ダービー複勝率
+    source:
+      type: seisansha_race_stat
+      stat: top3_rate
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.20
+        color: yellow
+
+  - name: 生産者ダービー3着内数
+    source:
+      type: seisansha_race_stat
+      stat: top3
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 1
+        color: yellow
+
+  - name: 種牡馬名
+    source:
+      type: sire_race_stat
+      stat: name
+
+  - name: 産駒コース勝率
+    source:
+      type: sire_course_stat
+      stat: win_rate
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+      track_condition: "1"
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.10
+        color: yellow
+
+  - name: 産駒コース勝利数
+    source:
+      type: sire_course_stat
+      stat: wins
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+      track_condition: "1"
+    color_rules:
+      - condition:
+          op: ">="
+          value: 3
+        color: yellow
+
+  - name: 産駒コース複勝率
+    source:
+      type: sire_course_stat
+      stat: top3_rate
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+      track_condition: "1"
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.30
+        color: yellow
+
+  - name: 産駒コース3着内数
+    source:
+      type: sire_course_stat
+      stat: top3
+      keibajo_code: "05"
+      track: shiba
+      kyori: 2400
+      years: 5
+      track_condition: "1"
+    color_rules:
+      - condition:
+          op: ">="
+          value: 5
+        color: yellow
+
+  - name: 父ダービー着順
+    source:
+      type: sire_race_chakujun
+      race_name_for_history: 東京優駿
+      years: 30
+    color_rules:
+      - condition:
+          op: "<="
+          value: 3
+        color: yellow
+
+  - name: 産駒ダービー勝率
+    source:
+      type: sire_race_stat
+      stat: win_rate
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.05
+        color: yellow
+
+  - name: 産駒ダービー勝利数
+    source:
+      type: sire_race_stat
+      stat: wins
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 1
+        color: yellow
+
+  - name: 産駒ダービー複勝率
+    source:
+      type: sire_race_stat
+      stat: top3_rate
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 0.20
+        color: yellow
+
+  - name: 産駒ダービー3着内数
+    source:
+      type: sire_race_stat
+      stat: top3
+      race_name_for_history: 東京優駿
+      years: 10
+    color_rules:
+      - condition:
+          op: ">="
+          value: 1
+        color: yellow
+
+trends:
+  出走馬傾向:
+    - name: 勝利数
+      source:
+        type: past_finish_count
+      rows:
+        type: fixed
+        items:
+          - {label: "0勝", op: "==", value: 0}
+          - {label: "1勝", op: "==", value: 1}
+          - {label: "2勝", op: "==", value: 2}
+          - {label: "3勝以上", op: ">=", value: 3}
+    - name: 重賞勝利数
+      source:
+        type: past_finish_count
+        grade_codes: ["A", "B", "C"]
+      rows:
+        type: fixed
+        items:
+          - {label: "0勝", op: "==", value: 0}
+          - {label: "1勝", op: "==", value: 1}
+          - {label: "2勝以上", op: ">=", value: 2}
+    - name: 東京勝利数
+      source:
+        type: past_finish_count
+        keibajo_code: "05"
+      rows:
+        type: fixed
+        items:
+          - {label: "0勝", op: "==", value: 0}
+          - {label: "1勝", op: "==", value: 1}
+          - {label: "2勝以上", op: ">=", value: 2}
+    - name: 前走レース
+      source:
+        type: prev_race_name
+      rows:
+        type: dynamic
+        top_n: 5
+    - name: デビュー
+      source:
+        type: debut_venue
+        allowed_values: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]
+      display_map:
+        "01": 札幌
+        "02": 函館
+        "03": 福島
+        "04": 新潟
+        "05": 東京
+        "06": 中山
+        "07": 中京
+        "08": 京都
+        "09": 阪神
+        "10": 小倉
+      rows:
+        type: dynamic
+    - name: キャリア
+      source:
+        type: career_count
+      rows:
+        type: fixed
+        items:
+          - {label: "2戦以下", op: "<=", value: 2}
+          - {label: "3戦", op: "==", value: 3}
+          - {label: "4戦", op: "==", value: 4}
+          - {label: "5戦", op: "==", value: 5}
+          - {label: "6戦", op: "==", value: 6}
+          - {label: "7戦以上", op: ">=", value: 7}
+    - name: 枠順
+      source:
+        type: gate_number
+      rows:
+        type: fixed
+        items:
+          - {label: "1枠", op: "==", value: 1}
+          - {label: "2枠", op: "==", value: 2}
+          - {label: "3枠", op: "==", value: 3}
+          - {label: "4枠", op: "==", value: 4}
+          - {label: "5枠", op: "==", value: 5}
+          - {label: "6枠", op: "==", value: 6}
+          - {label: "7枠", op: "==", value: 7}
+          - {label: "8枠", op: "==", value: 8}
+    - name: 人気
+      source:
+        type: popularity
+      rows:
+        type: fixed
+        items:
+          - {label: "1人気", op: "==", value: 1}
+          - {label: "2人気", op: "==", value: 2}
+          - {label: "3人気", op: "==", value: 3}
+          - {label: "4-6人気", op: "in", value: [4, 5, 6]}
+          - {label: "7-9人気", op: "in", value: [7, 8, 9]}
+          - {label: "10人気以下", op: ">=", value: 10}
+    - name: 脚質
+      source:
+        type: running_style
+      rows:
+        type: fixed
+        items:
+          - {label: "逃げ", op: "==", value: "1"}
+          - {label: "先行", op: "==", value: "2"}
+          - {label: "差し", op: "==", value: "3"}
+          - {label: "追込", op: "==", value: "4"}
+  騎手傾向:
+    - name: 継続騎乗
+      source:
+        type: jockey_continuity
+      rows:
+        type: fixed
+        items:
+          - {label: "継続騎乗", op: "==", value: "継続"}
+          - {label: "乗り戻り", op: "==", value: "乗り戻り"}
+          - {label: "テン乗り", op: "==", value: "テン乗り"}
+    - name: 騎手
+      source:
+        type: jockey_name
+      rows:
+        type: dynamic
+        top_n: 5
+  生産者傾向:
+    - name: 生産者
+      source:
+        type: breeder_name
+      rows:
+        type: dynamic
+        top_n: 5
+  血統傾向:
+    - name: 父実績
+      rows:
+        type: boolean_multi
+        items:
+          - label: "父ダービー勝ち"
+            source:
+              type: sire_race_condition_finisher
+              race_name: "東京優駿"
+              years: 30
+          - label: "父2400mG1勝ち"
+            source:
+              type: sire_race_condition_finisher
+              grade_codes: ["A"]
+              kyori: 2400
+              years: 30
+    - name: 種牡馬
+      source:
+        type: sire_name
+      rows:
+        type: dynamic
+        top_n: 5
