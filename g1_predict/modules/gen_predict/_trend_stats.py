@@ -84,6 +84,23 @@ def compute_stats(
     return {}
 
 
+def _src_cache_key(src: dict[str, Any]) -> tuple[Any, ...]:
+    """source 設定dict からキャッシュキーを生成する。
+
+    Args:
+        src (dict[str, Any]): source の YAML 設定dict。
+
+    Returns:
+        tuple[Any, ...]: ソート済みキー・値ペアのタプル（type キーを除く）。
+    """
+    parts: list[Any] = []
+    for k in sorted(k for k in src if k != "type"):
+        v = src[k]
+        parts.append(k)
+        parts.append(tuple(v) if isinstance(v, list) else v)
+    return tuple(parts)
+
+
 def _compute_sire_condition_stats(
     rows_cfg: dict[str, Any],
     manager: ConnectionManager,
@@ -92,6 +109,7 @@ def _compute_sire_condition_stats(
     """boolean_multi (sire_race_condition_finisher) の RowStats を返す。
 
     過去レースの全種牡馬別着度数を取得し、条件を満たす父馬を持つ出走馬を集約する。
+    同一 source 条件の SQL は1回のみ実行してキャッシュする。
 
     Args:
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
@@ -107,13 +125,17 @@ def _compute_sire_condition_stats(
         row.group: row for row in (sire_result.rows if sire_result.success else [])
     }
 
+    winner_set_cache: dict[tuple[Any, ...], set[str]] = {}
     stats_map: dict[str, RowStats] = {}
     for item in rows_cfg.get("items", []):
         src = item.get("source", {})
         if src.get("type") != "sire_race_condition_finisher":
             continue
         label = item["label"]
-        winner_set = _get_sire_winner_set(src, manager, race_year)
+        cache_key = _src_cache_key(src)
+        if cache_key not in winner_set_cache:
+            winner_set_cache[cache_key] = _get_sire_winner_set(src, manager, race_year)
+        winner_set = winner_set_cache[cache_key]
         matching = [
             _chakudo_row_to_stats(row)
             for name, row in sire_stats.items()

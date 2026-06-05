@@ -199,21 +199,18 @@ def test_group_by_rows_cfg_failed_result_returns_empty() -> None:
 
 def test_compute_stats_gate_number_calls_analyze_chakudo() -> None:
     """gate_number source は analyze_chakudo を呼び出す。"""
+    from unittest.mock import patch
+
     mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=2, total=10)])
-
-    with MagicMock() as mock_analyze:
-        mock_analyze.return_value = mock_result
-        from unittest.mock import patch
-
-        with patch(
-            "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
-            return_value=mock_result,
-        ):
-            metric_cfg = {
-                "source": {"type": "gate_number"},
-                "rows": {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]},
-            }
-            stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ):
+        metric_cfg = {
+            "source": {"type": "gate_number"},
+            "rows": {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]},
+        }
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
     assert "1枠" in stats
 
 
