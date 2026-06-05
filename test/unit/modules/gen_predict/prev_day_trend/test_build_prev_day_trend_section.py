@@ -8,9 +8,9 @@ import pytest
 from g1_predict.modules.gen_predict.prev_day_trend import build_prev_day_trend_section
 
 
-def _make_race_info(keibajo_code: str = "05", shiba_da: str = "芝") -> pd.DataFrame:
+def _make_race_info(keibajo_code: str = "05", track_code: str = "10") -> pd.DataFrame:
     """対象レースの基本情報DataFrameを生成する。"""
-    return pd.DataFrame({"競馬場コード": [keibajo_code], "芝ダ": [shiba_da]})
+    return pd.DataFrame({"keibajo_code": [keibajo_code], "track_code": [track_code]})
 
 
 def _make_raw_shosai(
@@ -95,10 +95,14 @@ def _call(
     mock_rg.get_race_shosai.return_value = raw_shosai
 
     with (
+        patch("g1_predict.modules.gen_predict.prev_day_trend.DataInterface", return_value=mock_di),
         patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
-        patch("g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name", return_value=venue_name),
+        patch(
+            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name",
+            return_value=venue_name,
+        ),
     ):
-        return build_prev_day_trend_section(race_code, race_info, mock_di)
+        return build_prev_day_trend_section(race_code, race_info)
 
 
 @pytest.fixture
@@ -229,10 +233,14 @@ def test_build_prev_day_trend_section_prev_date_passed_to_race_getter() -> None:
     mock_rg.get_race_shosai.return_value = pd.DataFrame()
 
     with (
+        patch("g1_predict.modules.gen_predict.prev_day_trend.DataInterface"),
         patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
-        patch("g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name", return_value="東京"),
+        patch(
+            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name",
+            return_value="東京",
+        ),
     ):
-        build_prev_day_trend_section("2026050505010101", _make_race_info(), MagicMock())
+        build_prev_day_trend_section("2026050505010101", _make_race_info())
 
     mock_rg.get_race_shosai.assert_called_once_with(
         start_date=date(2026, 5, 4),
