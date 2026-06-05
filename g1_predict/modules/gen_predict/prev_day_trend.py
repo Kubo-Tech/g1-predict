@@ -7,11 +7,7 @@ from keiba_data_interface import DataInterface
 from keiba_data_interface.utils.race_code import keibajo_code_to_name
 from mykeibadb import RaceGetter
 
-_TRACK_CODE_TO_SHIBA_DA: dict[str, str] = {
-    **{str(code): "芝" for code in range(10, 23)},
-    **{str(code): "ダ" for code in range(23, 30)},
-    **{str(code): "芝" for code in range(51, 60)},
-}
+from ._constants import TRACK_CODE_TO_SHIBA_DA
 
 _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "701": "新馬",
@@ -38,7 +34,6 @@ GRADE_CODE_DISPLAY: dict[str, str] = {
 def build_prev_day_trend_section(
     race_code: str,
     race_info: pd.DataFrame,
-    di: DataInterface,
 ) -> str:
     """前日の傾向セクションを生成する。
 
@@ -46,14 +41,15 @@ def build_prev_day_trend_section(
 
     Args:
         race_code (str): 16桁レースコード。
-        race_info (pd.DataFrame): 対象レースの基本情報DataFrame。
-        di (DataInterface): DataInterface インスタンス。
+        race_info (pd.DataFrame): 対象レースの基本情報DataFrame（raw英語カラム名）。
 
     Returns:
         str: 前日の傾向セクション文字列。
     """
-    keibajo_code = str(race_info["競馬場コード"].iloc[0])
-    target_shiba_da = str(race_info["芝ダ"].iloc[0])
+    di = DataInterface("mykeibadb")
+    keibajo_code = str(race_info["keibajo_code"].iloc[0])
+    track_code = str(race_info["track_code"].iloc[0]).strip()
+    target_shiba_da = TRACK_CODE_TO_SHIBA_DA.get(track_code, "")
 
     year = int(race_code[0:4])
     mmdd = race_code[4:8]
@@ -123,7 +119,7 @@ def _get_prev_day_matched_races(
     raw = raw[not_barrier]
 
     shiba_da_series = raw["track_code"].apply(
-        lambda tc: _TRACK_CODE_TO_SHIBA_DA.get(str(tc).strip(), "")
+        lambda tc: TRACK_CODE_TO_SHIBA_DA.get(str(tc).strip(), "")
     )
     raw = raw[shiba_da_series == shiba_da]
 

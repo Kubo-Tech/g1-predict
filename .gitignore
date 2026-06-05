@@ -24,3 +24,5 @@ venv/
 
 # TFJVデータ（ボリュームマウント）
 MY_DATA/
+
+DEV_HISTORY/

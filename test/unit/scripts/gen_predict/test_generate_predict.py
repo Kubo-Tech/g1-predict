@@ -1,5 +1,6 @@
 """generate_predict の単体テスト。"""
 import os
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -79,6 +80,7 @@ def _run(
     race_code: str = "2026013105010110",
     marks: dict[int, str] | None = None,
     kek_comments_per_call: list[dict[int, str]] | None = None,
+    trend_section_return: str = "## 前日の傾向\n",
 ) -> None:
     """generate_predict をパッチ環境で実行する。"""
     if marks is None:
@@ -94,7 +96,10 @@ def _run(
         patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
         patch("scripts.gen_predict.read_marks", return_value=marks),
         patch("scripts.gen_predict.read_kek_comments", side_effect=_fake_read_kek_comments),
-        patch("scripts.gen_predict.build_prev_day_trend_section", return_value="## 前日の傾向\n"),
+        patch(
+            "scripts.gen_predict.build_prev_day_trend_section",
+            return_value=trend_section_return,
+        ),
         patch.dict("os.environ", {"TFJV_DATA_DIR": "/tmp/fake_tfjv"}),
     ):
         generate_predict(race_code)
@@ -112,7 +117,7 @@ def test_generate_predict_title_format(dirs: tuple[str, str]) -> None:
     """生成ファイルのタイトルが # {race_name}{year}予想 になる。"""
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(race_name="天皇賞春", year="2026"), public_dir, templates_dir)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert content.startswith("# 天皇賞春2026")
 
 
@@ -128,7 +133,7 @@ def test_generate_predict_marks_section_shows_only_marked_horses(
     ]
     marks = {2: "◎"}
     _run(_make_mock_race_getter(horses=horses), public_dir, templates_dir, marks=marks)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     marks_section = content[content.index("## 印") : content.index("## 見解")]
     assert "カキクケコ" in marks_section
     assert "アイウエオ" not in marks_section
@@ -147,7 +152,7 @@ def test_generate_predict_marks_section_ordered_by_mark_priority(
     ]
     marks = {1: "▲", 2: "○", 3: "◎"}
     _run(_make_mock_race_getter(horses=horses), public_dir, templates_dir, marks=marks)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     marks_section = content[content.index("## 印") : content.index("## 見解")]
     assert (
         marks_section.index("◎")
@@ -167,7 +172,7 @@ def test_generate_predict_marks_section_same_mark_ordered_by_umaban(
     ]
     marks = {5: "○", 1: "○"}
     _run(_make_mock_race_getter(horses=horses), public_dir, templates_dir, marks=marks)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     marks_section = content[content.index("## 印") : content.index("## 見解")]
     assert marks_section.index("1ホースA") < marks_section.index("5ホースB")
 
@@ -180,7 +185,7 @@ def test_generate_predict_insight_section_shows_marked_horse_header(
     horses = [_make_horse_raw(3, "ホースA", "2020100001")]
     marks = {3: "◎"}
     _run(_make_mock_race_getter(horses=horses), public_dir, templates_dir, marks=marks)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert "### ◎3ホースA" in content
 
 
@@ -195,7 +200,7 @@ def test_generate_predict_insight_section_skips_unmarked_horse(
     ]
     marks = {1: "◎"}
     _run(_make_mock_race_getter(horses=horses), public_dir, templates_dir, marks=marks)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     insight_section = content[content.index("## 見解") : content.index("## 買い目")]
     assert "ホースA" in insight_section
     assert "ホースB" not in insight_section
@@ -413,19 +418,13 @@ def test_generate_predict_prev_day_trend_section_content_is_embedded(
 ) -> None:
     """build_prev_day_trend_section の戻り値が前日の傾向セクションに埋め込まれる。"""
     public_dir, templates_dir = dirs
-    with (
-        patch("scripts.gen_predict.DataInterface", return_value=_make_mock_di()),
-        patch("scripts.gen_predict._PUBLIC_DIR", public_dir),
-        patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
-        patch("scripts.gen_predict.read_marks", return_value={}),
-        patch("scripts.gen_predict.read_kek_comments", return_value={}),
-        patch(
-            "scripts.gen_predict.build_prev_day_trend_section",
-            return_value="## 前日の傾向\n\nダート先行有利\n",
-        ),
-        patch.dict("os.environ", {"TFJV_DATA_DIR": "/tmp/fake_tfjv"}),
-    ):
-        generate_predict("2026013105010110")
+    _run(
+        _make_mock_race_getter(),
+        public_dir,
+        templates_dir,
+        race_code="2026013105010110",
+        trend_section_return="## 前日の傾向\n\nダート先行有利\n",
+    )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert "ダート先行有利" in content
 
@@ -434,7 +433,7 @@ def test_generate_predict_has_insight_section(dirs: tuple[str, str]) -> None:
     """見解セクションが出力される。"""
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert "## 見解" in content
 
 
@@ -442,7 +441,7 @@ def test_generate_predict_has_kaimoku_section(dirs: tuple[str, str]) -> None:
     """買い目セクションが出力される。"""
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert "## 買い目" in content
 
 
@@ -452,24 +451,9 @@ def test_generate_predict_creates_file_in_race_subdir(
     """生成ファイルが {race_code}_{race_name}/予想.md に作成される。"""
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
-    assert os.path.exists(os.path.join(public_dir, "2026", "01_天皇賞春.md"))
-
-
-def test_generate_predict_serial_increments_from_existing_files(
-    dirs: tuple[str, str],
-) -> None:
-    """既存ファイルの最大番号 +1 が連番になる。"""
-    public_dir, templates_dir = dirs
-    year_dir = os.path.join(public_dir, "2026")
-    os.makedirs(year_dir)
-    with open(os.path.join(year_dir, "05_大阪杯.md"), "w"):
-        pass
-    with open(os.path.join(year_dir, "03_桜花賞.md"), "w"):
-        pass
-
-    _run(_make_mock_race_getter(), public_dir, templates_dir)
-
-    assert os.path.exists(os.path.join(public_dir, "2026", "06_天皇賞春.md"))
+    assert os.path.exists(
+        os.path.join(public_dir, "2026", "2026013105010110_天皇賞春", "予想.md")
+    )
 
 
 def test_generate_predict_uses_points_template_when_exists(
@@ -492,7 +476,7 @@ def test_generate_predict_uses_default_points_when_template_missing(
     """ポイントテンプレートがない場合、デフォルトのポイントセクションが使われる。"""
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
-    content = _read_output(public_dir, "2026", "01_天皇賞春.md")
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert "## ポイント" in content
     assert "先行有利" not in content
 
