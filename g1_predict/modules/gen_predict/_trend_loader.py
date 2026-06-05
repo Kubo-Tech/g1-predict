@@ -30,6 +30,7 @@ def build_race_context(
     track_code = str(race_info["track_code"].iloc[0]).strip()
     shiba_da = TRACK_CODE_TO_SHIBA_DA.get(track_code)
     race_year = int(str(race_info["kaisai_nen"].iloc[0]))
+    tokubetsu_kyoso_bango = str(race_info["tokubetsu_kyoso_bango"].iloc[0]).strip().zfill(4)
 
     config = ConfigManager.from_env()
     manager = ConnectionManager(config)
@@ -39,5 +40,6 @@ def build_race_context(
         shiba_da=shiba_da,
         year_from=str(race_year - TREND_YEARS),
         year_to=str(race_year - 1),
+        tokubetsu_kyoso_bango=tokubetsu_kyoso_bango,
     )
     return manager, condition
