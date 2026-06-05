@@ -7,8 +7,8 @@ from mykeibadb import MasterGetter, RaceGetter
 
 from g1_predict.modules.gen_table.table_utils import DIRT_TRACK_CODES, SHIBA_TRACK_CODES, year_range
 
+from ._constants import TRACK_CODE_TO_SHIBA_DA
 from ._trend_models import SIRE_YEARS, TREND_YEARS, Db, sire_cache_key
-from .prev_day_trend import TRACK_CODE_TO_SHIBA_DA
 
 
 def load_db(

@@ -80,6 +80,7 @@ def _run(
     race_code: str = "2026013105010110",
     marks: dict[int, str] | None = None,
     kek_comments_per_call: list[dict[int, str]] | None = None,
+    trend_section_return: str = "## 前日の傾向\n",
 ) -> None:
     """generate_predict をパッチ環境で実行する。"""
     if marks is None:
@@ -95,7 +96,10 @@ def _run(
         patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
         patch("scripts.gen_predict.read_marks", return_value=marks),
         patch("scripts.gen_predict.read_kek_comments", side_effect=_fake_read_kek_comments),
-        patch("scripts.gen_predict.build_prev_day_trend_section", return_value="## 前日の傾向\n"),
+        patch(
+            "scripts.gen_predict.build_prev_day_trend_section",
+            return_value=trend_section_return,
+        ),
         patch.dict("os.environ", {"TFJV_DATA_DIR": "/tmp/fake_tfjv"}),
     ):
         generate_predict(race_code)
@@ -419,9 +423,10 @@ def test_generate_predict_prev_day_trend_section_content_is_embedded(
         public_dir,
         templates_dir,
         race_code="2026013105010110",
+        trend_section_return="## 前日の傾向\n\nダート先行有利\n",
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "## 前日の傾向" in content
+    assert "ダート先行有利" in content
 
 
 def test_generate_predict_has_insight_section(dirs: tuple[str, str]) -> None:

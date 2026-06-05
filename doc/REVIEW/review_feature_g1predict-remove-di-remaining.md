@@ -11,7 +11,7 @@
 
 ## 指摘事項
 
-### 1. `_trend_loader.py` の import が絶対パス
+### 1. `_trend_loader.py` の import が絶対パス → 解消済み
 
 | 項目 | 内容 |
 |------|------|
@@ -20,19 +20,14 @@
 
 **指摘内容**
 
-同一パッケージ内の `prev_day_trend` モジュールを絶対インポートしている。同一パッケージ内のモジュールは相対インポートで参照するのが Python の慣習。
+同一パッケージ内の `prev_day_trend` モジュールを絶対インポートしていた。
 
-**修正案**
+**対応**
 
-```python
-# 修正前
-from g1_predict.modules.gen_predict.prev_day_trend import TRACK_CODE_TO_SHIBA_DA
+相対インポートに修正済み。さらに Copilot レビューにより `TRACK_CODE_TO_SHIBA_DA` を
+`_constants.py` へ分離し、`_trend_loader.py` から `prev_day_trend` への依存を解消した。
 
-# 修正後
-from .prev_day_trend import TRACK_CODE_TO_SHIBA_DA
-```
-
-### 2. `build_prev_day_trend_section()` 内で `DataInterface("mykeibadb")` をハードコード
+### 2. `build_prev_day_trend_section()` 内で `DataInterface("mykeibadb")` をハードコード → 解消済み
 
 | 項目 | 内容 |
 |------|------|
@@ -42,12 +37,11 @@ from .prev_day_trend import TRACK_CODE_TO_SHIBA_DA
 **指摘内容**
 
 `di = DataInterface("mykeibadb")` が関数内にハードコードされており、テスト時に DI を差し替えられない。
-今後テストを追加する際の障壁になりうる。
 
-**修正案**
+**対応**
 
-現時点ではこのリポジトリに `prev_day_trend` のテストが存在しないため、差し迫った問題はない。
-将来テストが必要になった際に引数として受け取る形に変更することを検討する。
+`test/unit/modules/gen_predict/prev_day_trend/test_build_prev_day_trend_section.py` を追加し、
+`patch("...DataInterface")` でモック注入する形でテストを実装した。
 
 ## まとめ
 
@@ -57,4 +51,4 @@ from .prev_day_trend import TRACK_CODE_TO_SHIBA_DA
 | Warning | 0 |
 | Suggestion | 2 |
 
-Critical・Warning なし。Suggestion 2件はいずれも修正しなくても支障なし。PRを進める。
+すべて対応済み。

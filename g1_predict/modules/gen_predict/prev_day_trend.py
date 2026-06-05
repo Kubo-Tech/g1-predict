@@ -7,11 +7,7 @@ from keiba_data_interface import DataInterface
 from keiba_data_interface.utils.race_code import keibajo_code_to_name
 from mykeibadb import RaceGetter
 
-TRACK_CODE_TO_SHIBA_DA: dict[str, str] = {
-    **{str(code): "芝" for code in range(10, 23)},
-    **{str(code): "ダ" for code in range(23, 30)},
-    **{str(code): "芝" for code in range(51, 60)},
-}
+from ._constants import TRACK_CODE_TO_SHIBA_DA
 
 _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "701": "新馬",
