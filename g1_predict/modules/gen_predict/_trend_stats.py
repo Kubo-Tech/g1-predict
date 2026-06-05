@@ -42,8 +42,8 @@ def compute_stats(
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
     """
-    rows_cfg = metric_cfg.get("rows", {})
-    src = metric_cfg.get("source", {})
+    rows_cfg = metric_cfg["rows"]
+    src = metric_cfg["source"]
     src_type = src.get("type", "")
 
     if rows_cfg.get("type") == "boolean_multi":
@@ -199,13 +199,15 @@ def _yaml_rows_to_rowsdef(
     """YAML rows 設定を RowsDef 形式に変換する。
 
     op: "==" は int/str、op: ">=" は (value, 9999)、op: "<=" は (0, value) に変換する。
-    op: "in" は analyze_entry_attr_chakudo では対応不可のためスキップする。
 
     Args:
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
 
     Returns:
         dict[str, tuple[int, int] | int | str]: RowsDef 形式の辞書。
+
+    Raises:
+        ValueError: op が "in" の場合（analyze_entry_attr_chakudo では非対応）。
     """
     if rows_cfg.get("type") == "dynamic":
         return {}
@@ -220,6 +222,8 @@ def _yaml_rows_to_rowsdef(
             result[label] = (int(value), 9999)
         elif op == "<=":
             result[label] = (0, int(value))
+        elif op == "in":
+            raise ValueError(f"op 'in' は entry_attr 系 source では使用できません。label={label!r}")
     return result
 
 

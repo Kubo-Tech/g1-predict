@@ -28,7 +28,7 @@ def build_race_context(
     keibajo_code = str(race_info["keibajo_code"].iloc[0]).strip()
     kyori = int(race_info["kyori"].iloc[0])
     track_code = str(race_info["track_code"].iloc[0]).strip()
-    shiba_da = TRACK_CODE_TO_SHIBA_DA.get(track_code) or None
+    shiba_da = TRACK_CODE_TO_SHIBA_DA.get(track_code)
     race_year = int(str(race_info["kaisai_nen"].iloc[0]))
 
     config = ConfigManager.from_env()

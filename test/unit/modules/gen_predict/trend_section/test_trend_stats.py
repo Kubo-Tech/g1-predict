@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+import pytest
 from mykeibadb.analytics import ChakudoResult, ChakudoRow, RaceCondition
 
 from g1_predict.modules.gen_predict._trend_models import RowStats
@@ -117,45 +118,27 @@ def test_merge_stats_sums_chakujun_counts() -> None:
 # --- _group_matches ---
 
 
-def test_group_matches_eq_int() -> None:
-    """整数値の == 比較が機能する。"""
-    assert _group_matches("3", "==", 3) is True
-    assert _group_matches("3", "==", 4) is False
-
-
-def test_group_matches_eq_str() -> None:
-    """文字列値の == 比較が機能する。"""
-    assert _group_matches("継続", "==", "継続") is True
-    assert _group_matches("継続", "==", "テン乗り") is False
-
-
-def test_group_matches_gte() -> None:
-    """>= 比較が機能する。"""
-    assert _group_matches("10", ">=", 10) is True
-    assert _group_matches("9", ">=", 10) is False
-
-
-def test_group_matches_lte() -> None:
-    """<= 比較が機能する。"""
-    assert _group_matches("2", "<=", 2) is True
-    assert _group_matches("3", "<=", 2) is False
-
-
-def test_group_matches_in_int_list() -> None:
-    """in 演算子（int リスト）が機能する。"""
-    assert _group_matches("4", "in", [4, 5, 6]) is True
-    assert _group_matches("7", "in", [4, 5, 6]) is False
-
-
-def test_group_matches_in_str_list() -> None:
-    """in 演算子（str リスト）が機能する。"""
-    assert _group_matches("1", "in", ["1", "2"]) is True
-    assert _group_matches("3", "in", ["1", "2"]) is False
-
-
-def test_group_matches_leading_zero_int() -> None:
-    """先頭ゼロの文字列も int 変換して比較できる。"""
-    assert _group_matches("01", "==", 1) is True
+@pytest.mark.parametrize(
+    "group_str, op, threshold, expected",
+    [
+        ("3", "==", 3, True),
+        ("3", "==", 4, False),
+        ("継続", "==", "継続", True),
+        ("継続", "==", "テン乗り", False),
+        ("10", ">=", 10, True),
+        ("9", ">=", 10, False),
+        ("2", "<=", 2, True),
+        ("3", "<=", 2, False),
+        ("4", "in", [4, 5, 6], True),
+        ("7", "in", [4, 5, 6], False),
+        ("1", "in", ["1", "2"], True),
+        ("3", "in", ["1", "2"], False),
+        ("01", "==", 1, True),
+    ],
+)
+def test_group_matches(group_str: str, op: str, threshold: object, expected: bool) -> None:
+    """_group_matches が各演算子と入力パターンを正しく評価する。"""
+    assert _group_matches(group_str, op, threshold) is expected
 
 
 # --- _group_by_rows_cfg ---

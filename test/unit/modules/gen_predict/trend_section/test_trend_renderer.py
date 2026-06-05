@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 from mykeibadb.analytics import RaceCondition
 
 from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
@@ -27,29 +28,19 @@ def _make_condition() -> RaceCondition:
 # --- _format_percent ---
 
 
-def test_format_percent_total_zero() -> None:
-    """Total が 0 の場合は "-" を返す。"""
-    assert _format_percent(0, 0) == "-"
-
-
-def test_format_percent_zero_count() -> None:
-    """Count が 0 の場合は "0%" を返す。"""
-    assert _format_percent(0, 10) == "0%"
-
-
-def test_format_percent_half() -> None:
-    """50% を正しく返す。"""
-    assert _format_percent(5, 10) == "50%"
-
-
-def test_format_percent_rounds() -> None:
-    """四捨五入して返す。"""
-    assert _format_percent(1, 3) == "33%"
-
-
-def test_format_percent_all() -> None:
-    """100% を正しく返す。"""
-    assert _format_percent(3, 3) == "100%"
+@pytest.mark.parametrize(
+    "count, total, expected",
+    [
+        (0, 0, "-"),
+        (0, 10, "0%"),
+        (5, 10, "50%"),
+        (1, 3, "33%"),
+        (3, 3, "100%"),
+    ],
+)
+def test_format_percent(count: int, total: int, expected: str) -> None:
+    """_format_percent が count/total から正しいパーセント文字列を返す。"""
+    assert _format_percent(count, total) == expected
 
 
 # --- _get_dynamic_labels ---
