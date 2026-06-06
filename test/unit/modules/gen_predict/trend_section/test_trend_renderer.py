@@ -8,6 +8,7 @@ from mykeibadb.analytics import RaceCondition
 from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
 from g1_predict.modules.gen_predict._trend_renderer import (
     _aggregate_other_stats,
+    _build_metric_section,
     _format_percent,
     _format_table_row,
     _get_dynamic_labels,
@@ -60,7 +61,7 @@ def test_get_dynamic_labels_sorted_by_top3() -> None:
 
 
 def test_get_dynamic_labels_top_n() -> None:
-    """top_n 件のみ返す。"""
+    """top_n 件のみ返す（タイなし）。"""
     stats_map = {
         "A": RowStats(first=3),
         "B": RowStats(first=2),
@@ -68,6 +69,25 @@ def test_get_dynamic_labels_top_n() -> None:
     }
     labels = _get_dynamic_labels(stats_map, top_n=2)
     assert labels == ["A", "B"]
+
+
+def test_get_dynamic_labels_top_n_tie_includes_all() -> None:
+    """top_n 位と同数のラベルを全て含める。"""
+    stats_map = {
+        "A": RowStats(first=3),
+        "B": RowStats(first=2),
+        "C": RowStats(first=2),
+        "D": RowStats(first=2),
+        "E": RowStats(first=1),
+        "F": RowStats(first=1),
+    }
+    labels = _get_dynamic_labels(stats_map, top_n=2)
+    assert "A" in labels
+    assert "B" in labels
+    assert "C" in labels
+    assert "D" in labels
+    assert "E" not in labels
+    assert len(labels) == 4
 
 
 def test_get_dynamic_labels_excludes_other_label() -> None:
@@ -238,3 +258,81 @@ def test_build_category_section_trend_years_in_header() -> None:
             "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
         )
     assert f"過去{TREND_YEARS}年" in result
+
+
+# --- _build_metric_section: always_include_grades ---
+
+
+def test_build_metric_section_always_include_grades_adds_missing_juusho() -> None:
+    """always_include_grades 指定時、top_n 外の重賞が表示される。"""
+    stats_map = {
+        "天皇賞": RowStats(first=5, second=3, third=2, total=20),
+        "マイルCS": RowStats(first=4, second=2, third=2, total=18),
+        "スプリンターズS": RowStats(first=3, second=2, third=1, total=15),
+        "京王杯SC": RowStats(first=2, second=1, third=1, total=12),
+        "阪神C": RowStats(first=1, second=1, third=0, total=10),
+        "ヴィクトリアM": RowStats(first=1, second=0, third=0, total=8),
+    }
+
+    metric_cfg = {
+        "name": "前走レース",
+        "source": {"type": "prev_race_name", "overseas_label": "海外"},
+        "rows": {
+            "type": "dynamic",
+            "top_n": 5,
+            "always_include_grades": ["A", "B", "C"],
+        },
+    }
+
+    with (
+        patch(
+            "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+            return_value=stats_map,
+        ),
+        patch(
+            "g1_predict.modules.gen_predict._trend_renderer.get_juusho_race_names",
+            return_value={"天皇賞", "マイルCS", "スプリンターズS", "ヴィクトリアM"},
+        ),
+    ):
+        result = _build_metric_section(metric_cfg, _make_manager(), _make_condition())
+
+    assert "ヴィクトリアM" in result
+    assert "天皇賞" in result
+
+
+def test_build_metric_section_always_include_grades_overseas_not_added() -> None:
+    """海外ラベルは重賞名セットに含まれないため追加されない。"""
+    stats_map = {
+        "海外": RowStats(first=1, second=0, third=0, total=3),
+        "マイルCS": RowStats(first=5, second=3, third=2, total=20),
+    }
+
+    metric_cfg = {
+        "name": "前走レース",
+        "source": {"type": "prev_race_name", "overseas_label": "海外"},
+        "rows": {
+            "type": "dynamic",
+            "top_n": 1,
+            "always_include_grades": ["A"],
+        },
+    }
+
+    with (
+        patch(
+            "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+            return_value=stats_map,
+        ),
+        patch(
+            "g1_predict.modules.gen_predict._trend_renderer.get_juusho_race_names",
+            return_value={"マイルCS"},
+        ),
+    ):
+        result = _build_metric_section(metric_cfg, _make_manager(), _make_condition())
+
+    lines = result.split("\n")
+    row_lines = [
+        ln for ln in lines
+        if ln.startswith("| ") and "---" not in ln and "前走レース" not in ln
+    ]
+    labels_in_result = [ln.split("|")[1].strip() for ln in row_lines]
+    assert "海外" not in labels_in_result

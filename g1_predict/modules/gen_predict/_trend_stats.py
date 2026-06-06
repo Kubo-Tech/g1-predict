@@ -90,6 +90,30 @@ def compute_stats(
     return {}
 
 
+def get_juusho_race_names(
+    manager: ConnectionManager,
+    grades: list[str],
+) -> set[str]:
+    """grade_code が grades に含まれるレースの競走名本題セットを返す。
+
+    Args:
+        manager (ConnectionManager): DB接続マネージャ。
+        grades (list[str]): 対象グレードコードのリスト（例: ["A", "B", "C"]）。
+
+    Returns:
+        set[str]: 競走名本題の文字列セット（空白トリム済み）。
+    """
+    sql = """
+        SELECT DISTINCT TRIM(r.kyosomei_hondai) AS race_name
+        FROM race_shosai r
+        WHERE r.grade_code = ANY(%s)
+    """
+    df = manager.fetch_dataframe(sql, params=(grades,))
+    if df.empty:
+        return set()
+    return set(df["race_name"].astype(str).str.strip().tolist())
+
+
 def _src_cache_key(src: dict[str, Any]) -> tuple[Any, ...]:
     """source 設定dict からキャッシュキーを生成する。
 

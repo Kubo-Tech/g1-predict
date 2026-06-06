@@ -6,7 +6,7 @@ from mykeibadb.analytics import RaceCondition
 from mykeibadb.connection import ConnectionManager
 
 from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
-from ._trend_stats import compute_stats
+from ._trend_stats import compute_stats, get_juusho_race_names
 
 
 def build_category_section(
@@ -70,6 +70,19 @@ def _build_metric_section(
         if allowed_values is not None:
             allowed_set = set(str(v) for v in allowed_values)
             labels = [lb for lb in labels if lb in allowed_set]
+        always_grades = rows_cfg.get("always_include_grades")
+        if always_grades is not None:
+            juusho_names = get_juusho_race_names(manager, always_grades)
+            labels_set = set(labels)
+            extra = [
+                name for name in juusho_names
+                if name in stats_map and name not in labels_set
+            ]
+            extra.sort(
+                key=lambda n: stats_map[n].first + stats_map[n].second + stats_map[n].third,
+                reverse=True,
+            )
+            labels = labels + extra
     elif rows_cfg["type"] in ("fixed", "boolean_multi"):
         labels = [item["label"] for item in rows_cfg["items"]]
     else:
@@ -119,7 +132,10 @@ def _get_dynamic_labels(
         if label != OTHER_LABEL
     ]
     items.sort(key=lambda x: x[1], reverse=True)
-    return [label for label, _ in items] if top_n is None else [label for label, _ in items[:top_n]]
+    if top_n is None or len(items) <= top_n:
+        return [label for label, _ in items]
+    threshold = items[top_n - 1][1]
+    return [label for label, score in items if score >= threshold]
 
 
 def _aggregate_other_stats(
