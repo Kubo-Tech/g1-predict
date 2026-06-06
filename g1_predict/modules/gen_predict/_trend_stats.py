@@ -76,10 +76,16 @@ def compute_stats(
         "prev_race_name",
         "debut_venue",
         "jockey_continuity",
+        "prev_race_col",
     ):
         group_by = _build_group_by(src, rows_cfg)
         result = analyze_chakudo(manager, [], condition, group_by)
         return _chakudo_to_stats_map(result)
+
+    if src_type == "same_race_prev_year_finish":
+        group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
+        result = analyze_chakudo(manager, [], condition, group_by)
+        return _group_by_rows_cfg(result, rows_cfg)
 
     return {}
 
@@ -140,6 +146,9 @@ def _compute_sire_condition_stats(
 
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
+
+    Raises:
+        ValueError: condition.year_to が None の場合。
     """
     if condition.year_to is None:
         raise ValueError("condition.year_to は必須です。")
