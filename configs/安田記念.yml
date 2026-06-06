@@ -1,0 +1,109 @@
+race_name: 安田記念
+
+trends:
+  出走馬傾向:
+    - name: 枠順
+      source: {type: gate_number}
+      rows:
+        type: fixed
+        items:
+          - {label: "1枠", op: "==", value: 1}
+          - {label: "2枠", op: "==", value: 2}
+          - {label: "3枠", op: "==", value: 3}
+          - {label: "4枠", op: "==", value: 4}
+          - {label: "5枠", op: "==", value: 5}
+          - {label: "6枠", op: "==", value: 6}
+          - {label: "7枠", op: "==", value: 7}
+          - {label: "8枠", op: "==", value: 8}
+    - name: 人気
+      source: {type: popularity}
+      rows:
+        type: fixed
+        items:
+          - {label: "1人気", op: "==", value: 1}
+          - {label: "2人気", op: "==", value: 2}
+          - {label: "3人気", op: "==", value: 3}
+          - {label: "4-6人気", op: "in", value: [4, 5, 6]}
+          - {label: "7-9人気", op: "in", value: [7, 8, 9]}
+          - {label: "10人気以下", op: ">=", value: 10}
+    - name: 脚質
+      source: {type: running_style}
+      rows:
+        type: fixed
+        items:
+          - {label: "逃げ", op: "==", value: "1"}
+          - {label: "先行", op: "==", value: "2"}
+          - {label: "差し", op: "==", value: "3"}
+          - {label: "追込", op: "==", value: "4"}
+    - name: 前走脚質
+      source: {type: prev_race_col, column: kyakushitsu_hantei}
+      rows:
+        type: fixed
+        items:
+          - {label: "逃げ", op: "==", value: "1"}
+          - {label: "先行", op: "==", value: "2"}
+          - {label: "差し", op: "==", value: "3"}
+          - {label: "追込", op: "==", value: "4"}
+    - name: 所属
+      source: {type: affiliation}
+      rows:
+        type: fixed
+        items:
+          - {label: "美浦", op: "==", value: 1}
+          - {label: "栗東", op: "==", value: 2}
+          - {label: "地方", op: "==", value: 3}
+          - {label: "海外", op: "==", value: 4}
+    - name: 馬齢
+      source: {type: horse_age}
+      rows:
+        type: fixed
+        items:
+          - {label: "3歳", op: "==", value: 3}
+          - {label: "4歳", op: "==", value: 4}
+          - {label: "5歳", op: "==", value: 5}
+          - {label: "6歳", op: "==", value: 6}
+          - {label: "7歳以上", op: ">=", value: 7}
+    - name: 性別
+      source: {type: sex}
+      rows:
+        type: fixed
+        items:
+          - {label: "牡", op: "==", value: 1}
+          - {label: "牝", op: "==", value: 2}
+          - {label: "セン", op: "==", value: 3}
+    - name: 前走レース
+      source: {type: prev_race_name, overseas_label: 海外}
+      rows:
+        type: dynamic
+        top_n: 5
+        always_include_grades: ["A", "B", "C"]
+    - name: 前走距離
+      source: {type: prev_race_col, column: kyori}
+      rows:
+        type: fixed
+        items:
+          - {label: "距離延長", op: "<", value: 1600}
+          - {label: "同距離", op: "==", value: 1600}
+          - {label: "距離短縮", op: ">", value: 1600}
+    - name: リピーター
+      source: {type: same_race_prev_year_finish, tokubetsu_kyoso_bango: "0010", absent_label: 前年出走無し}
+      rows:
+        type: fixed
+        items:
+          - {label: "前年3着以内", op: "<=", value: 3}
+          - {label: "前年4着以内", op: "<=", value: 4}
+          - {label: "前年5着以内", op: "<=", value: 5}
+          - {label: "前年6着以下", op: ">=", value: 6}
+          - {label: "前年出走無し", op: "==", value: "前年出走無し"}
+  騎手傾向:
+    - name: 騎手
+      source: {type: jockey_name}
+      rows: {type: dynamic, top_n: 5}
+  生産者傾向:
+    - name: 生産者
+      source: {type: breeder_name}
+      rows: {type: dynamic, top_n: 5}
+  血統傾向:
+    - name: 種牡馬
+      source: {type: sire_name}
+      rows: {type: dynamic, top_n: 5}
