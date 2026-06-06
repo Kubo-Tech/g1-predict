@@ -215,6 +215,76 @@ def test_compute_stats_gate_number_calls_analyze_chakudo() -> None:
     assert "1枠" in stats
 
 
+def test_compute_stats_prev_race_col_builds_fixed_group_by() -> None:
+    """prev_race_col source は fixed GroupBy で analyze_chakudo を呼ぶ。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="逃げ", wins=1, total=5)])
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {"type": "prev_race_col", "column": "kyakushitsu_hantei"},
+            "rows": {
+                "type": "fixed",
+                "items": [{"label": "逃げ", "op": "==", "value": "1"}],
+            },
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by.kind == "fixed"
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.type == "prev_race_col"
+    assert group_by.source.column == "kyakushitsu_hantei"
+
+
+def test_compute_stats_same_race_prev_year_finish_cumulative() -> None:
+    """same_race_prev_year_finish は history 取得 + _group_by_rows_cfg で累積計上される。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    raw_rows = [
+        _make_chakudo_row(group="1", wins=1, second=0, third=0, chakugai=0, total=1),
+        _make_chakudo_row(group="2", wins=0, second=1, third=0, chakugai=0, total=1),
+        _make_chakudo_row(group="前年出走無し", wins=0, second=0, third=0, chakugai=5, total=5),
+    ]
+    mock_result = _make_chakudo_result(raw_rows)
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {
+                "type": "same_race_prev_year_finish",
+                "tokubetsu_kyoso_bango": "0010",
+                "absent_label": "前年出走無し",
+            },
+            "rows": {
+                "type": "fixed",
+                "items": [
+                    {"label": "前年3着以内", "op": "<=", "value": 3},
+                    {"label": "前年出走無し", "op": "==", "value": "前年出走無し"},
+                ],
+            },
+        }
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by.kind == "history"
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.type == "same_race_prev_year_finish"
+    assert "前年3着以内" in stats
+    assert stats["前年3着以内"].first == 1
+    assert stats["前年3着以内"].second == 1
+    assert "前年出走無し" in stats
+    assert stats["前年出走無し"].fourth_plus == 5
+
+
 def test_compute_stats_unknown_type_returns_empty() -> None:
     """未知の source.type は空辞書を返す。"""
     metric_cfg = {
