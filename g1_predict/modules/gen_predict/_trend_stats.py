@@ -212,10 +212,9 @@ def _get_sire_winner_set(
 
     where_clause = " AND ".join(where_parts)
     sql = f"""
-        SELECT DISTINCT km2.ketto1_bamei AS sire_name
+        SELECT DISTINCT u.bamei AS sire_name
         FROM umagoto_race_joho u
         JOIN race_shosai r ON u.race_code = r.race_code
-        JOIN kyosoba_master2 km2 ON u.ketto_toroku_bango = km2.ketto_toroku_bango
         WHERE {where_clause}
     """
     df = manager.fetch_dataframe(sql, params=tuple(params))
