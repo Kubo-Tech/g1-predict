@@ -21,6 +21,15 @@ _SUBJECT_MAP: dict[str, Subject] = {
     "breeder_name": Subject.SEISANSHA,
 }
 
+_RACE_COL_MAP: dict[str, str] = {
+    "gate_number": "u.wakuban",
+    "popularity": "u.tansho_ninkijun",
+    "running_style": "u.kyakushitsu_hantei",
+    "affiliation": "u.tozai_shozoku_code",
+    "horse_age": "u.barei",
+    "sex": "u.seibetsu_code",
+}
+
 
 def compute_stats(
     metric_cfg: dict[str, Any],
@@ -48,21 +57,9 @@ def compute_stats(
     src = metric_cfg["source"]
     src_type = src.get("type", "")
 
-    if src_type == "gate_number":
+    if src_type in _RACE_COL_MAP:
         result = analyze_chakudo(
-            manager, [], condition, GroupBy(kind="race_col", column="u.wakuban")
-        )
-        return _group_by_rows_cfg(result, rows_cfg)
-
-    if src_type == "popularity":
-        result = analyze_chakudo(
-            manager, [], condition, GroupBy(kind="race_col", column="u.tansho_ninkijun")
-        )
-        return _group_by_rows_cfg(result, rows_cfg)
-
-    if src_type == "running_style":
-        result = analyze_chakudo(
-            manager, [], condition, GroupBy(kind="race_col", column="u.kyakushitsu_hantei")
+            manager, [], condition, GroupBy(kind="race_col", column=_RACE_COL_MAP[src_type])
         )
         return _group_by_rows_cfg(result, rows_cfg)
 
@@ -144,7 +141,9 @@ def _compute_sire_condition_stats(
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
     """
-    race_year = int(condition.year_to) + 1  # type: ignore[arg-type]
+    if condition.year_to is None:
+        raise ValueError("condition.year_to は必須です。")
+    race_year = int(condition.year_to) + 1
     sire_result = analyze_chakudo(
         manager, [], condition, GroupBy(kind="subject", subject=Subject.SIRE)
     )
@@ -228,7 +227,8 @@ def _yaml_rows_to_rowsdef(
 ) -> dict[str, tuple[int, int] | int | str]:
     """YAML rows 設定を RowsDef 形式に変換する。
 
-    op: "==" は int/str、op: ">=" は (value, 9999)、op: "<=" は (0, value) に変換する。
+    op: "==" は int/str、op: ">=" は (value, 9999)、op: "<=" は (0, value)、
+    op: ">" は (value+1, 9999)、op: "<" は (0, value-1) に変換する。
 
     Args:
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
@@ -252,6 +252,10 @@ def _yaml_rows_to_rowsdef(
             result[label] = (int(value), 9999)
         elif op == "<=":
             result[label] = (0, int(value))
+        elif op == "<":
+            result[label] = (0, int(value) - 1)
+        elif op == ">":
+            result[label] = (int(value) + 1, 9999)
         elif op == "in":
             raise ValueError(f"op 'in' は fixed rows では使用できません。label={label!r}")
     return result

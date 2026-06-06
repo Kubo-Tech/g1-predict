@@ -11,6 +11,7 @@ from g1_predict.modules.gen_predict._trend_stats import (
     _group_by_rows_cfg,
     _group_matches,
     _merge_stats,
+    _yaml_rows_to_rowsdef,
     compute_stats,
 )
 
@@ -222,3 +223,56 @@ def test_compute_stats_unknown_type_returns_empty() -> None:
     }
     stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
     assert stats == {}
+
+
+@pytest.mark.parametrize(
+    "src_type, expected_column",
+    [
+        ("affiliation", "u.tozai_shozoku_code"),
+        ("horse_age", "u.barei"),
+        ("sex", "u.seibetsu_code"),
+        ("gate_number", "u.wakuban"),
+        ("popularity", "u.tansho_ninkijun"),
+        ("running_style", "u.kyakushitsu_hantei"),
+    ],
+)
+def test_compute_stats_race_col_map(src_type: str, expected_column: str) -> None:
+    """_RACE_COL_MAP の各 src_type が正しい column で analyze_chakudo を呼ぶ。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import GroupBy
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=5)])
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {"type": src_type},
+            "rows": {"type": "fixed", "items": [{"label": "x", "op": "==", "value": 1}]},
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    assert mock_analyze.call_count == 1
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by == GroupBy(kind="race_col", column=expected_column)
+
+
+# --- _yaml_rows_to_rowsdef ---
+
+
+@pytest.mark.parametrize(
+    "op, value, expected",
+    [
+        ("<", 1600, (0, 1599)),
+        (">", 1600, (1601, 9999)),
+    ],
+)
+def test_yaml_rows_to_rowsdef_lt_gt(op: str, value: int, expected: tuple[int, int]) -> None:
+    """< / > op が (lo, hi) タプルに正しく変換される。"""
+    rows_cfg = {
+        "type": "fixed",
+        "items": [{"label": "test", "op": op, "value": value}],
+    }
+    result = _yaml_rows_to_rowsdef(rows_cfg)
+    assert result["test"] == expected
