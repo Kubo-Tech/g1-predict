@@ -61,9 +61,15 @@ def _build_metric_section(
 
     stats_map = compute_stats(metric_cfg, manager, condition)
 
+    source_cfg = metric_cfg.get("source", {})
+    allowed_values: list[str] | None = source_cfg.get("allowed_values")
+
     if rows_cfg["type"] == "dynamic":
         top_n = rows_cfg.get("top_n")
         labels = _get_dynamic_labels(stats_map, top_n)
+        if allowed_values is not None:
+            allowed_set = set(str(v) for v in allowed_values)
+            labels = [lb for lb in labels if lb in allowed_set]
     elif rows_cfg["type"] in ("fixed", "boolean_multi"):
         labels = [item["label"] for item in rows_cfg["items"]]
     else:
@@ -82,9 +88,8 @@ def _build_metric_section(
         stats = stats_map.get(label, RowStats())
         lines.append(_format_table_row(display_label, stats))
 
-    source_cfg = metric_cfg.get("source", {})
     has_top_n = rows_cfg.get("top_n") is not None
-    has_allowed = source_cfg.get("allowed_values") is not None
+    has_allowed = allowed_values is not None
     if rows_cfg["type"] == "dynamic" and (has_top_n or has_allowed):
         other_stats = _aggregate_other_stats(stats_map, set(labels))
         lines.append(_format_table_row(OTHER_LABEL, other_stats))
