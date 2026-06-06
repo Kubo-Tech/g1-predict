@@ -6,12 +6,10 @@ from mykeibadb.analytics import (
     AttrSource,
     ChakudoResult,
     ChakudoRow,
-    EntryAttrDef,
+    GroupBy,
     RaceCondition,
     Subject,
     analyze_chakudo,
-    analyze_entry_attr_chakudo,
-    analyze_subject_chakudo,
 )
 from mykeibadb.connection import ConnectionManager
 
@@ -43,31 +41,36 @@ def compute_stats(
         dict[str, RowStats]: 行ラベル -> RowStats。
     """
     rows_cfg = metric_cfg["rows"]
-    src = metric_cfg["source"]
-    src_type = src.get("type", "")
 
     if rows_cfg.get("type") == "boolean_multi":
         return _compute_sire_condition_stats(rows_cfg, manager, condition)
 
+    src = metric_cfg["source"]
+    src_type = src.get("type", "")
+
     if src_type == "gate_number":
-        result = analyze_chakudo(manager, "u.wakuban", "u.wakuban::int", condition)
+        result = analyze_chakudo(
+            manager, [], condition, GroupBy(kind="race_col", column="u.wakuban")
+        )
         return _group_by_rows_cfg(result, rows_cfg)
 
     if src_type == "popularity":
         result = analyze_chakudo(
-            manager, "u.tansho_ninkijun", "u.tansho_ninkijun::int", condition
+            manager, [], condition, GroupBy(kind="race_col", column="u.tansho_ninkijun")
         )
         return _group_by_rows_cfg(result, rows_cfg)
 
     if src_type == "running_style":
         result = analyze_chakudo(
-            manager, "u.kyakushitsu_hantei_code", "u.kyakushitsu_hantei_code", condition
+            manager, [], condition, GroupBy(kind="race_col", column="u.kyakushitsu_hantei")
         )
         return _group_by_rows_cfg(result, rows_cfg)
 
     if src_type in _SUBJECT_MAP:
         subject = _SUBJECT_MAP[src_type]
-        result = analyze_subject_chakudo(manager, subject, condition=condition)
+        result = analyze_chakudo(
+            manager, [], condition, GroupBy(kind="subject", subject=subject)
+        )
         return _chakudo_to_stats_map(result)
 
     if src_type in (
@@ -77,8 +80,8 @@ def compute_stats(
         "debut_venue",
         "jockey_continuity",
     ):
-        attr_def = _build_entry_attr_def(src, rows_cfg)
-        result = analyze_entry_attr_chakudo(manager, attr_def, condition)
+        group_by = _build_group_by(src, rows_cfg)
+        result = analyze_chakudo(manager, [], condition, group_by)
         return _chakudo_to_stats_map(result)
 
     return {}
@@ -101,6 +104,28 @@ def _src_cache_key(src: dict[str, Any]) -> tuple[Any, ...]:
     return tuple(parts)
 
 
+def _build_group_by(
+    src: dict[str, Any],
+    rows_cfg: dict[str, Any],
+) -> GroupBy:
+    """YAML の source / rows 設定から GroupBy を生成する。
+
+    rows_cfg の type が "dynamic" の場合は kind="history"、それ以外は kind="fixed"。
+
+    Args:
+        src (dict[str, Any]): source の YAML 設定dict。
+        rows_cfg (dict[str, Any]): rows の YAML 設定dict。
+
+    Returns:
+        GroupBy: 生成した GroupBy インスタンス。
+    """
+    attr_source = AttrSource.from_dict(src)
+    if rows_cfg.get("type") == "dynamic":
+        return GroupBy(kind="history", source=attr_source)
+    rows_def = _yaml_rows_to_rowsdef(rows_cfg)
+    return GroupBy(kind="fixed", source=attr_source, rows=rows_def)
+
+
 def _compute_sire_condition_stats(
     rows_cfg: dict[str, Any],
     manager: ConnectionManager,
@@ -120,7 +145,9 @@ def _compute_sire_condition_stats(
         dict[str, RowStats]: 行ラベル -> RowStats。
     """
     race_year = int(condition.year_to) + 1  # type: ignore[arg-type]
-    sire_result = analyze_subject_chakudo(manager, Subject.SIRE, condition=condition)
+    sire_result = analyze_chakudo(
+        manager, [], condition, GroupBy(kind="subject", subject=Subject.SIRE)
+    )
     sire_stats: dict[str, ChakudoRow] = {
         row.group: row for row in (sire_result.rows if sire_result.success else [])
     }
@@ -174,20 +201,20 @@ def _get_sire_winner_set(
         "CAST(u.kakutei_chakujun AS INTEGER) BETWEEN 1 AND %s",
     ]
     if "race_name" in src:
-        where_parts.append("r.race_name = %s")
+        where_parts.append("r.kyosomei_hondai = %s")
         params.append(src["race_name"])
     if "grade_codes" in src:
         where_parts.append("r.grade_code = ANY(%s)")
         params.append(src["grade_codes"])
     if "kyori" in src:
-        where_parts.append("r.kyori = %s")
+        where_parts.append("TRIM(r.kyori)::INTEGER = %s")
         params.append(int(src["kyori"]))
 
     where_clause = " AND ".join(where_parts)
     sql = f"""
         SELECT DISTINCT km2.ketto1_bamei AS sire_name
         FROM umagoto_race_joho u
-        JOIN race_joho r ON u.race_code = r.race_code
+        JOIN race_shosai r ON u.race_code = r.race_code
         JOIN kyosoba_master2 km2 ON u.ketto_toroku_bango = km2.ketto_toroku_bango
         WHERE {where_clause}
     """
@@ -195,24 +222,6 @@ def _get_sire_winner_set(
     if df.empty:
         return set()
     return set(df["sire_name"].astype(str).str.strip().tolist())
-
-
-def _build_entry_attr_def(
-    src: dict[str, Any],
-    rows_cfg: dict[str, Any],
-) -> EntryAttrDef:
-    """YAML の source / rows 設定から EntryAttrDef を生成する。
-
-    Args:
-        src (dict[str, Any]): source の YAML 設定dict。
-        rows_cfg (dict[str, Any]): rows の YAML 設定dict。
-
-    Returns:
-        EntryAttrDef: 生成した EntryAttrDef インスタンス。
-    """
-    attr_source = AttrSource.from_dict(src)
-    rows_def = _yaml_rows_to_rowsdef(rows_cfg)
-    return EntryAttrDef(source=attr_source, rows=rows_def)
 
 
 def _yaml_rows_to_rowsdef(
@@ -229,7 +238,7 @@ def _yaml_rows_to_rowsdef(
         dict[str, tuple[int, int] | int | str]: RowsDef 形式の辞書。
 
     Raises:
-        ValueError: op が "in" の場合（analyze_entry_attr_chakudo では非対応）。
+        ValueError: op が "in" の場合（GroupBy(kind="fixed") では非対応）。
     """
     if rows_cfg.get("type") == "dynamic":
         return {}
@@ -245,7 +254,7 @@ def _yaml_rows_to_rowsdef(
         elif op == "<=":
             result[label] = (0, int(value))
         elif op == "in":
-            raise ValueError(f"op 'in' は entry_attr 系 source では使用できません。label={label!r}")
+            raise ValueError(f"op 'in' は fixed rows では使用できません。label={label!r}")
     return result
 
 
