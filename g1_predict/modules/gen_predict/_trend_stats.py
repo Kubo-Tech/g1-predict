@@ -141,6 +141,8 @@ def _compute_sire_condition_stats(
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
     """
+    if condition.year_to is None:
+        raise ValueError("condition.year_to は必須です。")
     race_year = int(condition.year_to) + 1
     sire_result = analyze_chakudo(
         manager, [], condition, GroupBy(kind="subject", subject=Subject.SIRE)
