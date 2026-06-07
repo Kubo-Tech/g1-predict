@@ -12,6 +12,7 @@ _COLOR_FILLS: dict[str, PatternFill] = {
     "blue": PatternFill(patternType="solid", fgColor="FF9DC3E6"),
     "red": PatternFill(patternType="solid", fgColor="FFFF9999"),
     "orange": PatternFill(patternType="solid", fgColor="FFFFC000"),
+    "gray": PatternFill(patternType="solid", fgColor="FFBFBFBF"),
 }
 
 HEADER_FILL = PatternFill(patternType="solid", fgColor="FFD9D9D9")
