@@ -1,5 +1,366 @@
 race_name: 安田記念
 
+table:
+  出走馬:
+    - name: 枠勝率
+      source:
+        type: waku_stat
+        stat: win_rate
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+        course_kubun: "C"
+        week: 2
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.125
+          color: yellow
+
+    - name: 枠複勝率
+      source:
+        type: waku_stat
+        stat: top3_rate
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+        course_kubun: "C"
+        week: 2
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.375
+          color: yellow
+
+    - name: 前走脚質
+      source:
+        type: recent_umagoto_field
+        field: kyakushitsu
+      color_rules:
+        - condition:
+            op: "=="
+            value: "差"
+          color: yellow
+
+    - name: 前走上がり順位
+      source:
+        type: prev_race_kohan_3f_rank
+      color_rules:
+        - condition:
+            op: in
+            value: [1, 2, 3]
+          color: yellow
+
+    - name: 所属
+      source:
+        type: entry_field
+        field: 所属コード
+      display_map:
+        "1": 美浦
+        "2": 栗東
+        "3": 地方
+        "4": 海外
+      color_rules:
+        - condition:
+            op: "=="
+            value: "1"
+          color: yellow
+
+    - name: 馬齢
+      source:
+        type: entry_field
+        field: 馬齢
+      color_rules:
+        - condition:
+            op: in
+            value: [4, 5, 6]
+          color: yellow
+
+    - name: 性別
+      source:
+        type: entry_field
+        field: 性別コード
+      display_map:
+        "1": 牡
+        "2": 牝
+        "3": セン
+      color_rules:
+        - condition:
+            op: "=="
+            value: "2"
+          color: yellow
+
+    - name: 前走レース
+      source:
+        type: prev_race_name
+        overseas_label: 海外
+      color_rules:
+        - condition:
+            op: in
+            value: ["海外", "ヴィクトリアマイル"]
+          color: yellow
+        - condition:
+            op: "=="
+            value: "大阪杯"
+          color: gray
+
+    - name: 前走距離
+      source:
+        type: past_field
+        field: 距離
+      color_rules:
+        - condition:
+            op: "=="
+            value: "1600"
+          color: yellow
+        - condition:
+            op: "<"
+            value: "1600"
+          color: gray
+
+    - name: リピーター
+      source:
+        type: same_race_prev_year_finish
+        tokubetsu_kyoso_bango: "0010"
+        absent_label: "-"
+      color_rules:
+        - condition:
+            op: "<="
+            value: 5
+          color: yellow
+
+  騎手:
+    - name: 騎手名
+      source:
+        type: entry_field
+        field: 騎手名略称
+
+    - name: コース勝率
+      source:
+        type: kishu_course_stat
+        stat: win_rate
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.15
+          color: yellow
+
+    - name: コース勝利数
+      source:
+        type: kishu_course_stat
+        stat: wins
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+      color_rules:
+        - condition:
+            op: ">="
+            value: 10
+          color: yellow
+
+    - name: コース複勝率
+      source:
+        type: kishu_course_stat
+        stat: top3_rate
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.30
+          color: yellow
+
+    - name: コース3着内数
+      source:
+        type: kishu_course_stat
+        stat: top3
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+      color_rules:
+        - condition:
+            op: ">="
+            value: 30
+          color: yellow
+
+  生産者:
+    - name: 生産者名
+      source:
+        type: kyosoba_field
+        field: seisanshamei_hojinkaku_nashi
+
+    - name: 安田記念勝率
+      source:
+        type: seisansha_race_stat
+        stat: win_rate
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.05
+          color: yellow
+
+    - name: 安田記念勝利数
+      source:
+        type: seisansha_race_stat
+        stat: wins
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 1
+          color: yellow
+
+    - name: 安田記念複勝率
+      source:
+        type: seisansha_race_stat
+        stat: top3_rate
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.20
+          color: yellow
+
+    - name: 安田記念3着内数
+      source:
+        type: seisansha_race_stat
+        stat: top3
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 1
+          color: yellow
+
+  種牡馬:
+    - name: 種牡馬名
+      source:
+        type: sire_race_stat
+        stat: name
+
+    - name: 産駒コース勝率
+      source:
+        type: sire_course_stat
+        stat: win_rate
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+        track_condition: "1"
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.10
+          color: yellow
+
+    - name: 産駒コース勝利数
+      source:
+        type: sire_course_stat
+        stat: wins
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+        track_condition: "1"
+      color_rules:
+        - condition:
+            op: ">="
+            value: 3
+          color: yellow
+
+    - name: 産駒コース複勝率
+      source:
+        type: sire_course_stat
+        stat: top3_rate
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+        track_condition: "1"
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.30
+          color: yellow
+
+    - name: 産駒コース3着内数
+      source:
+        type: sire_course_stat
+        stat: top3
+        keibajo_code: "05"
+        track: shiba
+        kyori: 1600
+        years: 5
+        track_condition: "1"
+      color_rules:
+        - condition:
+            op: ">="
+            value: 5
+          color: yellow
+
+    - name: 産駒安田記念勝率
+      source:
+        type: sire_race_stat
+        stat: win_rate
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.05
+          color: yellow
+
+    - name: 産駒安田記念勝利数
+      source:
+        type: sire_race_stat
+        stat: wins
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 1
+          color: yellow
+
+    - name: 産駒安田記念複勝率
+      source:
+        type: sire_race_stat
+        stat: top3_rate
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 0.20
+          color: yellow
+
+    - name: 産駒安田記念3着内数
+      source:
+        type: sire_race_stat
+        stat: top3
+        race_name_for_history: 安田記念
+        years: 10
+      color_rules:
+        - condition:
+            op: ">="
+            value: 1
+          color: yellow
+
 trends:
   出走馬傾向:
     - name: 枠順
@@ -44,6 +405,15 @@ trends:
           - {label: "先行", op: "==", value: "2"}
           - {label: "差し", op: "==", value: "3"}
           - {label: "追込", op: "==", value: "4"}
+    - name: 前走上がり3F順位
+      source: {type: prev_race_col, column: kohan_3f_jun}
+      rows:
+        type: fixed
+        items:
+          - {label: "1位", op: "==", value: 1}
+          - {label: "2位", op: "==", value: 2}
+          - {label: "3位", op: "==", value: 3}
+          - {label: "4位以下", op: ">=", value: 4}
     - name: 所属
       source: {type: affiliation}
       rows:
@@ -98,7 +468,7 @@ trends:
   騎手傾向:
     - name: 騎手
       source: {type: jockey_name}
-      rows: {type: dynamic, top_n: 5}
+      rows: {type: all_jockeys}
   生産者傾向:
     - name: 生産者
       source: {type: breeder_name}
