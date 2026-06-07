@@ -14,6 +14,7 @@ def build_category_section(
     metrics: list[dict[str, Any]],
     manager: ConnectionManager,
     condition: RaceCondition,
+    race_code: str = "",
 ) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
 
@@ -25,6 +26,7 @@ def build_category_section(
         metrics (list[dict[str, Any]]): カテゴリ内の metric 設定リスト。
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
+        race_code (str): 16桁レースコード（all_jockeys 型で使用）。
 
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
@@ -32,7 +34,7 @@ def build_category_section(
     header = f"## {category_name}\n\n過去{TREND_YEARS}年{category_name}に関する傾向"
 
     metric_sections = [
-        _build_metric_section(metric_cfg, manager, condition) for metric_cfg in metrics
+        _build_metric_section(metric_cfg, manager, condition, race_code) for metric_cfg in metrics
     ]
     metric_sections.append("### 比較表\n")
     return header + "\n\n" + "\n\n".join(metric_sections)
@@ -42,6 +44,7 @@ def _build_metric_section(
     metric_cfg: dict[str, Any],
     manager: ConnectionManager,
     condition: RaceCondition,
+    race_code: str = "",
 ) -> str:
     """1 metric 分の h3 テーブルセクション文字列を生成する。
 
@@ -52,6 +55,7 @@ def _build_metric_section(
         metric_cfg (dict[str, Any]): metric の YAML 設定dict。
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
+        race_code (str): 16桁レースコード（all_jockeys 型で使用）。
 
     Returns:
         str: ### ヘッダーから始まる Markdown テーブル文字列。
@@ -64,7 +68,11 @@ def _build_metric_section(
     source_cfg = metric_cfg.get("source", {})
     allowed_values: list[str] | None = source_cfg.get("allowed_values")
 
-    if rows_cfg["type"] == "dynamic":
+    add_other_row = False
+    if rows_cfg["type"] == "all_jockeys":
+        entries = _get_race_jockey_entries(manager, race_code)
+        labels = _sort_jockey_labels(stats_map, entries)
+    elif rows_cfg["type"] == "dynamic":
         top_n = rows_cfg.get("top_n")
         labels = _get_dynamic_labels(stats_map, top_n)
         if allowed_values is not None:
@@ -83,6 +91,9 @@ def _build_metric_section(
                 reverse=True,
             )
             labels = labels + extra
+        has_top_n = rows_cfg.get("top_n") is not None
+        has_allowed = allowed_values is not None
+        add_other_row = has_top_n or has_allowed
     elif rows_cfg["type"] in ("fixed", "boolean_multi"):
         labels = [item["label"] for item in rows_cfg["items"]]
     else:
@@ -101,9 +112,7 @@ def _build_metric_section(
         stats = stats_map.get(label, RowStats())
         lines.append(_format_table_row(display_label, stats))
 
-    has_top_n = rows_cfg.get("top_n") is not None
-    has_allowed = allowed_values is not None
-    if rows_cfg["type"] == "dynamic" and (has_top_n or has_allowed):
+    if add_other_row:
         other_stats = _aggregate_other_stats(stats_map, set(labels))
         lines.append(_format_table_row(OTHER_LABEL, other_stats))
 
@@ -208,3 +217,63 @@ def _format_percent(count: int, total: int) -> str:
     if total == 0:
         return "-"
     return f"{round(count / total * 100)}%"
+
+
+def _get_race_jockey_entries(
+    manager: ConnectionManager,
+    race_code: str,
+) -> list[tuple[int, str]]:
+    """指定レースの出走騎手一覧を (umaban, kishu_name) リストで返す。
+
+    Args:
+        manager (ConnectionManager): DB接続マネージャ。
+        race_code (str): 16桁レースコード。
+
+    Returns:
+        list[tuple[int, str]]: 馬番昇順の (umaban, kishu_name) タプルリスト。
+    """
+    sql = """
+        SELECT TRIM(u.umaban)::INTEGER AS umaban,
+               TRIM(u.kishumei_ryakusho) AS kishu_name
+        FROM umagoto_race_joho u
+        WHERE u.race_code = %s
+        ORDER BY TRIM(u.umaban)::INTEGER
+    """
+    df = manager.fetch_dataframe(sql, params=(race_code,))
+    return list(zip(df["umaban"].astype(int).tolist(), df["kishu_name"].astype(str).tolist()))
+
+
+def _sort_jockey_labels(
+    stats_map: dict[str, RowStats],
+    jockey_entries: list[tuple[int, str]],
+) -> list[str]:
+    """騎手を複合ソートキーで並べたラベルリストを返す。
+
+    ソート優先順位:
+    1. 3着内数 降順
+    2. 1着数 降順
+    3. 2着数 降順
+    4. 3着数 降順
+    5. 馬番 昇順
+
+    Args:
+        stats_map (dict[str, RowStats]): 騎手名 -> RowStats。
+        jockey_entries (list[tuple[int, str]]): (umaban, kishu_name) リスト。
+
+    Returns:
+        list[str]: ソート済み騎手名リスト。
+    """
+    umaban_map = {name: umaban for umaban, name in jockey_entries}
+    all_names = [name for _, name in jockey_entries]
+
+    def sort_key(name: str) -> tuple[int, int, int, int, int]:
+        s = stats_map.get(name, RowStats())
+        return (
+            -(s.first + s.second + s.third),
+            -s.first,
+            -s.second,
+            -s.third,
+            umaban_map.get(name, 99),
+        )
+
+    return sorted(all_names, key=sort_key)

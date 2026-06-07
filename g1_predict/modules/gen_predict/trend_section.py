@@ -25,6 +25,8 @@ def build_trend_sections(
     """
     manager, condition = build_race_context(race_code, race_info)
     return {
-        category_name: build_category_section(category_name, metrics, manager, condition)
+        category_name: build_category_section(
+            category_name, metrics, manager, condition, race_code
+        )
         for category_name, metrics in trends_config.items()
     }
