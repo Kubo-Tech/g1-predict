@@ -297,7 +297,7 @@ table:
         track: shiba
         kyori: 2200
         years: 5
-        course_kubun: "C"
+        course_kubun: "B"
         week: 2
       color_rules:
         - condition:
@@ -393,7 +393,7 @@ table:
       color_rules:
         - condition:
             op: ">"
-            value: "2200"
+            value: 2200
           color: yellow
 
   騎手:
