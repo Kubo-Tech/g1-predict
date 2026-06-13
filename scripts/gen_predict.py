@@ -9,7 +9,6 @@ import argparse
 import os
 
 import pandas as pd
-import yaml
 from dotenv import find_dotenv, load_dotenv
 from mykeibadb import RaceGetter
 
@@ -17,7 +16,6 @@ from g1_predict.modules.gen_predict.prev_day_trend import (
     GRADE_CODE_DISPLAY,
     build_prev_day_trend_section,
 )
-from g1_predict.modules.gen_predict.trend_section import build_trend_sections
 from g1_predict.modules.utils.md_utils import replace_section
 from g1_predict.modules.utils.tfjv import (
     race_code_to_tfjv,
@@ -32,7 +30,6 @@ load_dotenv(find_dotenv())
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
 _TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
-_CONFIGS_DIR = os.path.join(_REPO_DIR, "configs")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
 _MARK_ORDER = ["◎", "○", "▲", "△", "◆", "☆", "注"]
@@ -58,12 +55,11 @@ def generate_predict(race_code: str) -> None:
     marks = read_marks(dat_path, um_dat_record_no(race_code))
 
     trend_section = build_prev_day_trend_section(race_code, race_shosai)
-    trend_sections_map = _build_trend_sections(race_code, race_name, race_shosai)
     points = _load_points(race_name)
     marks_section = _build_marks_section(marks, entry_raw)
     insight_section = _build_insight_section(marks, entry_raw, race_getter, tfjv_data_dir)
     content = _render_from_template(
-        race_name, year, points, trend_section, marks_section, insight_section, trend_sections_map
+        race_name, year, points, trend_section, marks_section, insight_section
     )
 
     year_dir = os.path.join(_PUBLIC_DIR, year)
@@ -76,30 +72,26 @@ def generate_predict(race_code: str) -> None:
 
 
 def main() -> None:
-    """エントリポイント。"""
+    """エントリポイント。
+
+    Args:
+        なし。
+    """
     parser = argparse.ArgumentParser(description="予想記事ベースを生成する")
     parser.add_argument("--race-code", required=True, help="16桁 race_code")
     args = parser.parse_args()
     generate_predict(args.race_code)
 
 
-def _build_trend_sections(
-    race_code: str,
-    race_name: str,
-    race_info: pd.DataFrame,
-) -> dict[str, str]:
-    config_path = os.path.join(_CONFIGS_DIR, f"{race_name}.yml")
-    if not os.path.isfile(config_path):
-        return {}
-    with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f) or {}
-    trends_config = config.get("trends")
-    if not trends_config:
-        return {}
-    return build_trend_sections(race_code, race_info, trends_config)
-
-
 def _load_points(race_name: str) -> str:
+    """ポイントセクションを読み込む。
+
+    Args:
+        race_name (str): レース名。
+
+    Returns:
+        str: ポイントセクションのMarkdown文字列。
+    """
     path = os.path.join(_TEMPLATES_DIR, "points", f"{race_name}.md")
     if os.path.isfile(path):
         with open(path, encoding="utf-8") as f:
@@ -108,6 +100,14 @@ def _load_points(race_name: str) -> str:
 
 
 def _sort_marks(marks: dict[int, str]) -> list[tuple[int, str]]:
+    """印を優先度順に並べる。
+
+    Args:
+        marks (dict[int, str]): 馬番 -> 印記号のdict。
+
+    Returns:
+        list[tuple[int, str]]: 優先度順に並べた馬番と印記号のリスト。
+    """
     return sorted(
         marks.items(),
         key=lambda x: (
@@ -118,6 +118,15 @@ def _sort_marks(marks: dict[int, str]) -> list[tuple[int, str]]:
 
 
 def _build_marks_section(marks: dict[int, str], entry_raw: pd.DataFrame) -> str:
+    """印セクションを生成する。
+
+    Args:
+        marks (dict[int, str]): 馬番 -> 印記号のdict。
+        entry_raw (pd.DataFrame): 出走馬情報DataFrame。
+
+    Returns:
+        str: 印セクションのMarkdown文字列。
+    """
     horse_map = {int(row["umaban"]): str(row["bamei"]).strip() for _, row in entry_raw.iterrows()}
     lines = ["## 印", ""]
     for umaban, mark in _sort_marks(marks):
@@ -131,6 +140,17 @@ def _build_insight_section(
     race_getter: RaceGetter,
     tfjv_data_dir: str,
 ) -> str:
+    """見解セクションを生成する。
+
+    Args:
+        marks (dict[int, str]): 馬番 -> 印記号のdict。
+        entry_raw (pd.DataFrame): 出走馬情報DataFrame。
+        race_getter (RaceGetter): レース情報取得オブジェクト。
+        tfjv_data_dir (str): JRA-VANデータディレクトリ。
+
+    Returns:
+        str: 見解セクションのMarkdown文字列。
+    """
     horse_map = {
         int(row["umaban"]): (str(row["bamei"]).strip(), str(row["ketto_toroku_bango"]))
         for _, row in entry_raw.iterrows()
@@ -181,6 +201,18 @@ def _build_insight_section(
 
 
 def _parse_kek_comment(comment: str) -> tuple[str, str]:
+    """成績コメントからレース名と本文を分離する。
+
+    Args:
+        comment (str): 成績コメント文字列。
+
+    Returns:
+        str: レース名。
+        str: コメント本文。
+
+    Raises:
+        ValueError: コメントのレース名閉じ括弧が存在しない場合。
+    """
     if comment.startswith("["):
         if "]" not in comment:
             raise ValueError(f"Invalid kek comment format (missing ']'): {comment!r}")
@@ -192,6 +224,14 @@ def _parse_kek_comment(comment: str) -> tuple[str, str]:
 
 
 def _format_ordinal(n: int) -> str:
+    """走数を前走表記へ変換する。
+
+    Args:
+        n (int): 走数。
+
+    Returns:
+        str: 前走、前々走、または n走前 の文字列。
+    """
     if n == 1:
         return "前走"
     if n == 2:
@@ -206,19 +246,27 @@ def _render_from_template(
     trend_section: str,
     marks_section: str,
     insight_section: str,
-    trend_sections_map: dict[str, str],
 ) -> str:
+    """予想テンプレートに各セクションを埋め込む。
+
+    Args:
+        race_name (str): レース名。
+        year (str): 開催年。
+        points_section (str): ポイントセクション。
+        trend_section (str): 前日の傾向セクション。
+        marks_section (str): 印セクション。
+        insight_section (str): 見解セクション。
+
+    Returns:
+        str: 生成済み予想記事Markdown文字列。
+    """
     template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_PREDICT.md")
     with open(template_path, encoding="utf-8") as f:
         content = f.read()
     content = content.replace("{RaceName}", race_name).replace("{Year}", year)
     content = replace_section(content, "## ポイント", points_section)
     content = replace_section(content, "## 前日の傾向", trend_section)
-    if trend_sections_map:
-        combined_trends = "\n\n".join(trend_sections_map.values())
-        content = replace_section(content, "## 印", combined_trends + "\n\n" + marks_section)
-    else:
-        content = replace_section(content, "## 印", marks_section)
+    content = replace_section(content, "## 印", marks_section)
     content = replace_section(content, "## 見解", insight_section)
     return content
 
