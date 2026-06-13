@@ -21,6 +21,14 @@ SUBJECT_MAP: dict[str, Subject] = {
     "breeder_name": Subject.SEISANSHA,
 }
 
+# 上がり3F順位: 同一レース内で上がり3Fタイム昇順に順位付けする
+_AGARI_3F_RANK_EXPR = (
+    "RANK() OVER ("
+    "PARTITION BY u.race_code "
+    "ORDER BY CASE WHEN TRIM(u.kohan_3f) ~ '^[0-9]+$' AND TRIM(u.kohan_3f) != '000' "
+    "THEN TRIM(u.kohan_3f)::NUMERIC ELSE NULL END)"
+)
+
 _RACE_COL_MAP: dict[str, str] = {
     "gate_number": "u.wakuban",
     "popularity": "u.tansho_ninkijun",
@@ -28,7 +36,7 @@ _RACE_COL_MAP: dict[str, str] = {
     "affiliation": "u.tozai_shozoku_code",
     "horse_age": "u.barei",
     "sex": "u.seibetsu_code",
-    "agari_3f_rank": "u.kohan_3f_jun",
+    "agari_3f_rank": _AGARI_3F_RANK_EXPR,
 }
 
 # prev_race_grade / prev_race_finish / prev_race_finish_by_grade -> prev_race_col の column名

@@ -1,13 +1,19 @@
 """_trend_loader の単体テスト。"""
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+import yaml
 from mykeibadb.analytics import RaceCondition
 
 from g1_predict.modules.gen_predict._trend_loader import build_metric_condition, build_race_context
 from g1_predict.modules.gen_predict._trend_models import TREND_YEARS
+
+_CONFIGS_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "configs")
+)
 
 
 def _make_race_info(
@@ -162,3 +168,65 @@ def test_build_metric_condition_years_less_than_one_raises() -> None:
     base_condition = _make_base_condition()
     with pytest.raises(ValueError, match="years"):
         build_metric_condition(base_condition, 2026, {"years": 0})
+
+
+# --- configs/宝塚記念.yml ---
+
+
+def test_takarazuka_yaml_loads_all_trend_categories() -> None:
+    """宝塚記念.yml の trends が全カテゴリを欠損なく読み込める。"""
+    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念.yml")
+    with open(config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    trends = config["trends"]
+    assert set(trends.keys()) == {"出走馬傾向", "騎手傾向", "生産者傾向", "血統傾向"}
+
+    metric_names = [m["name"] for m in trends["出走馬傾向"]]
+    assert metric_names == [
+        "枠順",
+        "人気",
+        "脚質",
+        "前走脚質",
+        "上がり3F順位",
+        "前走上がり3F順位",
+        "所属",
+        "馬齢",
+        "性別",
+        "前走レース",
+        "前走クラス",
+        "前走着順",
+        "前走G1着順",
+        "前走G2着順",
+        "前走G3着順",
+        "前走非重賞着順",
+        "前走距離",
+        "阪神重賞好走実績",
+    ]
+
+
+def test_takarazuka_yaml_jockey_and_breeder_use_all_entries() -> None:
+    """宝塚記念.yml の騎手・生産者が all_entries で今回出走対象を全表示する。"""
+    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念.yml")
+    with open(config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    trends = config["trends"]
+    assert trends["騎手傾向"][0]["rows"] == {"type": "all_entries"}
+    assert trends["生産者傾向"][0]["rows"] == {"type": "all_entries"}
+
+
+def test_takarazuka_yaml_gate_number_condition_is_hanshin_4th_day_good_track() -> None:
+    """枠順は阪神4日目良馬場のみのconditionを持つ。"""
+    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念.yml")
+    with open(config_path, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    gate_number_cfg = config["trends"]["出走馬傾向"][0]
+    assert gate_number_cfg["name"] == "枠順"
+    assert gate_number_cfg["condition"] == {
+        "years": 10,
+        "keibajo_codes": ["09"],
+        "kaisai_nichime": [4],
+        "babajotai_codes": ["1"],
+    }

@@ -1,0 +1,272 @@
+race_name: 宝塚記念
+
+trends:
+  出走馬傾向:
+    - name: 枠順
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+        kaisai_nichime: [4]
+        babajotai_codes: ["1"]
+      source: {type: gate_number}
+      rows:
+        type: fixed
+        items:
+          - {label: "1枠", op: "==", value: 1}
+          - {label: "2枠", op: "==", value: 2}
+          - {label: "3枠", op: "==", value: 3}
+          - {label: "4枠", op: "==", value: 4}
+          - {label: "5枠", op: "==", value: 5}
+          - {label: "6枠", op: "==", value: 6}
+          - {label: "7枠", op: "==", value: 7}
+          - {label: "8枠", op: "==", value: 8}
+    - name: 人気
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: popularity}
+      rows:
+        type: fixed
+        items:
+          - {label: "1人気", op: "==", value: 1}
+          - {label: "2人気", op: "==", value: 2}
+          - {label: "3人気", op: "==", value: 3}
+          - {label: "4-6人気", op: "in", value: [4, 5, 6]}
+          - {label: "7-9人気", op: "in", value: [7, 8, 9]}
+          - {label: "10人気以下", op: ">=", value: 10}
+    - name: 脚質
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+        kaisai_nichime: [4]
+        babajotai_codes: ["1"]
+      source: {type: running_style}
+      rows:
+        type: fixed
+        items:
+          - {label: "逃げ", op: "==", value: "1"}
+          - {label: "先行", op: "==", value: "2"}
+          - {label: "差し", op: "==", value: "3"}
+          - {label: "追込", op: "==", value: "4"}
+    - name: 前走脚質
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+        kaisai_nichime: [4]
+        babajotai_codes: ["1"]
+      source: {type: prev_race_col, column: kyakushitsu_hantei}
+      rows:
+        type: fixed
+        items:
+          - {label: "逃げ", op: "==", value: "1"}
+          - {label: "先行", op: "==", value: "2"}
+          - {label: "差し", op: "==", value: "3"}
+          - {label: "追込", op: "==", value: "4"}
+    - name: 上がり3F順位
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+        kaisai_nichime: [4]
+        babajotai_codes: ["1"]
+      source: {type: agari_3f_rank}
+      rows:
+        type: fixed
+        items:
+          - {label: "1位", op: "==", value: 1}
+          - {label: "2位", op: "==", value: 2}
+          - {label: "3位", op: "==", value: 3}
+          - {label: "4位以下", op: ">=", value: 4}
+    - name: 前走上がり3F順位
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+        kaisai_nichime: [4]
+        babajotai_codes: ["1"]
+      source: {type: prev_race_col, column: kohan_3f_jun}
+      rows:
+        type: fixed
+        items:
+          - {label: "1位", op: "==", value: 1}
+          - {label: "2位", op: "==", value: 2}
+          - {label: "3位", op: "==", value: 3}
+          - {label: "4位以下", op: ">=", value: 4}
+    - name: 所属
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: affiliation}
+      rows:
+        type: fixed
+        items:
+          - {label: "美浦", op: "==", value: 1}
+          - {label: "栗東", op: "==", value: 2}
+          - {label: "地方", op: "==", value: 3}
+          - {label: "海外", op: "==", value: 4}
+    - name: 馬齢
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: horse_age}
+      rows:
+        type: fixed
+        items:
+          - {label: "3歳", op: "==", value: 3}
+          - {label: "4歳", op: "==", value: 4}
+          - {label: "5歳", op: "==", value: 5}
+          - {label: "6歳", op: "==", value: 6}
+          - {label: "7歳以上", op: ">=", value: 7}
+    - name: 性別
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: sex}
+      rows:
+        type: fixed
+        items:
+          - {label: "牡", op: "==", value: 1}
+          - {label: "牝", op: "==", value: 2}
+          - {label: "セン", op: "==", value: 3}
+    - name: 前走レース
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_name, overseas_label: 海外}
+      rows:
+        type: dynamic
+        top_n: 5
+        always_include_grades: ["A", "B", "C"]
+    - name: 前走クラス
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_grade}
+      rows:
+        type: fixed
+        items:
+          - {label: "G1", op: "==", value: "A"}
+          - {label: "G2", op: "==", value: "B"}
+          - {label: "G3", op: "==", value: "C"}
+          - {label: "その他", op: "not_in", value: ["A", "B", "C"]}
+    - name: 前走着順
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_finish}
+      rows:
+        type: fixed
+        items:
+          - {label: "1着", op: "==", value: 1}
+          - {label: "2着", op: "==", value: 2}
+          - {label: "3着", op: "==", value: 3}
+          - {label: "4着", op: "==", value: 4}
+          - {label: "5着", op: "==", value: 5}
+          - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
+          - {label: "10着以下", op: ">=", value: 10}
+    - name: 前走G1着順
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_finish_by_grade, grade_codes: ["A"]}
+      rows:
+        type: fixed
+        items:
+          - {label: "1着", op: "==", value: 1}
+          - {label: "2着", op: "==", value: 2}
+          - {label: "3着", op: "==", value: 3}
+          - {label: "4着", op: "==", value: 4}
+          - {label: "5着", op: "==", value: 5}
+          - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
+          - {label: "10着以下", op: ">=", value: 10}
+    - name: 前走G2着順
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_finish_by_grade, grade_codes: ["B"]}
+      rows:
+        type: fixed
+        items:
+          - {label: "1着", op: "==", value: 1}
+          - {label: "2着", op: "==", value: 2}
+          - {label: "3着", op: "==", value: 3}
+          - {label: "4着", op: "==", value: 4}
+          - {label: "5着", op: "==", value: 5}
+          - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
+          - {label: "10着以下", op: ">=", value: 10}
+    - name: 前走G3着順
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_finish_by_grade, grade_codes: ["C"]}
+      rows:
+        type: fixed
+        items:
+          - {label: "1着", op: "==", value: 1}
+          - {label: "2着", op: "==", value: 2}
+          - {label: "3着", op: "==", value: 3}
+          - {label: "4着", op: "==", value: 4}
+          - {label: "5着", op: "==", value: 5}
+          - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
+          - {label: "10着以下", op: ">=", value: 10}
+    - name: 前走非重賞着順
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_finish_by_grade, exclude_grade_codes: ["A", "B", "C"]}
+      rows:
+        type: fixed
+        items:
+          - {label: "1着", op: "==", value: 1}
+          - {label: "2着", op: "==", value: 2}
+          - {label: "3着", op: "==", value: 3}
+          - {label: "4着", op: "==", value: 4}
+          - {label: "5着", op: "==", value: 5}
+          - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
+          - {label: "10着以下", op: ">=", value: 10}
+    - name: 前走距離
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: prev_race_col, column: kyori}
+      rows:
+        type: fixed
+        items:
+          - {label: "距離延長", op: "<", value: 2200}
+          - {label: "同距離", op: "==", value: 2200}
+          - {label: "距離短縮", op: ">", value: 2200}
+    - name: 阪神重賞好走実績
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source:
+        type: past_race_top_n_count
+        keibajo_codes: ["09"]
+        grade_codes: ["A", "B", "C"]
+        top_n: 3
+      rows:
+        type: fixed
+        items:
+          - {label: "0回", op: "==", value: 0}
+          - {label: "1回", op: "==", value: 1}
+          - {label: "2回", op: "==", value: 2}
+          - {label: "3回以上", op: ">=", value: 3}
+  騎手傾向:
+    - name: 騎手
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: jockey_name}
+      rows: {type: all_entries}
+  生産者傾向:
+    - name: 生産者
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: breeder_name}
+      rows: {type: all_entries}
+  血統傾向:
+    - name: 種牡馬
+      condition:
+        years: 10
+        keibajo_codes: ["09"]
+      source: {type: sire_name}
+      rows: {type: dynamic, top_n: 5}
