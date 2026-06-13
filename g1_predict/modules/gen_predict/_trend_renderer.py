@@ -3,8 +3,7 @@
 from typing import Any
 
 from mykeibadb.analytics import RaceCondition
-from mykeibadb.code_converter import (convert_babajotai_code,
-                                      convert_keibajo_code)
+from mykeibadb.code_converter import convert_babajotai_code, convert_keibajo_code
 from mykeibadb.connection import ConnectionManager
 
 from ._trend_loader import build_metric_condition

@@ -5,13 +5,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 from mykeibadb.analytics import RaceCondition
 
-from g1_predict.modules.gen_predict._trend_models import (OTHER_LABEL,
-                                                          TREND_YEARS,
-                                                          RowStats)
+from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
 from g1_predict.modules.gen_predict._trend_renderer import (
-    _aggregate_other_stats, _build_metric_section, _format_percent,
-    _format_table_row, _get_dynamic_labels, build_category_section,
-    format_condition_note)
+    _aggregate_other_stats,
+    _build_metric_section,
+    _format_percent,
+    _format_table_row,
+    _get_dynamic_labels,
+    build_category_section,
+    format_condition_note,
+)
 
 
 def _make_manager() -> MagicMock:

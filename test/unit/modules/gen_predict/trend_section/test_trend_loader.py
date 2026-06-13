@@ -6,8 +6,7 @@ import pandas as pd
 import pytest
 from mykeibadb.analytics import RaceCondition
 
-from g1_predict.modules.gen_predict._trend_loader import (
-    build_metric_condition, build_race_context)
+from g1_predict.modules.gen_predict._trend_loader import build_metric_condition, build_race_context
 from g1_predict.modules.gen_predict._trend_models import TREND_YEARS
 
 
