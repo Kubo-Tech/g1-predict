@@ -3,8 +3,11 @@
 from typing import Any
 
 from mykeibadb.analytics import RaceCondition
+from mykeibadb.code_converter import (convert_babajotai_code,
+                                      convert_keibajo_code)
 from mykeibadb.connection import ConnectionManager
 
+from ._trend_loader import build_metric_condition
 from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
 from ._trend_stats import compute_stats, get_juusho_race_names
 
@@ -14,6 +17,7 @@ def build_category_section(
     metrics: list[dict[str, Any]],
     manager: ConnectionManager,
     condition: RaceCondition,
+    race_year: int,
     race_code: str = "",
 ) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
@@ -26,6 +30,7 @@ def build_category_section(
         metrics (list[dict[str, Any]]): カテゴリ内の metric 設定リスト。
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
+        race_year (int): 対象レースの開催年。
         race_code (str): 16桁レースコード（all_jockeys 型で使用）。
 
     Returns:
@@ -34,7 +39,8 @@ def build_category_section(
     header = f"## {category_name}\n\n過去{TREND_YEARS}年{category_name}に関する傾向"
 
     metric_sections = [
-        _build_metric_section(metric_cfg, manager, condition, race_code) for metric_cfg in metrics
+        _build_metric_section(metric_cfg, manager, condition, race_year, race_code)
+        for metric_cfg in metrics
     ]
     metric_sections.append("### 比較表\n")
     return header + "\n\n" + "\n\n".join(metric_sections)
@@ -44,17 +50,21 @@ def _build_metric_section(
     metric_cfg: dict[str, Any],
     manager: ConnectionManager,
     condition: RaceCondition,
+    race_year: int,
     race_code: str = "",
 ) -> str:
     """1 metric 分の h3 テーブルセクション文字列を生成する。
 
     rows.type に応じてラベル一覧を決定し、各行の集計値から
     Markdown テーブルを生成する。dynamic 型は最後に「その他」行を追加する。
+    metric_cfg に condition が指定されている場合は、開催条件を反映した
+    RaceCondition で集計し、表の直下に開催条件の注記を出力する。
 
     Args:
         metric_cfg (dict[str, Any]): metric の YAML 設定dict。
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
+        race_year (int): 対象レースの開催年。
         race_code (str): 16桁レースコード（all_jockeys 型で使用）。
 
     Returns:
@@ -62,8 +72,10 @@ def _build_metric_section(
     """
     metric_name = metric_cfg["name"]
     rows_cfg = metric_cfg["rows"]
+    condition_cfg = metric_cfg.get("condition")
 
-    stats_map = compute_stats(metric_cfg, manager, condition)
+    metric_condition = build_metric_condition(condition, race_year, condition_cfg)
+    stats_map = compute_stats(metric_cfg, manager, metric_condition)
 
     source_cfg = metric_cfg.get("source", {})
     allowed_values: list[str] | None = source_cfg.get("allowed_values")
@@ -116,7 +128,48 @@ def _build_metric_section(
         other_stats = _aggregate_other_stats(stats_map, set(labels))
         lines.append(_format_table_row(OTHER_LABEL, other_stats))
 
+    note = format_condition_note(condition_cfg)
+    if note:
+        lines.append("")
+        lines.append(note)
+
     return "\n".join(lines)
+
+
+def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
+    """metric condition から開催条件の注記文字列を返す。
+
+    `※過去{years}年{開催場名}{開催日目}{馬場}のみ` の形式で返す。
+    condition_cfg が None の場合は空文字を返す。
+
+    Args:
+        condition_cfg (dict[str, Any] | None): metric の condition 設定dict。
+
+    Returns:
+        str: 注記文字列。condition_cfg が None の場合は空文字。
+    """
+    if condition_cfg is None:
+        return ""
+
+    years = condition_cfg.get("years", TREND_YEARS)
+    parts = [f"過去{years}年"]
+
+    keibajo_codes: list[str] | None = condition_cfg.get("keibajo_codes")
+    if keibajo_codes:
+        parts.append("・".join(convert_keibajo_code(code) for code in keibajo_codes))
+
+    kaisai_nichime: list[int] | None = condition_cfg.get("kaisai_nichime")
+    if kaisai_nichime:
+        nichime_str = "・".join(str(n) for n in kaisai_nichime)
+        parts.append(f"{nichime_str}日目")
+
+    babajotai_codes: list[str] | None = condition_cfg.get("babajotai_codes")
+    if babajotai_codes:
+        baba_str = "・".join(convert_babajotai_code(code) for code in babajotai_codes)
+        parts.append(f"{baba_str}馬場")
+
+    parts.append("のみ")
+    return "※" + "".join(parts)
 
 
 def _get_dynamic_labels(

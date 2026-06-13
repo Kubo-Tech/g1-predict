@@ -24,9 +24,10 @@ def build_trend_sections(
         dict[str, str]: カテゴリ名 -> Markdownセクション文字列。
     """
     manager, condition = build_race_context(race_code, race_info)
+    race_year = int(str(race_info["kaisai_nen"].iloc[0]))
     return {
         category_name: build_category_section(
-            category_name, metrics, manager, condition, race_code
+            category_name, metrics, manager, condition, race_year, race_code
         )
         for category_name, metrics in trends_config.items()
     }
