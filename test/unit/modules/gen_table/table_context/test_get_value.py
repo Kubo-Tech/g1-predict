@@ -283,6 +283,47 @@ def test_get_value_waku_stat_delegates_to_stat(
     assert result == 2
 
 
+@pytest.mark.parametrize(
+    "grade_code, expected",
+    [
+        ("A", "G1 5着"),
+        ("B", "G2 5着"),
+        ("C", "G3 5着"),
+        ("", "非重賞 5着"),
+    ],
+)
+def test_get_value_prev_race_grade_finish_returns_grade_and_finish(
+    ctx: TableContext, mock_cache: MagicMock, grade_code: str, expected: str
+) -> None:
+    """prev_race_grade_finishはグレードと確定着順を「{グレード} {n}着」形式で返す。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame(
+        {"グレードコード": [grade_code], "確定着順": ["5"]}
+    )
+    result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_grade_finish"})
+    assert result == expected
+
+
+def test_get_value_prev_race_grade_finish_returns_none_when_no_past(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """prev_race_grade_finishは過去成績がないときNoneを返す。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame()
+    result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_grade_finish"})
+    assert result is None
+
+
+@pytest.mark.parametrize("finish, expected", [("0", None), ("中", None)])
+def test_get_value_prev_race_grade_finish_returns_none_for_invalid_finish(
+    ctx: TableContext, mock_cache: MagicMock, finish: str, expected: None
+) -> None:
+    """prev_race_grade_finishは確定着順が0または数値変換不能のときNoneを返す。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame(
+        {"グレードコード": ["A"], "確定着順": [finish]}
+    )
+    result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_grade_finish"})
+    assert result == expected
+
+
 # 準正常系
 def test_get_value_raises_for_unknown_src_type(ctx: TableContext) -> None:
     """不明なsrc typeはValueErrorを発生させる。"""

@@ -60,3 +60,24 @@ def test_apply_color_rules_various_conditions(
     rules = [_rule(op, threshold, color)]
     result = apply_color_rules(value, rules)
     assert isinstance(result, PatternFill)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["G1 9着", "G2 2着", "G3 1着"],
+)
+def test_apply_color_rules_grade_finish_within_matches(value: str) -> None:
+    """grade_finish_withinは着順がグレード別上限以内のときPatternFillを返す。"""
+    rules = [_rule("grade_finish_within", {"G1": 9, "G2": 2, "G3": 1}, "yellow")]
+    result = apply_color_rules(value, rules)
+    assert isinstance(result, PatternFill)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["G1 10着", "G2 3着", "G3 2着", "非重賞 1着", "不正な値"],
+)
+def test_apply_color_rules_grade_finish_within_does_not_match(value: str) -> None:
+    """grade_finish_withinは着順上限超過・対象外グレード・不正形式のときNoneを返す。"""
+    rules = [_rule("grade_finish_within", {"G1": 9, "G2": 2, "G3": 1}, "yellow")]
+    assert apply_color_rules(value, rules) is None
