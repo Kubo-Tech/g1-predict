@@ -15,7 +15,7 @@ from mykeibadb.connection import ConnectionManager
 
 from ._trend_models import SIRE_YEARS, RowStats
 
-_SUBJECT_MAP: dict[str, Subject] = {
+SUBJECT_MAP: dict[str, Subject] = {
     "jockey_name": Subject.KISHU,
     "sire_name": Subject.SIRE,
     "breeder_name": Subject.SEISANSHA,
@@ -63,8 +63,8 @@ def compute_stats(
         )
         return _group_by_rows_cfg(result, rows_cfg)
 
-    if src_type in _SUBJECT_MAP:
-        subject = _SUBJECT_MAP[src_type]
+    if src_type in SUBJECT_MAP:
+        subject = SUBJECT_MAP[src_type]
         result = analyze_chakudo(
             manager, [], condition, GroupBy(kind="subject", subject=subject)
         )

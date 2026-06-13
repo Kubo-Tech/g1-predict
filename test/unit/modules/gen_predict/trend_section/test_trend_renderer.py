@@ -2,18 +2,22 @@
 
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
-from mykeibadb.analytics import RaceCondition
+from mykeibadb.analytics import RaceCondition, Subject
 
 from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
 from g1_predict.modules.gen_predict._trend_renderer import (
     _aggregate_other_stats,
     _build_metric_section,
+    _format_chakudo,
     _format_percent,
     _format_table_row,
     _get_dynamic_labels,
     build_category_section,
     format_condition_note,
+    get_race_subject_entries,
+    sort_entry_labels,
 )
 
 
@@ -165,7 +169,7 @@ def test_format_table_row_basic() -> None:
     )
     row = _format_table_row("東京", s)
     assert row.startswith("| 東京 |")
-    assert "2頭" in row
+    assert "2-1-1-6" in row
     assert "20%" in row
     assert "80%" in row
 
@@ -174,8 +178,17 @@ def test_format_table_row_zero_total() -> None:
     """Total が 0 の場合、払戻率は "-" になる。"""
     s = RowStats()
     row = _format_table_row("ラベル", s)
-    assert "0頭" in row
+    assert "0-0-0-0" in row
     assert "- |" in row
+
+
+# --- _format_chakudo ---
+
+
+def test_format_chakudo_formats_counts() -> None:
+    """着度数が「1着-2着-3着-着外」形式の文字列になる。"""
+    s = RowStats(first=0, second=1, third=1, fourth_plus=15)
+    assert _format_chakudo(s) == "0-1-1-15"
 
 
 # --- build_category_section ---
@@ -421,3 +434,152 @@ def test_build_metric_section_without_condition_no_note() -> None:
         )
 
     assert "※" not in result
+
+
+# --- get_race_subject_entries ---
+
+
+def _make_entries_manager(umaban: list[int], label: list[str]) -> MagicMock:
+    """fetch_dataframe が umaban/label の DataFrame を返すモックを生成する。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame({"umaban": umaban, "label": label})
+    return manager
+
+
+def test_get_race_subject_entries_kishu_no_join() -> None:
+    """Subject.KISHU は km2 への JOIN なしで kishumei_ryakusho を取得する。"""
+    manager = _make_entries_manager([1, 2], ["武豊", "ルメール"])
+    entries = get_race_subject_entries(manager, "2026061409030411", Subject.KISHU)
+
+    sql = manager.fetch_dataframe.call_args[0][0]
+    assert "u.kishumei_ryakusho" in sql
+    assert "kyosoba_master2" not in sql
+    assert entries == [(1, "武豊"), (2, "ルメール")]
+
+
+def test_get_race_subject_entries_seisansha_with_join() -> None:
+    """Subject.SEISANSHA は kyosoba_master2 への JOIN を含む。"""
+    manager = _make_entries_manager([1], ["社台ファーム"])
+    entries = get_race_subject_entries(manager, "2026061409030411", Subject.SEISANSHA)
+
+    sql = manager.fetch_dataframe.call_args[0][0]
+    assert "km2.seisanshamei_hojinkaku_nashi" in sql
+    assert "kyosoba_master2" in sql
+    assert entries == [(1, "社台ファーム")]
+
+
+def test_get_race_subject_entries_dedup_uses_min_umaban() -> None:
+    """同一ラベルが複数馬に出る場合、最小馬番のみ残る。"""
+    manager = _make_entries_manager([1, 2, 3], ["社台ファーム", "社台ファーム", "ノーザンファーム"])
+    entries = get_race_subject_entries(manager, "2026061409030411", Subject.SEISANSHA)
+
+    assert entries == [(1, "社台ファーム"), (3, "ノーザンファーム")]
+
+
+# --- sort_entry_labels ---
+
+
+def test_sort_entry_labels_order() -> None:
+    """1着数→2着数→3着数 降順、着外数 昇順、馬番昇順でソートされる。"""
+    stats_map = {
+        "A": RowStats(first=1, second=0, third=0, fourth_plus=5),
+        "B": RowStats(first=1, second=1, third=0, fourth_plus=3),
+        "C": RowStats(first=0, second=0, third=0, fourth_plus=10),
+    }
+    entries = [(3, "A"), (1, "B"), (2, "C")]
+    labels = sort_entry_labels(stats_map, entries)
+    assert labels == ["B", "A", "C"]
+
+
+def test_sort_entry_labels_tie_breaks_by_chakugai_then_umaban() -> None:
+    """1-2-3着が同数の場合、着外数が少ない順で並ぶ。"""
+    stats_map = {
+        "A": RowStats(first=1, second=1, third=1, fourth_plus=5),
+        "B": RowStats(first=1, second=1, third=1, fourth_plus=2),
+    }
+    entries = [(1, "A"), (2, "B")]
+    labels = sort_entry_labels(stats_map, entries)
+    assert labels == ["B", "A"]
+
+
+def test_sort_entry_labels_no_stats_uses_umaban() -> None:
+    """stats_map にないラベルは着度数0として馬番昇順で並ぶ。"""
+    entries = [(2, "B"), (1, "A")]
+    labels = sort_entry_labels({}, entries)
+    assert labels == ["A", "B"]
+
+
+# --- _build_metric_section: all_entries ---
+
+
+def _make_all_entries_metric_cfg(source_type: str = "jockey_name") -> dict:
+    """all_entries 型の metric 設定を生成する。"""
+    return {
+        "name": "騎手",
+        "rows": {"type": "all_entries"},
+        "source": {"type": source_type},
+    }
+
+
+def test_build_metric_section_all_entries_shows_all_runners() -> None:
+    """all_entries 指定時、今回出走対象を全表示する。"""
+    stats_map = {
+        "武豊": RowStats(first=1, second=0, third=0, fourth_plus=5, total=6),
+        "ルメール": RowStats(first=0, second=0, third=0, fourth_plus=3, total=3),
+    }
+    entries = [(1, "武豊"), (2, "ルメール")]
+
+    with (
+        patch(
+            "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+            return_value=stats_map,
+        ),
+        patch(
+            "g1_predict.modules.gen_predict._trend_renderer.get_race_subject_entries",
+            return_value=entries,
+        ),
+    ):
+        result = _build_metric_section(
+            _make_all_entries_metric_cfg(),
+            _make_manager(),
+            _make_condition(),
+            RACE_YEAR,
+            race_code="2026061409030411",
+        )
+
+    assert "武豊" in result
+    assert "ルメール" in result
+    assert "1-0-0-5" in result
+    assert "0-0-0-3" in result
+
+
+def test_build_metric_section_all_entries_empty_race_code_raises() -> None:
+    """all_entries 指定時、race_code が空なら ValueError になる。"""
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        return_value={},
+    ):
+        with pytest.raises(ValueError):
+            _build_metric_section(
+                _make_all_entries_metric_cfg(),
+                _make_manager(),
+                _make_condition(),
+                RACE_YEAR,
+                race_code="",
+            )
+
+
+def test_build_metric_section_all_entries_unsupported_source_raises() -> None:
+    """all_entries 指定時、SUBJECT_MAP に存在しない source.type は ValueError になる。"""
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        return_value={},
+    ):
+        with pytest.raises(ValueError):
+            _build_metric_section(
+                _make_all_entries_metric_cfg(source_type="gate_number"),
+                _make_manager(),
+                _make_condition(),
+                RACE_YEAR,
+                race_code="2026061409030411",
+            )
