@@ -15,6 +15,16 @@ def _make_horse_raw(
     bamei: str,
     ketto_toroku_bango: str,
 ) -> dict[str, Any]:
+    """出走馬のraw dictを生成する。
+
+    Args:
+        umaban (int): 馬番。
+        bamei (str): 馬名。
+        ketto_toroku_bango (str): 血統登録番号。
+
+    Returns:
+        dict[str, Any]: 出走馬情報dict。
+    """
     return {"umaban": umaban, "bamei": bamei, "ketto_toroku_bango": ketto_toroku_bango}
 
 
@@ -25,7 +35,18 @@ def _make_mock_race_getter(
     horses: list[dict[str, Any]] | None = None,
     past_races: list[dict[str, Any]] | None = None,
 ) -> MagicMock:
-    """RaceGetter のモックを生成する。"""
+    """RaceGetter のモックを生成する。
+
+    Args:
+        race_name (str): レース名。
+        year (str): 開催年。
+        grade_code (str): グレードコード。
+        horses (list[dict[str, Any]] | None): 出走馬情報リスト。
+        past_races (list[dict[str, Any]] | None): 過去走情報リスト。
+
+    Returns:
+        MagicMock: RaceGetter のモック。
+    """
     if horses is None:
         horses = [
             _make_horse_raw(1, "ホースA", "2020100001"),
@@ -44,6 +65,14 @@ def _make_mock_race_getter(
     )
 
     def _umagoto(**kwargs: Any) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (Any): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return entry_df.copy()
         return past_df.copy()
@@ -54,7 +83,15 @@ def _make_mock_race_getter(
 
 @pytest.fixture
 def dirs(tmp_path: Path) -> tuple[str, str]:
-    """public・templates ディレクトリを用意する。"""
+    """public・templates ディレクトリを用意する。
+
+    Args:
+        tmp_path (Path): pytest が提供する一時ディレクトリ。
+
+    Returns:
+        str: public ディレクトリパス。
+        str: templates ディレクトリパス。
+    """
     public_dir = str(tmp_path / "public")
     templates_dir = str(tmp_path / "templates")
     os.makedirs(os.path.join(templates_dir, "points"))
@@ -82,12 +119,31 @@ def _run(
     kek_comments_per_call: list[dict[int, str]] | None = None,
     trend_section_return: str = "## 前日の傾向\n",
 ) -> None:
-    """generate_predict をパッチ環境で実行する。"""
+    """generate_predict をパッチ環境で実行する。
+
+    Args:
+        mock_race_getter (MagicMock): RaceGetter のモック。
+        public_dir (str): public ディレクトリパス。
+        templates_dir (str): templates ディレクトリパス。
+        race_code (str): 16桁 JRA-VAN 形式の race_code。
+        marks (dict[int, str] | None): 馬番 -> 印記号のdict。
+        kek_comments_per_call (list[dict[int, str]] | None): 呼び出しごとの成績コメント。
+        trend_section_return (str): 前日の傾向セクション戻り値。
+    """
     if marks is None:
         marks = {}
     comment_iter = iter(kek_comments_per_call or [])
 
     def _fake_read_kek_comments(*_args: object, **_kwargs: object) -> dict[int, str]:
+        """成績コメントを呼び出し順に返す。
+
+        Args:
+            *_args (object): 未使用の位置引数。
+            **_kwargs (object): 未使用のキーワード引数。
+
+        Returns:
+            dict[int, str]: 馬番 -> 成績コメントのdict。
+        """
         return next(comment_iter, {})
 
     with (
@@ -106,7 +162,17 @@ def _run(
 
 
 def _read_output(public_dir: str, year: str, race_code: str, race_name: str) -> str:
-    """生成ファイルの内容を返す。"""
+    """生成ファイルの内容を返す。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+        year (str): 開催年。
+        race_code (str): 16桁 JRA-VAN 形式の race_code。
+        race_name (str): レース名。
+
+    Returns:
+        str: 生成ファイルの内容。
+    """
     path = os.path.join(public_dir, year, f"{race_code}_{race_name}", "予想.md")
     with open(path, encoding="utf-8") as f:
         return f.read()
@@ -114,7 +180,11 @@ def _read_output(public_dir: str, year: str, race_code: str, race_name: str) -> 
 
 # 正常系
 def test_generate_predict_title_format(dirs: tuple[str, str]) -> None:
-    """生成ファイルのタイトルが # {race_name}{year}予想 になる。"""
+    """生成ファイルのタイトルが # {race_name}{year}予想 になる。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(race_name="天皇賞春", year="2026"), public_dir, templates_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
@@ -124,7 +194,11 @@ def test_generate_predict_title_format(dirs: tuple[str, str]) -> None:
 def test_generate_predict_marks_section_shows_only_marked_horses(
     dirs: tuple[str, str],
 ) -> None:
-    """印セクションに印のある馬のみ出力される。"""
+    """印セクションに印のある馬のみ出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [
         _make_horse_raw(1, "アイウエオ", "2020100001"),
@@ -143,7 +217,11 @@ def test_generate_predict_marks_section_shows_only_marked_horses(
 def test_generate_predict_marks_section_ordered_by_mark_priority(
     dirs: tuple[str, str],
 ) -> None:
-    """印セクションは印記号優先度順（◎○▲）に出力される。"""
+    """印セクションは印記号優先度順（◎○▲）に出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [
         _make_horse_raw(1, "ホースA", "2020100001"),
@@ -164,7 +242,11 @@ def test_generate_predict_marks_section_ordered_by_mark_priority(
 def test_generate_predict_marks_section_same_mark_ordered_by_umaban(
     dirs: tuple[str, str],
 ) -> None:
-    """同じ印の馬は馬番昇順で出力される。"""
+    """同じ印の馬は馬番昇順で出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [
         _make_horse_raw(1, "ホースA", "2020100001"),
@@ -180,7 +262,11 @@ def test_generate_predict_marks_section_same_mark_ordered_by_umaban(
 def test_generate_predict_insight_section_shows_marked_horse_header(
     dirs: tuple[str, str],
 ) -> None:
-    """見解セクションに印のある馬の見出しが出力される。"""
+    """見解セクションに印のある馬の見出しが出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(3, "ホースA", "2020100001")]
     marks = {3: "◎"}
@@ -192,7 +278,11 @@ def test_generate_predict_insight_section_shows_marked_horse_header(
 def test_generate_predict_insight_section_skips_unmarked_horse(
     dirs: tuple[str, str],
 ) -> None:
-    """見解セクションに印のない馬は出力されない。"""
+    """見解セクションに印のない馬は出力されない。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [
         _make_horse_raw(1, "ホースA", "2020100001"),
@@ -209,7 +299,11 @@ def test_generate_predict_insight_section_skips_unmarked_horse(
 def test_generate_predict_insight_section_past_comment_zensou(
     dirs: tuple[str, str],
 ) -> None:
-    """前走（1走前）のコメントが「前走」表記で出力される。"""
+    """前走（1走前）のコメントが「前走」表記で出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(5, "ホースA", "2020100001")]
     marks = {5: "◎"}
@@ -218,6 +312,14 @@ def test_generate_predict_insight_section_past_comment_zensou(
     past_df = pd.DataFrame({"race_code": ["2025050205021011"], "umaban": [5]})
 
     def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return pd.DataFrame(horses)
         return past_df
@@ -241,7 +343,11 @@ def test_generate_predict_insight_section_past_comment_zensou(
 def test_generate_predict_insight_section_past_comment_zenzensou(
     dirs: tuple[str, str],
 ) -> None:
-    """前々走（2走前）のコメントが「前々走」表記で出力される。"""
+    """前々走（2走前）のコメントが「前々走」表記で出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(5, "ホースA", "2020100001")]
     marks = {5: "◎"}
@@ -253,6 +359,14 @@ def test_generate_predict_insight_section_past_comment_zenzensou(
     })
 
     def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return pd.DataFrame(horses)
         return past_df
@@ -276,7 +390,11 @@ def test_generate_predict_insight_section_past_comment_zenzensou(
 def test_generate_predict_insight_section_ordinal_3plus(
     dirs: tuple[str, str],
 ) -> None:
-    """3走前以降は「n走前」表記で出力される。"""
+    """3走前以降は「n走前」表記で出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(1, "ホースA", "2020100001")]
     marks = {1: "◎"}
@@ -292,6 +410,14 @@ def test_generate_predict_insight_section_ordinal_3plus(
     })
 
     def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return pd.DataFrame(horses)
         return past_df
@@ -315,7 +441,11 @@ def test_generate_predict_insight_section_ordinal_3plus(
 def test_generate_predict_insight_race_without_comment_counted_in_ordinal(
     dirs: tuple[str, str],
 ) -> None:
-    """コメントなしのレースも走数カウントに含まれる。"""
+    """コメントなしのレースも走数カウントに含まれる。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(3, "ホースA", "2020100001")]
     marks = {3: "◎"}
@@ -327,6 +457,14 @@ def test_generate_predict_insight_race_without_comment_counted_in_ordinal(
     })
 
     def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return pd.DataFrame(horses)
         return past_df
@@ -352,7 +490,11 @@ def test_generate_predict_insight_race_without_comment_counted_in_ordinal(
 def test_generate_predict_insight_section_grade_l(
     dirs: tuple[str, str],
 ) -> None:
-    """グレードコード L が「L」として出力される。"""
+    """グレードコード L が「L」として出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(1, "ホースA", "2020100001")]
     marks = {1: "◎"}
@@ -361,6 +503,14 @@ def test_generate_predict_insight_section_grade_l(
     past_df = pd.DataFrame({"race_code": ["2025050205021011"], "umaban": [1]})
 
     def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return pd.DataFrame(horses)
         return past_df
@@ -384,7 +534,11 @@ def test_generate_predict_insight_section_grade_l(
 def test_generate_predict_insight_section_no_grade_for_general_race(
     dirs: tuple[str, str],
 ) -> None:
-    """一般競走（グレードコード _）はグレード表示なしで出力される。"""
+    """一般競走（グレードコード _）はグレード表示なしで出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(1, "ホースA", "2020100001")]
     marks = {1: "◎"}
@@ -393,6 +547,14 @@ def test_generate_predict_insight_section_no_grade_for_general_race(
     past_df = pd.DataFrame({"race_code": ["2025050205021011"], "umaban": [1]})
 
     def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return pd.DataFrame(horses)
         return past_df
@@ -416,7 +578,11 @@ def test_generate_predict_insight_section_no_grade_for_general_race(
 def test_generate_predict_prev_day_trend_section_content_is_embedded(
     dirs: tuple[str, str],
 ) -> None:
-    """build_prev_day_trend_section の戻り値が前日の傾向セクションに埋め込まれる。"""
+    """build_prev_day_trend_section の戻り値が前日の傾向セクションに埋め込まれる。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     _run(
         _make_mock_race_getter(),
@@ -430,7 +596,11 @@ def test_generate_predict_prev_day_trend_section_content_is_embedded(
 
 
 def test_generate_predict_has_insight_section(dirs: tuple[str, str]) -> None:
-    """見解セクションが出力される。"""
+    """見解セクションが出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
@@ -438,7 +608,11 @@ def test_generate_predict_has_insight_section(dirs: tuple[str, str]) -> None:
 
 
 def test_generate_predict_has_kaimoku_section(dirs: tuple[str, str]) -> None:
-    """買い目セクションが出力される。"""
+    """買い目セクションが出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
@@ -448,7 +622,11 @@ def test_generate_predict_has_kaimoku_section(dirs: tuple[str, str]) -> None:
 def test_generate_predict_creates_file_in_race_subdir(
     dirs: tuple[str, str],
 ) -> None:
-    """生成ファイルが {race_code}_{race_name}/予想.md に作成される。"""
+    """生成ファイルが {race_code}_{race_name}/予想.md に作成される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
     assert os.path.exists(
@@ -456,10 +634,29 @@ def test_generate_predict_creates_file_in_race_subdir(
     )
 
 
+def test_generate_predict_does_not_create_trend_file(
+    dirs: tuple[str, str],
+) -> None:
+    """gen_predict は傾向.md を生成しない。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
+    public_dir, templates_dir = dirs
+    _run(_make_mock_race_getter(), public_dir, templates_dir)
+    assert not os.path.exists(
+        os.path.join(public_dir, "2026", "2026013105010110_天皇賞春", "傾向.md")
+    )
+
+
 def test_generate_predict_uses_points_template_when_exists(
     dirs: tuple[str, str],
 ) -> None:
-    """ポイントテンプレートが存在する場合、その内容が記事に含まれる。"""
+    """ポイントテンプレートが存在する場合、その内容が記事に含まれる。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     with open(os.path.join(templates_dir, "points", "天皇賞春.md"), "w", encoding="utf-8") as f:
         f.write("## ポイント\n\n- 先行有利\n")
@@ -473,7 +670,11 @@ def test_generate_predict_uses_points_template_when_exists(
 def test_generate_predict_uses_default_points_when_template_missing(
     dirs: tuple[str, str],
 ) -> None:
-    """ポイントテンプレートがない場合、デフォルトのポイントセクションが使われる。"""
+    """ポイントテンプレートがない場合、デフォルトのポイントセクションが使われる。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
@@ -484,7 +685,11 @@ def test_generate_predict_uses_default_points_when_template_missing(
 def test_generate_predict_insight_deduplicates_postponed_race(
     dirs: tuple[str, str],
 ) -> None:
-    """延期によりMMDDのみ異なる同一レースのコメントは1回だけ出力される。"""
+    """延期によりMMDDのみ異なる同一レースのコメントは1回だけ出力される。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
     public_dir, templates_dir = dirs
     horses = [_make_horse_raw(1, "ホースA", "2020100001")]
     marks = {1: "◎"}
@@ -500,6 +705,14 @@ def test_generate_predict_insight_deduplicates_postponed_race(
     })
 
     def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
         if "race_code" in kwargs:
             return pd.DataFrame(horses)
         return past_df
@@ -523,7 +736,12 @@ def test_generate_predict_insight_deduplicates_postponed_race(
 def test_generate_predict_uses_default_data_dir_when_env_not_set(
     dirs: tuple[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """TFJV_DATA_DIR が設定されていない場合、デフォルトのデータディレクトリが使われる。"""
+    """TFJV_DATA_DIR が設定されていない場合、デフォルトのデータディレクトリが使われる。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+        monkeypatch (pytest.MonkeyPatch): pytest の環境変数差し替えfixture。
+    """
     public_dir, templates_dir = dirs
     mock_rg = _make_mock_race_getter()
     monkeypatch.delenv("TFJV_DATA_DIR", raising=False)
