@@ -285,6 +285,129 @@ def test_compute_stats_same_race_prev_year_finish_cumulative() -> None:
     assert stats["前年出走無し"].fourth_plus == 5
 
 
+def test_compute_stats_past_race_top_n_count_builds_fixed_group_by() -> None:
+    """past_race_top_n_count source は fixed GroupBy で analyze_chakudo を呼ぶ。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="0勝", wins=0, total=5)])
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {
+                "type": "past_race_top_n_count",
+                "keibajo_codes": ["05"],
+                "top_n": 1,
+            },
+            "rows": {
+                "type": "fixed",
+                "items": [{"label": "0勝", "op": "==", "value": 0}],
+            },
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by.kind == "fixed"
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.type == "past_race_top_n_count"
+    assert group_by.source.keibajo_codes == ["05"]
+    assert group_by.source.top_n == 1
+
+
+def test_compute_stats_past_race_top_n_count_converts_filters_field_to_column() -> None:
+    """past_race_top_n_count の filters はfield名がmykeibadbのcolumn名に変換される。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="0回", wins=0, total=5)])
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {
+                "type": "past_race_top_n_count",
+                "filters": [{"field": "グレードコード", "op": "in", "value": ["A", "B", "C"]}],
+            },
+            "rows": {
+                "type": "fixed",
+                "items": [{"label": "0回", "op": "==", "value": 0}],
+            },
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.filters == [
+        {"column": "grade_code", "op": "in", "value": ["A", "B", "C"]}
+    ]
+
+
+def test_compute_stats_past_race_top_n_count_converts_ijo_kubun_filter() -> None:
+    """past_race_top_n_count の 異常区分コード filter はijo_kubun_codeへ変換される。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="4戦", wins=0, total=5)])
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {
+                "type": "past_race_top_n_count",
+                "filters": [
+                    {"field": "異常区分コード", "op": "not_in", "value": ["1", "2", "3"]}
+                ],
+            },
+            "rows": {
+                "type": "fixed",
+                "items": [{"label": "4戦", "op": "==", "value": 4}],
+            },
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.filters == [
+        {"column": "ijo_kubun_code", "op": "not_in", "value": ["1", "2", "3"]}
+    ]
+
+
+def test_compute_stats_past_race_top_n_count_unsupported_field_raises() -> None:
+    """past_race_top_n_count の filters に未対応fieldを指定するとValueError。"""
+    metric_cfg = {
+        "source": {
+            "type": "past_race_top_n_count",
+            "filters": [{"field": "未対応フィールド", "op": "==", "value": 1}],
+        },
+        "rows": {
+            "type": "fixed",
+            "items": [{"label": "0回", "op": "==", "value": 0}],
+        },
+    }
+    with pytest.raises(ValueError, match="未対応フィールド"):
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+
+def test_compute_stats_past_race_top_n_count_top_n_less_than_one_raises() -> None:
+    """past_race_top_n_count の top_n が 1 未満なら ValueError。"""
+    metric_cfg = {
+        "source": {"type": "past_race_top_n_count", "top_n": 0},
+        "rows": {
+            "type": "fixed",
+            "items": [{"label": "0回", "op": "==", "value": 0}],
+        },
+    }
+    with pytest.raises(ValueError, match="top_n は 1 以上"):
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+
 def test_compute_stats_unknown_type_returns_empty() -> None:
     """未知の source.type は空辞書を返す。"""
     metric_cfg = {
