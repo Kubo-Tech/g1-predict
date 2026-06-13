@@ -255,8 +255,9 @@ class TableContext:
         if past_df.empty:
             return None
         row = past_df.iloc[0]
-        grade_label = _PREV_RACE_GRADE_LABELS.get(str(row["グレードコード"]).strip(), "非重賞")
-        finish = pd.to_numeric(row["確定着順"], errors="coerce")
+        grade_code = str(row.get("グレードコード", "")).strip()
+        grade_label = _PREV_RACE_GRADE_LABELS.get(grade_code, "非重賞")
+        finish = pd.to_numeric(str(row.get("確定着順", "")), errors="coerce")
         if pd.isna(finish) or int(finish) == 0:
             return None
         return f"{grade_label} {int(finish)}着"

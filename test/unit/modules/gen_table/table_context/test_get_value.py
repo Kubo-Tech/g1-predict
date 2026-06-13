@@ -312,6 +312,15 @@ def test_get_value_prev_race_grade_finish_returns_none_when_no_past(
     assert result is None
 
 
+def test_get_value_prev_race_grade_finish_returns_none_when_columns_missing(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """prev_race_grade_finishはグレードコード・確定着順列がないときNoneを返す。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame({"レースコード": ["2025010101"]})
+    result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_grade_finish"})
+    assert result is None
+
+
 @pytest.mark.parametrize("finish, expected", [("0", None), ("中", None)])
 def test_get_value_prev_race_grade_finish_returns_none_for_invalid_finish(
     ctx: TableContext, mock_cache: MagicMock, finish: str, expected: None
