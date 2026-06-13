@@ -19,6 +19,8 @@ from g1_predict.modules.gen_table.table_stat import (
 )
 from g1_predict.modules.gen_table.table_utils import filter_by_horse, filter_df, to_cell_value
 
+_PREV_RACE_GRADE_LABELS: dict[str, str] = {"A": "G1", "B": "G2", "C": "G3"}
+
 
 class TableContext:
     """テーブル生成に必要なデータを保持するコンテキスト。
@@ -208,6 +210,9 @@ class TableContext:
         if src_type == "prev_race_name":
             return self._get_prev_race_name(horse_id, source)
 
+        if src_type == "prev_race_grade_finish":
+            return self._get_prev_race_grade_finish(horse_id)
+
         if src_type == "prev_race_kohan_3f_rank":
             return prev_race_kohan_3f_rank(horse_id, self._cache)
 
@@ -235,3 +240,24 @@ class TableContext:
         if overseas_label and keibajo_code and not keibajo_code[:1].isdigit():
             return overseas_label
         return to_cell_value(row.get("競走名本題"))
+
+    def _get_prev_race_grade_finish(self, horse_id: str) -> Any:
+        """前走のグレードと確定着順を「{グレード} {n}着」形式で返す。
+
+        Args:
+            horse_id (str): 血統登録番号。
+
+        Returns:
+            Any: 例 "G1 5着"、"非重賞 3着"。前走データがない場合、
+                または確定着順が0/数値変換不能の場合はNone。
+        """
+        past_df = self._cache.build_past_df(horse_id)
+        if past_df.empty:
+            return None
+        row = past_df.iloc[0]
+        grade_code = str(row.get("グレードコード", "")).strip()
+        grade_label = _PREV_RACE_GRADE_LABELS.get(grade_code, "非重賞")
+        finish = pd.to_numeric(str(row.get("確定着順", "")), errors="coerce")
+        if pd.isna(finish) or int(finish) == 0:
+            return None
+        return f"{grade_label} {int(finish)}着"
