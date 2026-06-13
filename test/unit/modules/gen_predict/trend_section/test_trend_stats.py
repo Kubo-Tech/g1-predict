@@ -347,38 +347,6 @@ def test_compute_stats_past_race_top_n_count_converts_filters_field_to_column() 
     ]
 
 
-def test_compute_stats_past_race_top_n_count_converts_ijo_kubun_filter() -> None:
-    """past_race_top_n_count の 異常区分コード filter はijo_kubun_codeへ変換される。"""
-    from unittest.mock import patch
-
-    from mykeibadb.analytics import AttrSource
-
-    mock_result = _make_chakudo_result([_make_chakudo_row(group="4戦", wins=0, total=5)])
-    with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
-        return_value=mock_result,
-    ) as mock_analyze:
-        metric_cfg = {
-            "source": {
-                "type": "past_race_top_n_count",
-                "filters": [
-                    {"field": "異常区分コード", "op": "not_in", "value": ["1", "2", "3"]}
-                ],
-            },
-            "rows": {
-                "type": "fixed",
-                "items": [{"label": "4戦", "op": "==", "value": 4}],
-            },
-        }
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
-
-    _, _, _, group_by = mock_analyze.call_args[0]
-    assert isinstance(group_by.source, AttrSource)
-    assert group_by.source.filters == [
-        {"column": "ijo_kubun_code", "op": "not_in", "value": ["1", "2", "3"]}
-    ]
-
-
 def test_compute_stats_past_race_top_n_count_unsupported_field_raises() -> None:
     """past_race_top_n_count の filters に未対応fieldを指定するとValueError。"""
     metric_cfg = {

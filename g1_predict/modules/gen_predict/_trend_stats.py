@@ -38,7 +38,6 @@ _HIST_FILTER_FIELD_MAP: dict[str, str] = {
     "距離": "kyori_int",
     "脚質判定コード": "kyakushitsu_hantei",
     "特別競走番号": "tokubetsu_kyoso_bango",
-    "異常区分コード": "ijo_kubun_code",
 }
 
 
