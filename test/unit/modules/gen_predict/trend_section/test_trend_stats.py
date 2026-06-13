@@ -285,6 +285,157 @@ def test_compute_stats_same_race_prev_year_finish_cumulative() -> None:
     assert stats["前年出走無し"].fourth_plus == 5
 
 
+def test_compute_stats_prev_race_grade_groups_by_grade_code() -> None:
+    """prev_race_grade は history 取得 + _group_by_rows_cfg でG1/G2/G3/その他に集計される。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    raw_rows = [
+        _make_chakudo_row(group="A", wins=1, total=1),
+        _make_chakudo_row(group="B", wins=0, total=1),
+        _make_chakudo_row(group="Z", wins=0, total=1),
+    ]
+    mock_result = _make_chakudo_result(raw_rows)
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {"type": "prev_race_grade"},
+            "rows": {
+                "type": "fixed",
+                "items": [
+                    {"label": "G1", "op": "==", "value": "A"},
+                    {"label": "G2", "op": "==", "value": "B"},
+                    {"label": "G3", "op": "==", "value": "C"},
+                    {"label": "その他", "op": "not_in", "value": ["A", "B", "C"]},
+                ],
+            },
+        }
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by.kind == "history"
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.type == "prev_race_col"
+    assert group_by.source.column == "grade_code"
+    assert stats["G1"].total == 1
+    assert stats["G2"].total == 1
+    assert stats["その他"].total == 1
+
+
+def test_compute_stats_prev_race_finish_groups_by_kakutei_chakujun() -> None:
+    """prev_race_finish は前走確定着順を固定行へ集計する。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    raw_rows = [
+        _make_chakudo_row(group="1", wins=1, total=1),
+        _make_chakudo_row(group="6", wins=0, total=1),
+        _make_chakudo_row(group="12", wins=0, total=1),
+    ]
+    mock_result = _make_chakudo_result(raw_rows)
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {"type": "prev_race_finish"},
+            "rows": {
+                "type": "fixed",
+                "items": [
+                    {"label": "1着", "op": "==", "value": 1},
+                    {"label": "6-9着", "op": "in", "value": [6, 7, 8, 9]},
+                    {"label": "10着以下", "op": ">=", "value": 10},
+                ],
+            },
+        }
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.type == "prev_race_col"
+    assert group_by.source.column == "kakutei_chakujun"
+    assert stats["1着"].total == 1
+    assert stats["6-9着"].total == 1
+    assert stats["10着以下"].total == 1
+
+
+def test_compute_stats_prev_race_finish_by_grade_with_grade_codes() -> None:
+    """prev_race_finish_by_grade の grade_codes は filters(grade_code in ...) に変換される。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=1)])
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {"type": "prev_race_finish_by_grade", "grade_codes": ["A"]},
+            "rows": {
+                "type": "fixed",
+                "items": [{"label": "1着", "op": "==", "value": 1}],
+            },
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.column == "kakutei_chakujun"
+    assert group_by.source.filters == [{"column": "grade_code", "op": "in", "value": ["A"]}]
+
+
+def test_compute_stats_prev_race_finish_by_grade_with_exclude_grade_codes() -> None:
+    """prev_race_finish_by_grade の exclude_grade_codes は filters(grade_code not_in ...) に変換される。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=1)])
+    with patch(
+        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {
+                "type": "prev_race_finish_by_grade",
+                "exclude_grade_codes": ["A", "B", "C"],
+            },
+            "rows": {
+                "type": "fixed",
+                "items": [{"label": "1着", "op": "==", "value": 1}],
+            },
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.filters == [
+        {"column": "grade_code", "op": "not_in", "value": ["A", "B", "C"]}
+    ]
+
+
+def test_compute_stats_prev_race_finish_by_grade_both_grade_codes_raises() -> None:
+    """prev_race_finish_by_grade で grade_codes と exclude_grade_codes を両方指定すると ValueError。"""
+    metric_cfg = {
+        "source": {
+            "type": "prev_race_finish_by_grade",
+            "grade_codes": ["A"],
+            "exclude_grade_codes": ["B"],
+        },
+        "rows": {
+            "type": "fixed",
+            "items": [{"label": "1着", "op": "==", "value": 1}],
+        },
+    }
+    with pytest.raises(ValueError, match="grade_codes と exclude_grade_codes"):
+        compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+
 def test_compute_stats_past_race_top_n_count_builds_fixed_group_by() -> None:
     """past_race_top_n_count source は fixed GroupBy で analyze_chakudo を呼ぶ。"""
     from unittest.mock import patch
@@ -395,6 +546,7 @@ def test_compute_stats_unknown_type_returns_empty() -> None:
         ("gate_number", "u.wakuban"),
         ("popularity", "u.tansho_ninkijun"),
         ("running_style", "u.kyakushitsu_hantei"),
+        ("agari_3f_rank", "u.kohan_3f_jun"),
     ],
 )
 def test_compute_stats_race_col_map(src_type: str, expected_column: str) -> None:

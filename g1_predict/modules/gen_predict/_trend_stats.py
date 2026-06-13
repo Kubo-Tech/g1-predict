@@ -28,6 +28,14 @@ _RACE_COL_MAP: dict[str, str] = {
     "affiliation": "u.tozai_shozoku_code",
     "horse_age": "u.barei",
     "sex": "u.seibetsu_code",
+    "agari_3f_rank": "u.kohan_3f_jun",
+}
+
+# prev_race_grade / prev_race_finish / prev_race_finish_by_grade -> prev_race_col の column名
+_PREV_RACE_COL_TYPES: dict[str, str] = {
+    "prev_race_grade": "grade_code",
+    "prev_race_finish": "kakutei_chakujun",
+    "prev_race_finish_by_grade": "kakutei_chakujun",
 }
 
 # past_race_top_n_count の filters で指定する field名 -> mykeibadb horse_hist の column名
@@ -95,6 +103,12 @@ def compute_stats(
 
     if src_type == "same_race_prev_year_finish":
         group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
+        result = analyze_chakudo(manager, [], condition, group_by)
+        return _group_by_rows_cfg(result, rows_cfg)
+
+    if src_type in _PREV_RACE_COL_TYPES:
+        attr_source = AttrSource.from_dict(_convert_prev_race_source(src))
+        group_by = GroupBy(kind="history", source=attr_source)
         result = analyze_chakudo(manager, [], condition, group_by)
         return _group_by_rows_cfg(result, rows_cfg)
 
@@ -189,6 +203,38 @@ def _convert_hist_filter(filt: dict[str, Any]) -> dict[str, Any]:
     if field not in _HIST_FILTER_FIELD_MAP:
         raise ValueError(f"past_race_top_n_count の filters で未対応の field です: {field!r}")
     return {"column": _HIST_FILTER_FIELD_MAP[field], "op": filt["op"], "value": filt["value"]}
+
+
+def _convert_prev_race_source(src: dict[str, Any]) -> dict[str, Any]:
+    """prev_race_grade/prev_race_finish/prev_race_finish_by_grade を prev_race_col 形式へ変換する。
+
+    Args:
+        src (dict[str, Any]): source の YAML 設定dict。
+
+    Returns:
+        dict[str, Any]: type="prev_race_col" の source 設定dict。
+
+    Raises:
+        ValueError: prev_race_finish_by_grade で grade_codes と exclude_grade_codes を
+            同時に指定した場合。
+    """
+    src_type = src["type"]
+    converted = {**src, "type": "prev_race_col", "column": _PREV_RACE_COL_TYPES[src_type]}
+    if src_type == "prev_race_finish_by_grade":
+        grade_codes = converted.pop("grade_codes", None)
+        exclude_grade_codes = converted.pop("exclude_grade_codes", None)
+        if grade_codes is not None and exclude_grade_codes is not None:
+            raise ValueError(
+                "prev_race_finish_by_grade では grade_codes と exclude_grade_codes を"
+                "同時に指定できません。"
+            )
+        if grade_codes is not None:
+            converted["filters"] = [{"column": "grade_code", "op": "in", "value": grade_codes}]
+        elif exclude_grade_codes is not None:
+            converted["filters"] = [
+                {"column": "grade_code", "op": "not_in", "value": exclude_grade_codes}
+            ]
+    return converted
 
 
 def _compute_sire_condition_stats(
