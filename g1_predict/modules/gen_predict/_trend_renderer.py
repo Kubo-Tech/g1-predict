@@ -2,13 +2,21 @@
 
 from typing import Any
 
-from mykeibadb.analytics import RaceCondition
+from mykeibadb.analytics import RaceCondition, Subject
 from mykeibadb.code_converter import convert_babajotai_code, convert_keibajo_code
 from mykeibadb.connection import ConnectionManager
 
 from ._trend_loader import build_metric_condition
 from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
-from ._trend_stats import compute_stats, get_juusho_race_names
+from ._trend_stats import SUBJECT_MAP, compute_stats, get_juusho_race_names
+
+_KM2_JOIN = "JOIN kyosoba_master2 km2 ON u.ketto_toroku_bango = km2.ketto_toroku_bango"
+
+_SUBJECT_COLUMN_MAP: dict[Subject, tuple[str, str | None]] = {
+    Subject.KISHU: ("u.kishumei_ryakusho", None),
+    Subject.SIRE: ("km2.ketto1_bamei", _KM2_JOIN),
+    Subject.SEISANSHA: ("km2.seisanshamei_hojinkaku_nashi", _KM2_JOIN),
+}
 
 
 def build_category_section(
@@ -30,7 +38,7 @@ def build_category_section(
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
         race_year (int): 対象レースの開催年。
-        race_code (str): 16桁レースコード（all_jockeys 型で使用）。
+        race_code (str): 16桁レースコード（all_entries 型で使用）。
 
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
@@ -100,10 +108,14 @@ def _build_metric_section(
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
         race_year (int): 対象レースの開催年。
-        race_code (str): 16桁レースコード（all_jockeys 型で使用）。
+        race_code (str): 16桁レースコード（all_entries 型で使用）。
 
     Returns:
         str: ### ヘッダーから始まる Markdown テーブル文字列。
+
+    Raises:
+        ValueError: rows.type が all_entries で race_code が空、または
+            source.type が SUBJECT_MAP に存在しない場合。
     """
     metric_name = metric_cfg["name"]
     rows_cfg = metric_cfg["rows"]
@@ -116,9 +128,14 @@ def _build_metric_section(
     allowed_values: list[str] | None = source_cfg.get("allowed_values")
 
     add_other_row = False
-    if rows_cfg["type"] == "all_jockeys":
-        entries = _get_race_jockey_entries(manager, race_code)
-        labels = _sort_jockey_labels(stats_map, entries)
+    if rows_cfg["type"] == "all_entries":
+        if not race_code:
+            raise ValueError("rows.type: all_entries には race_code が必要です")
+        src_type = source_cfg.get("type", "")
+        if src_type not in SUBJECT_MAP:
+            raise ValueError(f"all_entries で未対応の source.type です: {src_type}")
+        entries = get_race_subject_entries(manager, race_code, SUBJECT_MAP[src_type])
+        labels = sort_entry_labels(stats_map, entries)
     elif rows_cfg["type"] == "dynamic":
         top_n = rows_cfg.get("top_n")
         labels = _get_dynamic_labels(stats_map, top_n)
@@ -151,8 +168,8 @@ def _build_metric_section(
     lines = [
         f"### {metric_name}",
         "",
-        f"| {metric_name} | 1着 | 2着 | 3着 | 着外 | 勝率 | 複率 | 単回 | 複回 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        f"| {metric_name} | 着度数 | 勝率 | 複率 | 単回 | 複回 |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for label in labels:
         display_label = display_map.get(label, label)
@@ -241,16 +258,28 @@ def _format_table_row(label: str, s: RowStats) -> str:
         s (RowStats): 行の集計値。
 
     Returns:
-        str: | label | 1着 | 2着 | 3着 | 着外 | 勝率 | 複率 | 単回 | 複回 | 形式の文字列。
+        str: | label | 着度数 | 勝率 | 複率 | 単回 | 複回 | 形式の文字列。
     """
     win_str = _format_percent(s.first, s.total)
     place_str = _format_percent(s.first + s.second + s.third, s.total)
     tansho_str = f"{round(s.tansho_kaishuu)}%" if s.total > 0 else "-"
     fukusho_str = f"{round(s.fukusho_kaishuu)}%" if s.total > 0 else "-"
     return (
-        f"| {label} | {s.first}頭 | {s.second}頭 | {s.third}頭 | {s.fourth_plus}頭"
+        f"| {label} | {_format_chakudo(s)}"
         f" | {win_str} | {place_str} | {tansho_str} | {fukusho_str} |"
     )
+
+
+def _format_chakudo(s: RowStats) -> str:
+    """RowStats を「1着-2着-3着-着外」形式の着度数文字列に変換する。
+
+    Args:
+        s (RowStats): 行の集計値。
+
+    Returns:
+        str: "{first}-{second}-{third}-{fourth_plus}" 形式の文字列。
+    """
+    return f"{s.first}-{s.second}-{s.third}-{s.fourth_plus}"
 
 
 def _format_percent(count: int, total: int) -> str:
@@ -271,61 +300,68 @@ def _format_percent(count: int, total: int) -> str:
     return f"{round(count / total * 100)}%"
 
 
-def _get_race_jockey_entries(
+def get_race_subject_entries(
     manager: ConnectionManager,
     race_code: str,
+    subject: Subject,
 ) -> list[tuple[int, str]]:
-    """指定レースの出走騎手一覧を (umaban, kishu_name) リストで返す。
+    """指定レースの Subject 対象を (umaban, label) リストで返す。
+
+    同一ラベルが複数馬に出る場合は最小馬番を採用し、重複を除いて返す。
 
     Args:
         manager (ConnectionManager): DB接続マネージャ。
         race_code (str): 16桁レースコード。
+        subject (Subject): 集計対象。
 
     Returns:
-        list[tuple[int, str]]: 馬番昇順の (umaban, kishu_name) タプルリスト。
+        list[tuple[int, str]]: 馬番昇順の (umaban, label) タプルリスト。
     """
-    sql = """
+    column, join_sql = _SUBJECT_COLUMN_MAP[subject]
+    join_clause = f"\n        {join_sql}" if join_sql else ""
+    sql = f"""
         SELECT TRIM(u.umaban)::INTEGER AS umaban,
-               TRIM(u.kishumei_ryakusho) AS kishu_name
-        FROM umagoto_race_joho u
+               TRIM({column}) AS label
+        FROM umagoto_race_joho u{join_clause}
         WHERE u.race_code = %s
         ORDER BY TRIM(u.umaban)::INTEGER
     """
     df = manager.fetch_dataframe(sql, params=(race_code,))
-    return list(zip(df["umaban"].astype(int).tolist(), df["kishu_name"].astype(str).tolist()))
+    entries = list(zip(df["umaban"].astype(int).tolist(), df["label"].astype(str).tolist()))
+
+    min_umaban: dict[str, int] = {}
+    for umaban, label in entries:
+        if label not in min_umaban or umaban < min_umaban[label]:
+            min_umaban[label] = umaban
+
+    return sorted(((umaban, label) for label, umaban in min_umaban.items()), key=lambda x: x[0])
 
 
-def _sort_jockey_labels(
+def sort_entry_labels(
     stats_map: dict[str, RowStats],
-    jockey_entries: list[tuple[int, str]],
+    entries: list[tuple[int, str]],
 ) -> list[str]:
-    """騎手を複合ソートキーで並べたラベルリストを返す。
+    """今回出走対象ラベルを着度数・着外数・馬番でソートして返す。
 
     ソート優先順位:
-    1. 3着内数 降順
-    2. 1着数 降順
-    3. 2着数 降順
-    4. 3着数 降順
+    1. 1着数 降順
+    2. 2着数 降順
+    3. 3着数 降順
+    4. 着外数 昇順
     5. 馬番 昇順
 
     Args:
-        stats_map (dict[str, RowStats]): 騎手名 -> RowStats。
-        jockey_entries (list[tuple[int, str]]): (umaban, kishu_name) リスト。
+        stats_map (dict[str, RowStats]): ラベル -> RowStats。
+        entries (list[tuple[int, str]]): (umaban, label) リスト。
 
     Returns:
-        list[str]: ソート済み騎手名リスト。
+        list[str]: ソート済みラベルリスト。
     """
-    umaban_map = {name: umaban for umaban, name in jockey_entries}
-    all_names = [name for _, name in jockey_entries]
+    umaban_map = {label: umaban for umaban, label in entries}
+    all_labels = [label for _, label in entries]
 
-    def sort_key(name: str) -> tuple[int, int, int, int, int]:
-        s = stats_map.get(name, RowStats())
-        return (
-            -(s.first + s.second + s.third),
-            -s.first,
-            -s.second,
-            -s.third,
-            umaban_map.get(name, 99),
-        )
+    def sort_key(label: str) -> tuple[int, int, int, int, int]:
+        s = stats_map.get(label, RowStats())
+        return (-s.first, -s.second, -s.third, s.fourth_plus, umaban_map.get(label, 99))
 
-    return sorted(all_names, key=sort_key)
+    return sorted(all_labels, key=sort_key)
