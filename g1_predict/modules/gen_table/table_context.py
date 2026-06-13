@@ -63,12 +63,31 @@ class TableContext:
         if src_type == "entry_field":
             return to_cell_value(horse.get(source["field"]))
 
-        if src_type == "past_count":
-            filters = source.get("filters", [])
+        if src_type == "past_race_top_n_count":
             past_df = self._cache.build_past_df(horse_id)
             if past_df.empty:
                 return 0
-            return len(filter_df(past_df, filters))
+            filtered = past_df
+            keibajo_codes = source.get("keibajo_codes")
+            if keibajo_codes:
+                filtered = filtered[
+                    filtered["競馬場コード"].astype(str).str.strip().isin(keibajo_codes)
+                ]
+            grade_codes = source.get("grade_codes")
+            if grade_codes:
+                filtered = filtered[
+                    filtered["グレードコード"].astype(str).str.strip().isin(grade_codes)
+                ]
+            top_n = source.get("top_n")
+            if top_n is not None:
+                if int(top_n) < 1:
+                    raise ValueError("past_race_top_n_count の top_n は 1 以上で指定してください。")
+                kakutei = pd.to_numeric(filtered["確定着順"], errors="coerce")
+                filtered = filtered[(kakutei >= 1) & (kakutei <= int(top_n))]
+            filters = source.get("filters", [])
+            if filters:
+                filtered = filter_df(filtered, filters)
+            return len(filtered)
 
         if src_type == "past_field":
             filters = source.get("filters", [])

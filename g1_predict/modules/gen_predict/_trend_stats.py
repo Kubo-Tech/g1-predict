@@ -30,6 +30,16 @@ _RACE_COL_MAP: dict[str, str] = {
     "sex": "u.seibetsu_code",
 }
 
+# past_race_top_n_count の filters で指定する field名 -> mykeibadb horse_hist の column名
+_HIST_FILTER_FIELD_MAP: dict[str, str] = {
+    "確定着順": "kakutei_chakujun",
+    "グレードコード": "grade_code",
+    "競馬場コード": "keibajo_code",
+    "距離": "kyori_int",
+    "脚質判定コード": "kyakushitsu_hantei",
+    "特別競走番号": "tokubetsu_kyoso_bango",
+}
+
 
 def compute_stats(
     metric_cfg: dict[str, Any],
@@ -48,6 +58,7 @@ def compute_stats(
 
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
+
     """
     rows_cfg = metric_cfg["rows"]
 
@@ -71,7 +82,7 @@ def compute_stats(
         return _chakudo_to_stats_map(result)
 
     if src_type in (
-        "past_finish_count",
+        "past_race_top_n_count",
         "career_count",
         "prev_race_name",
         "debut_venue",
@@ -145,12 +156,39 @@ def _build_group_by(
 
     Returns:
         GroupBy: 生成した GroupBy インスタンス。
+
+    Raises:
+        ValueError: past_race_top_n_count の top_n が 1 未満、または filters に未対応fieldがある場合。
     """
+    if src.get("type") == "past_race_top_n_count":
+        top_n = src.get("top_n")
+        if top_n is not None and int(top_n) < 1:
+            raise ValueError("past_race_top_n_count の top_n は 1 以上で指定してください。")
+    if src.get("type") == "past_race_top_n_count" and src.get("filters"):
+        src = {**src, "filters": [_convert_hist_filter(f) for f in src["filters"]]}
     attr_source = AttrSource.from_dict(src)
     if rows_cfg.get("type") == "dynamic":
         return GroupBy(kind="history", source=attr_source)
     rows_def = _yaml_rows_to_rowsdef(rows_cfg)
     return GroupBy(kind="fixed", source=attr_source, rows=rows_def)
+
+
+def _convert_hist_filter(filt: dict[str, Any]) -> dict[str, Any]:
+    """past_race_top_n_count の filters 1要素をAttrSource.filters形式へ変換する。
+
+    Args:
+        filt (dict[str, Any]): {"field": str, "op": str, "value": Any} 形式のYAML設定。
+
+    Returns:
+        dict[str, Any]: {"column": str, "op": str, "value": Any} 形式の辞書。
+
+    Raises:
+        ValueError: field が _HIST_FILTER_FIELD_MAP に存在しない場合。
+    """
+    field = filt["field"]
+    if field not in _HIST_FILTER_FIELD_MAP:
+        raise ValueError(f"past_race_top_n_count の filters で未対応の field です: {field!r}")
+    return {"column": _HIST_FILTER_FIELD_MAP[field], "op": filt["op"], "value": filt["value"]}
 
 
 def _compute_sire_condition_stats(
