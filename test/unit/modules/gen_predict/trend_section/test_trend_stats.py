@@ -7,6 +7,7 @@ from mykeibadb.analytics import ChakudoResult, ChakudoRow, RaceCondition
 
 from g1_predict.modules.gen_predict._trend_models import RowStats
 from g1_predict.modules.gen_predict._trend_stats import (
+    _AGARI_3F_RANK_EXPR,
     _chakudo_row_to_stats,
     _group_by_rows_cfg,
     _group_matches,
@@ -546,7 +547,7 @@ def test_compute_stats_unknown_type_returns_empty() -> None:
         ("gate_number", "u.wakuban"),
         ("popularity", "u.tansho_ninkijun"),
         ("running_style", "u.kyakushitsu_hantei"),
-        ("agari_3f_rank", "u.kohan_3f_jun"),
+        ("agari_3f_rank", _AGARI_3F_RANK_EXPR),
     ],
 )
 def test_compute_stats_race_col_map(src_type: str, expected_column: str) -> None:

@@ -3,11 +3,8 @@ race_name: 東京優駿
 columns:
   - name: 勝利数
     source:
-      type: past_count
-      filters:
-        - field: 確定着順
-          op: "=="
-          value: 1
+      type: past_race_top_n_count
+      top_n: 1
     color_rules:
       - condition:
           op: ">="
@@ -16,14 +13,9 @@ columns:
 
   - name: 重賞勝利数
     source:
-      type: past_count
-      filters:
-        - field: グレードコード
-          op: in
-          value: ["A", "B", "C"]
-        - field: 確定着順
-          op: "=="
-          value: 1
+      type: past_race_top_n_count
+      grade_codes: ["A", "B", "C"]
+      top_n: 1
     color_rules:
       - condition:
           op: ">="
@@ -32,14 +24,9 @@ columns:
 
   - name: 東京勝利数
     source:
-      type: past_count
-      filters:
-        - field: 競馬場コード
-          op: "=="
-          value: "05"
-        - field: 確定着順
-          op: "=="
-          value: 1
+      type: past_race_top_n_count
+      keibajo_codes: ["05"]
+      top_n: 1
     color_rules:
       - condition:
           op: ">="
@@ -84,7 +71,7 @@ columns:
 
   - name: キャリア
     source:
-      type: past_count
+      type: past_race_top_n_count
       filters:
         - field: 異常区分コード
           op: not_in
@@ -392,7 +379,8 @@ trends:
   出走馬傾向:
     - name: 勝利数
       source:
-        type: past_finish_count
+        type: past_race_top_n_count
+        top_n: 1
       rows:
         type: fixed
         items:
@@ -402,8 +390,9 @@ trends:
           - {label: "3勝以上", op: ">=", value: 3}
     - name: 重賞勝利数
       source:
-        type: past_finish_count
+        type: past_race_top_n_count
         grade_codes: ["A", "B", "C"]
+        top_n: 1
       rows:
         type: fixed
         items:
@@ -412,8 +401,9 @@ trends:
           - {label: "2勝以上", op: ">=", value: 2}
     - name: 東京勝利数
       source:
-        type: past_finish_count
-        keibajo_code: "05"
+        type: past_race_top_n_count
+        keibajo_codes: ["05"]
+        top_n: 1
       rows:
         type: fixed
         items:
