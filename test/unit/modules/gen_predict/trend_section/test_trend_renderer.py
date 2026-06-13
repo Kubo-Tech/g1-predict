@@ -13,6 +13,7 @@ from g1_predict.modules.gen_predict._trend_renderer import (
     _format_table_row,
     _get_dynamic_labels,
     build_category_section,
+    format_condition_note,
 )
 
 
@@ -23,7 +24,10 @@ def _make_manager() -> MagicMock:
 
 def _make_condition() -> RaceCondition:
     """テスト用 RaceCondition を生成する。"""
-    return RaceCondition(keibajo_code="05", kyori=2400, year_from="2016", year_to="2025")
+    return RaceCondition(keibajo_codes=["05"], kyori=2400, year_from="2016", year_to="2025")
+
+
+RACE_YEAR = 2026
 
 
 # --- _format_percent ---
@@ -204,7 +208,7 @@ def test_build_category_section_has_header() -> None:
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
-            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition(), RACE_YEAR
         )
     assert result.startswith("## 出走馬傾向")
 
@@ -216,7 +220,7 @@ def test_build_category_section_has_hikaku_table() -> None:
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
-            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition(), RACE_YEAR
         )
     assert "### 比較表" in result
 
@@ -232,6 +236,7 @@ def test_build_category_section_has_metric_header() -> None:
             [_make_fixed_metric_cfg("枠番")],
             _make_manager(),
             _make_condition(),
+            RACE_YEAR,
         )
     assert "### 枠番" in result
 
@@ -243,7 +248,7 @@ def test_build_category_section_hikaku_table_at_end() -> None:
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
-            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition(), RACE_YEAR
         )
     assert result.rstrip().endswith("### 比較表")
 
@@ -255,7 +260,7 @@ def test_build_category_section_trend_years_in_header() -> None:
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
-            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition()
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition(), RACE_YEAR
         )
     assert f"過去{TREND_YEARS}年" in result
 
@@ -294,7 +299,7 @@ def test_build_metric_section_always_include_grades_adds_missing_juusho() -> Non
             return_value={"天皇賞", "マイルCS", "スプリンターズS", "ヴィクトリアM"},
         ),
     ):
-        result = _build_metric_section(metric_cfg, _make_manager(), _make_condition())
+        result = _build_metric_section(metric_cfg, _make_manager(), _make_condition(), RACE_YEAR)
 
     assert "ヴィクトリアM" in result
     assert "天皇賞" in result
@@ -327,7 +332,7 @@ def test_build_metric_section_always_include_grades_overseas_not_added() -> None
             return_value={"マイルCS"},
         ),
     ):
-        result = _build_metric_section(metric_cfg, _make_manager(), _make_condition())
+        result = _build_metric_section(metric_cfg, _make_manager(), _make_condition(), RACE_YEAR)
 
     lines = result.split("\n")
     row_lines = [
@@ -336,3 +341,83 @@ def test_build_metric_section_always_include_grades_overseas_not_added() -> None
     ]
     labels_in_result = [ln.split("|")[1].strip() for ln in row_lines]
     assert "海外" not in labels_in_result
+
+
+# --- format_condition_note ---
+
+
+def test_format_condition_note_none_returns_empty() -> None:
+    """condition_cfg が None の場合は空文字を返す。"""
+    assert format_condition_note(None) == ""
+
+
+def test_format_condition_note_full() -> None:
+    """全項目指定時、SPEC04 の出力例と一致する。"""
+    condition_cfg = {
+        "years": 10,
+        "keibajo_codes": ["09"],
+        "kaisai_nichime": [4],
+        "babajotai_codes": ["1"],
+    }
+    assert format_condition_note(condition_cfg) == "※過去10年阪神4日目良馬場のみ"
+
+
+def test_format_condition_note_multiple_values_joined() -> None:
+    """複数値は「・」で連結される。"""
+    condition_cfg = {
+        "years": 5,
+        "keibajo_codes": ["09", "06"],
+        "kaisai_nichime": [3, 4],
+        "babajotai_codes": ["1", "2"],
+    }
+    note = format_condition_note(condition_cfg)
+    assert "阪神・中山" in note
+    assert "3・4日目" in note
+    assert "良・稍重馬場" in note
+
+
+def test_format_condition_note_years_only() -> None:
+    """years のみ指定時は「※過去N年のみ」になる。"""
+    assert format_condition_note({"years": 5}) == "※過去5年のみ"
+
+
+# --- _build_metric_section: condition note ---
+
+
+def test_build_metric_section_with_condition_appends_note() -> None:
+    """metric_cfg に condition がある場合、注記行が末尾に追加される。"""
+    metric_cfg = {
+        "name": "枠番",
+        "rows": {
+            "type": "fixed",
+            "items": [{"label": "1-4枠", "op": "<=", "value": 4}],
+        },
+        "source": {"type": "gate_number"},
+        "condition": {
+            "years": 10,
+            "keibajo_codes": ["09"],
+            "kaisai_nichime": [4],
+            "babajotai_codes": ["1"],
+        },
+    }
+
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        return_value={},
+    ):
+        result = _build_metric_section(metric_cfg, _make_manager(), _make_condition(), RACE_YEAR)
+
+    assert "※過去10年阪神4日目良馬場のみ" in result
+
+
+def test_build_metric_section_without_condition_no_note() -> None:
+    """metric_cfg に condition がない場合、※注記行は出力されない。"""
+    with patch(
+        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        return_value={},
+    ):
+        result = _build_metric_section(
+            _make_fixed_metric_cfg(), _make_manager(), _make_condition(), RACE_YEAR
+        )
+
+    assert "※" not in result

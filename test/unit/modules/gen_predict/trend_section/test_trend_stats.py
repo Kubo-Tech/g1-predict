@@ -23,7 +23,7 @@ def _make_manager() -> MagicMock:
 
 def _make_condition() -> RaceCondition:
     """テスト用 RaceCondition を生成する。"""
-    return RaceCondition(keibajo_code="05", kyori=2400, year_from="2016", year_to="2025")
+    return RaceCondition(keibajo_codes=["05"], kyori=2400, year_from="2016", year_to="2025")
 
 
 def _make_chakudo_row(

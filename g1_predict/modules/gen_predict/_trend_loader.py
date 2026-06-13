@@ -1,5 +1,8 @@
 """傾向計算に必要な DB コンテキストを構築するモジュール。"""
 
+from dataclasses import replace
+from typing import Any
+
 import pandas as pd
 from mykeibadb.analytics import RaceCondition
 from mykeibadb.config import ConfigManager
@@ -35,7 +38,7 @@ def build_race_context(
     config = ConfigManager.from_env()
     manager = ConnectionManager(config)
     condition = RaceCondition(
-        keibajo_code=keibajo_code,
+        keibajo_codes=[keibajo_code],
         kyori=kyori,
         shiba_da=shiba_da,
         year_from=str(race_year - TREND_YEARS),
@@ -43,3 +46,42 @@ def build_race_context(
         tokubetsu_kyoso_bango=tokubetsu_kyoso_bango,
     )
     return manager, condition
+
+
+def build_metric_condition(
+    base_condition: RaceCondition,
+    race_year: int,
+    condition_cfg: dict[str, Any] | None,
+) -> RaceCondition:
+    """metric 個別の condition 設定を反映した RaceCondition を返す。
+
+    condition_cfg が None の場合は base_condition をそのまま返す。
+    指定時は years から year_from / year_to を再計算し、
+    keibajo_codes / kaisai_nichime / babajotai_codes を上書きする。
+
+    Args:
+        base_condition (RaceCondition): build_race_context が生成した基本条件。
+        race_year (int): 対象レースの開催年。
+        condition_cfg (dict[str, Any] | None): metric の condition 設定dict。
+
+    Returns:
+        RaceCondition: metric 個別条件を反映した RaceCondition。
+
+    Raises:
+        ValueError: condition_cfg["years"] が1未満の場合。
+    """
+    if condition_cfg is None:
+        return base_condition
+
+    years = condition_cfg.get("years", TREND_YEARS)
+    if years < 1:
+        raise ValueError(f"years は1以上の整数を指定してください: {years!r}")
+
+    return replace(
+        base_condition,
+        year_from=str(race_year - years),
+        year_to=str(race_year - 1),
+        keibajo_codes=condition_cfg.get("keibajo_codes", base_condition.keibajo_codes),
+        kaisai_nichime=condition_cfg.get("kaisai_nichime", base_condition.kaisai_nichime),
+        babajotai_codes=condition_cfg.get("babajotai_codes", base_condition.babajotai_codes),
+    )
