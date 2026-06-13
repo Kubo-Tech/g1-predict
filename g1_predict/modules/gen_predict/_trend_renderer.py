@@ -89,6 +89,73 @@ def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
     return "※" + "".join(parts)
 
 
+def get_race_subject_entries(
+    manager: ConnectionManager,
+    race_code: str,
+    subject: Subject,
+) -> list[tuple[int, str]]:
+    """指定レースの Subject 対象を (umaban, label) リストで返す。
+
+    同一ラベルが複数馬に出る場合は最小馬番を採用し、重複を除いて返す。
+
+    Args:
+        manager (ConnectionManager): DB接続マネージャ。
+        race_code (str): 16桁レースコード。
+        subject (Subject): 集計対象。
+
+    Returns:
+        list[tuple[int, str]]: 馬番昇順の (umaban, label) タプルリスト。
+    """
+    column, join_sql = _SUBJECT_COLUMN_MAP[subject]
+    join_clause = f"\n        {join_sql}" if join_sql else ""
+    sql = f"""
+        SELECT TRIM(u.umaban)::INTEGER AS umaban,
+               TRIM({column}) AS label
+        FROM umagoto_race_joho u{join_clause}
+        WHERE u.race_code = %s
+        ORDER BY TRIM(u.umaban)::INTEGER
+    """
+    df = manager.fetch_dataframe(sql, params=(race_code,))
+    entries = list(zip(df["umaban"].astype(int).tolist(), df["label"].astype(str).tolist()))
+
+    min_umaban: dict[str, int] = {}
+    for umaban, label in entries:
+        if label not in min_umaban or umaban < min_umaban[label]:
+            min_umaban[label] = umaban
+
+    return sorted(((umaban, label) for label, umaban in min_umaban.items()), key=lambda x: x[0])
+
+
+def sort_entry_labels(
+    stats_map: dict[str, RowStats],
+    entries: list[tuple[int, str]],
+) -> list[str]:
+    """今回出走対象ラベルを着度数・着外数・馬番でソートして返す。
+
+    ソート優先順位:
+    1. 1着数 降順
+    2. 2着数 降順
+    3. 3着数 降順
+    4. 着外数 昇順
+    5. 馬番 昇順
+
+    Args:
+        stats_map (dict[str, RowStats]): ラベル -> RowStats。
+        entries (list[tuple[int, str]]): (umaban, label) リスト。
+
+    Returns:
+        list[str]: ソート済みラベルリスト。
+    """
+    umaban_map = {label: umaban for umaban, label in entries}
+    all_labels = [label for _, label in entries]
+
+    def sort_key(label: str) -> tuple[int, int, int, int, int]:
+        s = stats_map.get(label, RowStats())
+        return (-s.first, -s.second, -s.third, s.fourth_plus, umaban_map.get(label, 99))
+
+    return sorted(all_labels, key=sort_key)
+
+
 def _build_metric_section(
     metric_cfg: dict[str, Any],
     manager: ConnectionManager,
@@ -169,7 +236,7 @@ def _build_metric_section(
         f"### {metric_name}",
         "",
         f"| {metric_name} | 着度数 | 勝率 | 複率 | 単回 | 複回 |",
-        "| --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for label in labels:
         display_label = display_map.get(label, label)
@@ -298,70 +365,3 @@ def _format_percent(count: int, total: int) -> str:
     if total == 0:
         return "-"
     return f"{round(count / total * 100)}%"
-
-
-def get_race_subject_entries(
-    manager: ConnectionManager,
-    race_code: str,
-    subject: Subject,
-) -> list[tuple[int, str]]:
-    """指定レースの Subject 対象を (umaban, label) リストで返す。
-
-    同一ラベルが複数馬に出る場合は最小馬番を採用し、重複を除いて返す。
-
-    Args:
-        manager (ConnectionManager): DB接続マネージャ。
-        race_code (str): 16桁レースコード。
-        subject (Subject): 集計対象。
-
-    Returns:
-        list[tuple[int, str]]: 馬番昇順の (umaban, label) タプルリスト。
-    """
-    column, join_sql = _SUBJECT_COLUMN_MAP[subject]
-    join_clause = f"\n        {join_sql}" if join_sql else ""
-    sql = f"""
-        SELECT TRIM(u.umaban)::INTEGER AS umaban,
-               TRIM({column}) AS label
-        FROM umagoto_race_joho u{join_clause}
-        WHERE u.race_code = %s
-        ORDER BY TRIM(u.umaban)::INTEGER
-    """
-    df = manager.fetch_dataframe(sql, params=(race_code,))
-    entries = list(zip(df["umaban"].astype(int).tolist(), df["label"].astype(str).tolist()))
-
-    min_umaban: dict[str, int] = {}
-    for umaban, label in entries:
-        if label not in min_umaban or umaban < min_umaban[label]:
-            min_umaban[label] = umaban
-
-    return sorted(((umaban, label) for label, umaban in min_umaban.items()), key=lambda x: x[0])
-
-
-def sort_entry_labels(
-    stats_map: dict[str, RowStats],
-    entries: list[tuple[int, str]],
-) -> list[str]:
-    """今回出走対象ラベルを着度数・着外数・馬番でソートして返す。
-
-    ソート優先順位:
-    1. 1着数 降順
-    2. 2着数 降順
-    3. 3着数 降順
-    4. 着外数 昇順
-    5. 馬番 昇順
-
-    Args:
-        stats_map (dict[str, RowStats]): ラベル -> RowStats。
-        entries (list[tuple[int, str]]): (umaban, label) リスト。
-
-    Returns:
-        list[str]: ソート済みラベルリスト。
-    """
-    umaban_map = {label: umaban for umaban, label in entries}
-    all_labels = [label for _, label in entries]
-
-    def sort_key(label: str) -> tuple[int, int, int, int, int]:
-        s = stats_map.get(label, RowStats())
-        return (-s.first, -s.second, -s.third, s.fourth_plus, umaban_map.get(label, 99))
-
-    return sorted(all_labels, key=sort_key)

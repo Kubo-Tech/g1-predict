@@ -468,7 +468,7 @@ trends:
   騎手傾向:
     - name: 騎手
       source: {type: jockey_name}
-      rows: {type: all_jockeys}
+      rows: {type: all_entries}
   生産者傾向:
     - name: 生産者
       source: {type: breeder_name}
