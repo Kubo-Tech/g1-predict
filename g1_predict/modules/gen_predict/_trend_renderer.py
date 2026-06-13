@@ -46,6 +46,42 @@ def build_category_section(
     return header + "\n\n" + "\n\n".join(metric_sections)
 
 
+def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
+    """metric condition から開催条件の注記文字列を返す。
+
+    `※過去{years}年{開催場名}{開催日目}{馬場}のみ` の形式で返す。
+    condition_cfg が None の場合は空文字を返す。
+
+    Args:
+        condition_cfg (dict[str, Any] | None): metric の condition 設定dict。
+
+    Returns:
+        str: 注記文字列。condition_cfg が None の場合は空文字。
+    """
+    if condition_cfg is None:
+        return ""
+
+    years = condition_cfg.get("years", TREND_YEARS)
+    parts = [f"過去{years}年"]
+
+    keibajo_codes: list[str] | None = condition_cfg.get("keibajo_codes")
+    if keibajo_codes:
+        parts.append("・".join(convert_keibajo_code(code) for code in keibajo_codes))
+
+    kaisai_nichime: list[int] | None = condition_cfg.get("kaisai_nichime")
+    if kaisai_nichime:
+        nichime_str = "・".join(str(n) for n in kaisai_nichime)
+        parts.append(f"{nichime_str}日目")
+
+    babajotai_codes: list[str] | None = condition_cfg.get("babajotai_codes")
+    if babajotai_codes:
+        baba_str = "・".join(convert_babajotai_code(code) for code in babajotai_codes)
+        parts.append(f"{baba_str}馬場")
+
+    parts.append("のみ")
+    return "※" + "".join(parts)
+
+
 def _build_metric_section(
     metric_cfg: dict[str, Any],
     manager: ConnectionManager,
@@ -134,42 +170,6 @@ def _build_metric_section(
         lines.append(note)
 
     return "\n".join(lines)
-
-
-def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
-    """metric condition から開催条件の注記文字列を返す。
-
-    `※過去{years}年{開催場名}{開催日目}{馬場}のみ` の形式で返す。
-    condition_cfg が None の場合は空文字を返す。
-
-    Args:
-        condition_cfg (dict[str, Any] | None): metric の condition 設定dict。
-
-    Returns:
-        str: 注記文字列。condition_cfg が None の場合は空文字。
-    """
-    if condition_cfg is None:
-        return ""
-
-    years = condition_cfg.get("years", TREND_YEARS)
-    parts = [f"過去{years}年"]
-
-    keibajo_codes: list[str] | None = condition_cfg.get("keibajo_codes")
-    if keibajo_codes:
-        parts.append("・".join(convert_keibajo_code(code) for code in keibajo_codes))
-
-    kaisai_nichime: list[int] | None = condition_cfg.get("kaisai_nichime")
-    if kaisai_nichime:
-        nichime_str = "・".join(str(n) for n in kaisai_nichime)
-        parts.append(f"{nichime_str}日目")
-
-    babajotai_codes: list[str] | None = condition_cfg.get("babajotai_codes")
-    if babajotai_codes:
-        baba_str = "・".join(convert_babajotai_code(code) for code in babajotai_codes)
-        parts.append(f"{baba_str}馬場")
-
-    parts.append("のみ")
-    return "※" + "".join(parts)
 
 
 def _get_dynamic_labels(
