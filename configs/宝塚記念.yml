@@ -393,7 +393,7 @@ table:
       color_rules:
         - condition:
             op: ">"
-            value: 2200
+            value: "2200"
           color: yellow
 
   騎手:
