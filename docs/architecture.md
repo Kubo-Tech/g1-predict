@@ -126,8 +126,6 @@ JRA-VAN のレースコード。すべてのスクリプトが `--race-code` で
 
 ## 設計方針
 
-過去の仕様書（`docs/DEV_HISTORY/`、git 管理外）で明文化され、現在のコードが従っている方針。
-
 - **YAML 駆動**: 傾向表の項目も分析表の列も、Python を変更せず `configs/{レース名}.yml` の追加・修正で表現できることを優先する。表現できない集計が出てきたときだけ `source.type` を新設する。
 - **フォールバックしない**: 未対応の `source.type` / `rows.type` / `op` は握りつぶさず `ValueError` を送出する。設定ミスに気づけることを、動き続けることより優先する。
 - **後方互換より整理**: レースが変わるたびに要件が変わるため、破壊的変更を許容する。旧 `source.type` の互換分岐は残さず、既存 YAML の側を修正して追従させる（例: `past_finish_count` / `past_count` → `past_race_top_n_count` への統合）。

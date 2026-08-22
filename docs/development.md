@@ -69,22 +69,3 @@ test/unit/
 4. 単体テストを追加する。
 5. `configs/{レース名}.yml` を更新し、実データで生成して表が欠損なく出ることを確認する。**動作確認で生成した記事や xlsx はコミットしない**。
 6. [config-reference.md](config-reference.md) の一覧に追記する。
-
-## 仕様書（DEV_HISTORY）
-
-まとまった機能追加は、SPEC（仕様書）→ PLAN（PR 単位の実装計画）→ 実装、という流れで進めてきた。過去の SPEC / PLAN は `docs/DEV_HISTORY/` に置いてあるが、**`docs/DEV_HISTORY/.gitignore` により git 管理外**（ローカルにのみ存在する）。
-
-直近の2件:
-
-| 資料 | 内容 |
-| --- | --- |
-| SPEC04 / PLAN04 | 宝塚記念対応。metric 別の開催条件（`condition`）と注記、`all_entries` の汎用化、着度数1カラム化、`past_race_top_n_count` への統合、前走クラス・前走着順などの source 追加 |
-| SPEC05 / PLAN05 | 分析表の「前走クラス着順」列（`prev_race_grade_finish`）と `grade_finish_within` 演算子の追加 |
-
-いずれも完了済み。ローカルに DEV_HISTORY が無い環境では、上表と本ドキュメント群が到達点の記録になる。
-
-## 既知の宿題
-
-- `configs/東京優駿.yml` が旧形式（トップレベル `columns:`）のままで、現在の `gen_table` では読み込めない。シート形式（`table:` + シート名）への移行が必要。
-- CI の対象範囲が `scripts/` に限定されている（上述）。
-- `gen_predict` / `gen_result` は出力を毎回上書きするため、記事を書き足した後の再実行に耐えない。
