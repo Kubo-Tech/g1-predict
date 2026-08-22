@@ -98,7 +98,7 @@ def _call(
         patch("g1_predict.modules.gen_predict.prev_day_trend.DataInterface", return_value=mock_di),
         patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
         patch(
-            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name",
+            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_from_code",
             return_value=venue_name,
         ),
     ):
@@ -226,7 +226,7 @@ def test_build_prev_day_trend_body_prev_date_passed_to_race_getter() -> None:
         patch("g1_predict.modules.gen_predict.prev_day_trend.DataInterface"),
         patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
         patch(
-            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name",
+            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_from_code",
             return_value="東京",
         ),
     ):

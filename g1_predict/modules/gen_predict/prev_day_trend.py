@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 from keiba_data_interface import DataInterface
-from keiba_data_interface.utils.race_code import keibajo_code_to_name
+from keiba_domain import keibajo_from_code
 from mykeibadb import RaceGetter
 
 from ._constants import GRADE_CODE_DISPLAY, TRACK_CODE_TO_SHIBA_DA
@@ -50,7 +50,7 @@ def build_prev_day_trend_body(
     if matched.empty:
         return ""
 
-    venue_name = keibajo_code_to_name(keibajo_code)
+    venue_name = keibajo_from_code(keibajo_code)
 
     race_data: list[tuple[pd.DataFrame, pd.DataFrame]] = []
     for _, raw_row in matched.iterrows():

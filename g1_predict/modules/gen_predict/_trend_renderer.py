@@ -2,8 +2,8 @@
 
 from typing import Any
 
+from keiba_domain import baba_from_code, keibajo_from_code
 from mykeibadb.analytics import RaceCondition, Subject
-from mykeibadb.code_converter import convert_babajotai_code, convert_keibajo_code
 from mykeibadb.connection import ConnectionManager
 
 from ._trend_loader import build_metric_condition
@@ -56,7 +56,7 @@ def build_category_section(
 def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
     """metric condition から開催条件の注記文字列を返す。
 
-    `※過去{years}年{開催場名}{開催日目}{馬場}のみ` の形式で返す。
+    `※過去{years}年{開催場名}{開催日目}{馬場状態}のみ` の形式で返す。
     condition_cfg が None の場合は空文字を返す。
 
     Args:
@@ -73,7 +73,7 @@ def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
 
     keibajo_codes: list[str] | None = condition_cfg.get("keibajo_codes")
     if keibajo_codes:
-        parts.append("・".join(convert_keibajo_code(code) for code in keibajo_codes))
+        parts.append("・".join(keibajo_from_code(code) for code in keibajo_codes))
 
     kaisai_nichime: list[int] | None = condition_cfg.get("kaisai_nichime")
     if kaisai_nichime:
@@ -82,8 +82,14 @@ def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
 
     babajotai_codes: list[str] | None = condition_cfg.get("babajotai_codes")
     if babajotai_codes:
-        baba_str = "・".join(convert_babajotai_code(code) for code in babajotai_codes)
-        parts.append(f"{baba_str}馬場")
+        # baba_from_code はコード"0"（未設定）に対してNoneを返すため、その場合は
+        # 注記に含めずスキップする。
+        # Baba は "稍"/"不" と短縮した名称のため「馬場」は付けない（"稍馬場" は不自然）。
+        baba_names = [
+            baba for code in babajotai_codes if (baba := baba_from_code(code)) is not None
+        ]
+        if baba_names:
+            parts.append("・".join(baba_names))
 
     parts.append("のみ")
     return "※" + "".join(parts)

@@ -20,11 +20,14 @@ JRA の G1 レースについて、
 | mykeibadb（PostgreSQL） | [`mykeibadb-python`](https://github.com/KeibaAI-developer/mykeibadb-python) の `RaceGetter` / `MasterGetter` / `ShussobetsuGetter` / `analytics` | JRA-VAN 由来のレース・出走馬・血統・成績データ |
 | 同上（正規化済みビュー） | [`keiba-data-interface`](https://github.com/KeibaAI-developer/keiba-data-interface) の `DataInterface("mykeibadb")` | 日本語カラム名に整形された出走表・結果・過去成績 |
 | TARGET frontier JV のデータファイル | `g1_predict/modules/utils/tfjv.py` で直接バイナリ読み書き | 自分でつけた**印**と、レースごとに書き溜めた**成績コメント** |
+| （データソースではない） | [`keiba-domain`](https://github.com/KeibaAI-developer/keiba-domain) | 競馬場・馬場状態などコード表由来の定義と判定。DB にも外部 API にも依存しない最下層ライブラリ |
 
 同じ DB を2つのライブラリ経由で参照している点に注意が必要。
 
 - `mykeibadb` 直叩き … カラム名は英字スネークケース（`kakutei_chakujun`、`kohan_3f` など）。集計 SQL（`analytics.analyze_chakudo`）を使う傾向分析側で主に利用する。
 - `keiba_data_interface` … カラム名は日本語（`確定着順`、`後3ハロン` など）。分析表・結果記事側で主に利用する。
+
+コード（競馬場コード、馬場状態コード）から名称への変換は、どちらのライブラリにも同等の関数があるが、**`keiba-domain` に一本化している**。定義が3箇所に散らばると不整合に気づけないため。表示名も `keiba-domain` の値をそのまま使う（馬場状態は「良」「稍」「重」「不」）。
 
 `configs/*.yml` の `filters` や `field` で指定するカラム名は、**どちら側の API を使う機能なのかで表記が変わる**。詳細は [config-reference.md](config-reference.md) を参照。
 
