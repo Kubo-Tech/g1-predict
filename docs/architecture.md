@@ -78,14 +78,15 @@ g1-predict/
 │   ├── hatena.yml                  # 記事種別 → はてなカテゴリの対応
 │   └── {レース名}.yml               # trends（傾向表）と table（分析表）の定義
 ├── g1_predict/modules/
-│   ├── gen_predict/                # 傾向分析・前日の傾向の生成ロジック
-│   │   ├── _constants.py           # トラックコード → 芝/ダ の対応
+│   ├── constants.py                # 複数機能で共有する定数（トラックコード → 芝/ダ、グレード表示）
+│   ├── gen_trend/                  # 傾向分析の生成ロジック
 │   │   ├── _trend_models.py        # RowStats（着度数・回収率）と既定年数
 │   │   ├── _trend_loader.py        # RaceCondition の構築、metric 別 condition の適用
 │   │   ├── _trend_stats.py         # source.type → analytics 呼び出しと集計
 │   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル
-│   │   ├── trend_section.py        # 傾向セクション群の公開 API
-│   │   └── prev_day_trend.py       # 前日の同競馬場・同芝ダの結果集計（前日の傾向記事）
+│   │   └── trend_section.py        # 傾向セクション群の公開 API
+│   ├── gen_prev_day_trend/         # 前日の傾向の生成ロジック
+│   │   └── prev_day_trend.py       # 前日の同競馬場・同芝ダの結果集計
 │   ├── gen_table/                  # 分析表（Excel）の生成ロジック
 │   │   ├── table_context.py        # source.type → 値取得のディスパッチ
 │   │   ├── table_data_cache.py     # DB アクセスとキャッシュ
@@ -93,6 +94,7 @@ g1-predict/
 │   │   └── table_utils.py          # フィルタ、色ルール、セル変換
 │   └── utils/
 │       ├── md_utils.py             # Markdown セクション置換
+│       ├── output_path.py          # 出力パスの検証
 │       └── tfjv.py                 # TARGET frontier JV ファイルの読み書き
 ├── scripts/                        # エントリポイント（python -m scripts.xxx）
 ├── templates/
@@ -107,7 +109,7 @@ g1-predict/
 └── test/unit/                      # scripts / modules の単体テスト
 ```
 
-`scripts/` は「引数のパース・入出力パス決定・テンプレート埋め込み」に徹し、集計や判定のロジックは `g1_predict/modules/` 側に置く方針になっている。
+`scripts/` は「引数のパース・入出力パス決定・テンプレート埋め込み」に徹し、集計や判定のロジックは `g1_predict/modules/` 側に置く方針になっている。`modules/` 配下のパッケージ名は、それを使うスクリプト名と対応させる（`scripts/gen_trend.py` → `modules/gen_trend/`）。複数の機能から参照する定数だけが `modules/constants.py` に置かれる。
 
 ## race_code（16桁）の構造
 
