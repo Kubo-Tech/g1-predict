@@ -7,7 +7,7 @@ from keiba_data_interface import DataInterface
 from keiba_domain import keibajo_from_code
 from mykeibadb import RaceGetter
 
-from ._constants import GRADE_CODE_DISPLAY, TRACK_CODE_TO_SHIBA_DA
+from g1_predict.modules.constants import GRADE_CODE_DISPLAY, TRACK_CODE_TO_SHIBA_DA
 
 _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "701": "新馬",

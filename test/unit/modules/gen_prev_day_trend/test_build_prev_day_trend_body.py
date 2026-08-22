@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from g1_predict.modules.gen_predict.prev_day_trend import build_prev_day_trend_body
+from g1_predict.modules.gen_prev_day_trend.prev_day_trend import build_prev_day_trend_body
 
 
 def _make_race_info(keibajo_code: str = "05", track_code: str = "10") -> pd.DataFrame:
@@ -95,10 +95,16 @@ def _call(
     mock_rg.get_race_shosai.return_value = raw_shosai
 
     with (
-        patch("g1_predict.modules.gen_predict.prev_day_trend.DataInterface", return_value=mock_di),
-        patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
         patch(
-            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_from_code",
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface",
+            return_value=mock_di,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            return_value=mock_rg,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
             return_value=venue_name,
         ),
     ):
@@ -223,10 +229,13 @@ def test_build_prev_day_trend_body_prev_date_passed_to_race_getter() -> None:
     mock_rg.get_race_shosai.return_value = pd.DataFrame()
 
     with (
-        patch("g1_predict.modules.gen_predict.prev_day_trend.DataInterface"),
-        patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
+        patch("g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface"),
         patch(
-            "g1_predict.modules.gen_predict.prev_day_trend.keibajo_from_code",
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            return_value=mock_rg,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
             return_value="東京",
         ),
     ):

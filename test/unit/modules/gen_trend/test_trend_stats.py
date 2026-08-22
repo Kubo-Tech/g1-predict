@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 from mykeibadb.analytics import ChakudoResult, ChakudoRow, RaceCondition
 
-from g1_predict.modules.gen_predict._trend_models import RowStats
-from g1_predict.modules.gen_predict._trend_stats import (
+from g1_predict.modules.gen_trend._trend_models import RowStats
+from g1_predict.modules.gen_trend._trend_stats import (
     _AGARI_3F_RANK_EXPR,
     _chakudo_row_to_stats,
     _group_by_rows_cfg,
@@ -205,7 +205,7 @@ def test_compute_stats_gate_number_calls_analyze_chakudo() -> None:
 
     mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=2, total=10)])
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ):
         metric_cfg = {
@@ -224,7 +224,7 @@ def test_compute_stats_prev_race_col_builds_fixed_group_by() -> None:
 
     mock_result = _make_chakudo_result([_make_chakudo_row(group="逃げ", wins=1, total=5)])
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -256,7 +256,7 @@ def test_compute_stats_same_race_prev_year_finish_cumulative() -> None:
     ]
     mock_result = _make_chakudo_result(raw_rows)
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -299,7 +299,7 @@ def test_compute_stats_prev_race_grade_groups_by_grade_code() -> None:
     ]
     mock_result = _make_chakudo_result(raw_rows)
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -339,7 +339,7 @@ def test_compute_stats_prev_race_finish_groups_by_kakutei_chakujun() -> None:
     ]
     mock_result = _make_chakudo_result(raw_rows)
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -372,7 +372,7 @@ def test_compute_stats_prev_race_finish_by_grade_with_grade_codes() -> None:
 
     mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=1)])
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -398,7 +398,7 @@ def test_compute_stats_prev_race_finish_by_grade_with_exclude_grade_codes() -> N
 
     mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=1)])
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -445,7 +445,7 @@ def test_compute_stats_past_race_top_n_count_builds_fixed_group_by() -> None:
 
     mock_result = _make_chakudo_result([_make_chakudo_row(group="0勝", wins=0, total=5)])
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -477,7 +477,7 @@ def test_compute_stats_past_race_top_n_count_converts_filters_field_to_column() 
 
     mock_result = _make_chakudo_result([_make_chakudo_row(group="0回", wins=0, total=5)])
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {
@@ -558,7 +558,7 @@ def test_compute_stats_race_col_map(src_type: str, expected_column: str) -> None
 
     mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=5)])
     with patch(
-        "g1_predict.modules.gen_predict._trend_stats.analyze_chakudo",
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
         metric_cfg = {

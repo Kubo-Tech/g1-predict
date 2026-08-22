@@ -1,6 +1,6 @@
 """_trend_models の単体テスト。"""
 
-from g1_predict.modules.gen_predict._trend_models import RowStats
+from g1_predict.modules.gen_trend._trend_models import RowStats
 
 
 def test_rowstats_default_values() -> None:
