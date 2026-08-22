@@ -27,6 +27,8 @@ def test_build_race_dir_returns_expected_path() -> None:
         (_PUBLIC_DIR, _YEAR, "../../etc", _RACE_NAME),  # race_code パストラバーサル
         (_PUBLIC_DIR, "202", _RACE_CODE, _RACE_NAME),  # year 3桁
         (_PUBLIC_DIR, "20xx", _RACE_CODE, _RACE_NAME),  # year 英字混在
+        (_PUBLIC_DIR, "2026\n", _RACE_CODE, _RACE_NAME),  # year 末尾に改行
+        (_PUBLIC_DIR, _YEAR, f"{_RACE_CODE}\n", _RACE_NAME),  # race_code 末尾に改行
         (_PUBLIC_DIR, _YEAR, _RACE_CODE, "../evil"),  # race_name に / を含む
         (_PUBLIC_DIR, _YEAR, _RACE_CODE, "a\\b"),  # race_name に \ を含む
         (_PUBLIC_DIR, _YEAR, _RACE_CODE, "."),  # race_name が .

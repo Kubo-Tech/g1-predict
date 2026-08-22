@@ -9,8 +9,9 @@ import os
 import re
 from pathlib import Path
 
-_RACE_CODE_PATTERN = re.compile(r"^[0-9]{16}$")
-_YEAR_PATTERN = re.compile(r"^[0-9]{4}$")
+# $ は文字列末尾の改行直前にもマッチするため、アンカーではなく fullmatch で判定する。
+_RACE_CODE_PATTERN = re.compile(r"[0-9]{16}")
+_YEAR_PATTERN = re.compile(r"[0-9]{4}")
 
 
 def validate_race_code(race_code: str) -> None:
@@ -22,7 +23,7 @@ def validate_race_code(race_code: str) -> None:
     Raises:
         ValueError: 16桁の数字でない場合。
     """
-    if not _RACE_CODE_PATTERN.match(race_code):
+    if not _RACE_CODE_PATTERN.fullmatch(race_code):
         raise ValueError(f"race_code は16桁の数字である必要があります: {race_code!r}")
 
 
@@ -44,7 +45,7 @@ def build_race_dir(public_dir: str, year: str, race_code: str, race_name: str) -
             または組み立てたパスが public_dir の外を指す場合。
     """
     validate_race_code(race_code)
-    if not _YEAR_PATTERN.match(year):
+    if not _YEAR_PATTERN.fullmatch(year):
         raise ValueError(f"year は4桁の数字である必要があります: {year!r}")
     _validate_race_name(race_name)
 

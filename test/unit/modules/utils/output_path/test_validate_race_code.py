@@ -19,6 +19,7 @@ def test_validate_race_code_accepts_16_digit_number() -> None:
         "202606140903041a",  # 英字混在
         "",  # 空文字
         "../../etc",  # パストラバーサル
+        "2026061409030411\n",  # 末尾に改行
     ],
 )
 def test_validate_race_code_raises_for_invalid_format(race_code: str) -> None:
