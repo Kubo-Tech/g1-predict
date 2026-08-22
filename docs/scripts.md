@@ -40,7 +40,7 @@ python -m scripts.gen_trend --race-code 2026061409030411
 | --- | --- | --- | --- | --- | --- |
 | 1枠 | 0-1-0-1 | 0% | 50% | 0% | 175% |
 
-※過去10年阪神4日目良馬場のみ
+※過去10年阪神4日目良のみ
 ```
 
 - 末尾の `※...` は metric に `condition` を指定したときだけ出る（[config-reference.md](config-reference.md#condition--開催条件の絞り込み)）。

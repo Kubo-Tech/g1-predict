@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from keiba_domain import Baba, baba_from_code, keibajo_from_code
+from keiba_domain import baba_from_code, keibajo_from_code
 from mykeibadb.analytics import RaceCondition, Subject
 from mykeibadb.connection import ConnectionManager
 
@@ -11,16 +11,6 @@ from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
 from ._trend_stats import SUBJECT_MAP, compute_stats, get_juusho_race_names
 
 _KM2_JOIN = "JOIN kyosoba_master2 km2 ON u.ketto_toroku_bango = km2.ketto_toroku_bango"
-
-# keiba-domain の Baba は "稍"/"不" のように短縮した名称を持つが、傾向表の注記は
-# 従来から "稍重"/"不良" という表示名を使っているため、表示文言を変えないための
-# 変換マップを用意する。
-_BABA_DISPLAY: dict[Baba, str] = {
-    Baba.GOOD: "良",
-    Baba.SLIGHTLY_HEAVY: "稍重",
-    Baba.HEAVY: "重",
-    Baba.VERY_HEAVY: "不良",
-}
 
 _SUBJECT_COLUMN_MAP: dict[Subject, tuple[str, str | None]] = {
     Subject.KISHU: ("u.kishumei_ryakusho", None),
@@ -66,7 +56,7 @@ def build_category_section(
 def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
     """metric condition から開催条件の注記文字列を返す。
 
-    `※過去{years}年{開催場名}{開催日目}{馬場}のみ` の形式で返す。
+    `※過去{years}年{開催場名}{開催日目}{馬場状態}のみ` の形式で返す。
     condition_cfg が None の場合は空文字を返す。
 
     Args:
@@ -94,14 +84,12 @@ def format_condition_note(condition_cfg: dict[str, Any] | None) -> str:
     if babajotai_codes:
         # baba_from_code はコード"0"（未設定）に対してNoneを返すため、その場合は
         # 注記に含めずスキップする。
+        # Baba は "稍"/"不" と短縮した名称のため「馬場」は付けない（"稍馬場" は不自然）。
         baba_names = [
-            _BABA_DISPLAY[baba]
-            for code in babajotai_codes
-            if (baba := baba_from_code(code)) is not None
+            baba for code in babajotai_codes if (baba := baba_from_code(code)) is not None
         ]
         if baba_names:
-            baba_str = "・".join(baba_names)
-            parts.append(f"{baba_str}馬場")
+            parts.append("・".join(baba_names))
 
     parts.append("のみ")
     return "※" + "".join(parts)

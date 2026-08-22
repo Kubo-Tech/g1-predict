@@ -372,7 +372,7 @@ def test_format_condition_note_full() -> None:
         "kaisai_nichime": [4],
         "babajotai_codes": ["1"],
     }
-    assert format_condition_note(condition_cfg) == "※過去10年阪神4日目良馬場のみ"
+    assert format_condition_note(condition_cfg) == "※過去10年阪神4日目良のみ"
 
 
 def test_format_condition_note_multiple_values_joined() -> None:
@@ -386,7 +386,7 @@ def test_format_condition_note_multiple_values_joined() -> None:
     note = format_condition_note(condition_cfg)
     assert "阪神・中山" in note
     assert "3・4日目" in note
-    assert "良・稍重馬場" in note
+    assert "良・稍" in note
 
 
 def test_format_condition_note_years_only() -> None:
@@ -398,17 +398,17 @@ def test_format_condition_note_years_only() -> None:
     "babajotai_codes, expected_baba_str",
     [
         (["1"], "良"),
-        (["2"], "稍重"),
+        (["2"], "稍"),
         (["3"], "重"),
-        (["4"], "不良"),
+        (["4"], "不"),
     ],
 )
-def test_format_condition_note_baba_display_matches_legacy_names(
+def test_format_condition_note_baba_uses_domain_names(
     babajotai_codes: list[str], expected_baba_str: str
 ) -> None:
-    """馬場状態の表示名が従来どおりになる（keiba-domainの短縮名"稍"/"不"にならない）。"""
+    """馬場状態は keiba-domain の名称をそのまま使い、「馬場」を付けない。"""
     condition_cfg = {"years": 5, "babajotai_codes": babajotai_codes}
-    assert format_condition_note(condition_cfg) == f"※過去5年{expected_baba_str}馬場のみ"
+    assert format_condition_note(condition_cfg) == f"※過去5年{expected_baba_str}のみ"
 
 
 def test_format_condition_note_baba_code_zero_is_skipped() -> None:
@@ -443,7 +443,7 @@ def test_build_metric_section_with_condition_appends_note() -> None:
     ):
         result = _build_metric_section(metric_cfg, _make_manager(), _make_condition(), RACE_YEAR)
 
-    assert "※過去10年阪神4日目良馬場のみ" in result
+    assert "※過去10年阪神4日目良のみ" in result
 
 
 def test_build_metric_section_without_condition_no_note() -> None:
