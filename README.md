@@ -20,8 +20,8 @@ JRA-VAN のデータと TARGET frontier JV の自作メモをもとに、**JRA G
 ## クイックスタート
 
 ```bash
-# 1. 依存インストール
-pip install -r requirements.txt
+# 1. 依存インストール（開発時は開発用ツールも入る ".[dev]" を使う）
+pip install -e .
 
 # 2. 環境変数（.env）を用意する
 #    MYKEIBADB_HOST / MYKEIBADB_PORT / MYKEIBADB_DATABASE / MYKEIBADB_USER / MYKEIBADB_PASSWORD

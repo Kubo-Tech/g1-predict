@@ -12,20 +12,19 @@
 
 ## 静的解析とテスト
 
-CI（`.github/workflows/ci.yml`）と同じチェックをローカルで走らせる場合:
+設定はすべて `pyproject.toml` に集約している（`[tool.ruff]` / `[tool.mypy]` / `[tool.pytest.ini_options]`）。CI と同じチェックをローカルで走らせる場合:
 
 ```bash
-isort --profile=black --line-length=100 --check-only --diff scripts/ test/
-flake8 scripts/ --max-line-length=100 \
-  --ignore=E203,W503,ANN101,ANN204,ANN401,D105,D107,D403,D415,DAR101,DAR201,DAR402 \
-  --select=E,W,F,N,D --docstring-convention=google
-mypy scripts/ --ignore-missing-imports
+ruff check scripts/ test/
+mypy scripts/
 pytest test/unit
 ```
 
-> **CI の適用範囲に穴がある**: ワークフローの `paths` は `scripts/**` / `test/**` / `pytest.ini` / `requirements*.txt` / `ci.yml` のみで、`g1_predict/**` と `configs/**` の変更では CI が起動しない。静的解析の対象も `scripts/` だけで、実装の大半がある `g1_predict/` は含まれていない。`g1_predict/` を触ったときはローカルで手動確認する（あるいは CI 側を直す）。
+ruff は isort・flake8・darglint を置き換えたもので、KeibaAI の他ライブラリと同じルールセット（`E,W,F,N,D,I,DOC` / Google スタイル docstring / 100文字）を使う。CI では共通の `library-workflow` と同じバージョン（`RUFF_VERSION`）に固定して実行するため、ローカルの ruff の版が違うと結果がずれることがある。
 
-`pytest` は外部依存をモックしているので DB・TFJV データが無くても通る。ただし `openpyxl` などの依存は必要なので、事前に `pip install -r requirements.txt` を済ませておく。
+> **CI の適用範囲に穴がある**: ワークフローの `paths` は `scripts/**` / `test/**` / `pyproject.toml` / `ci.yml` のみで、`g1_predict/**` と `configs/**` の変更では CI が起動しない。静的解析の対象も `scripts/`（mypy）と `scripts/` + `test/`（ruff）だけで、実装の大半がある `g1_predict/` は含まれていない。`g1_predict/` を触ったときはローカルで手動確認する。
+
+`pytest` は外部依存をモックしているので DB・TFJV データが無くても通る。ただし `openpyxl` などの依存は必要なので、事前に `pip install -e ".[dev]"` を済ませておく。
 
 ## テストの置き場所
 
