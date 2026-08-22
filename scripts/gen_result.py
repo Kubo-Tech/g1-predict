@@ -14,6 +14,7 @@ from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_ijo_kubun_code
 
 from g1_predict.modules.utils.md_utils import replace_section
+from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 from g1_predict.modules.utils.tfjv import (
     race_code_to_tfjv,
     read_kek_comments,
@@ -38,6 +39,7 @@ def generate_result(race_code: str) -> None:
     Args:
         race_code: 16桁 JRA-VAN 形式の race_code。
     """
+    validate_race_code(race_code)
     tfjv_data_dir = os.environ.get("TFJV_DATA_DIR", _DEFAULT_DATA_DIR)
 
     di = DataInterface("mykeibadb")
@@ -59,8 +61,7 @@ def generate_result(race_code: str) -> None:
 
     content = _render_from_template(race_name, year, result_section, review_section)
 
-    year_dir = os.path.join(_PUBLIC_DIR, year)
-    race_dir = os.path.join(year_dir, f"{race_code}_{race_name}")
+    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_name)
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "結果.md")
     with open(output_path, "w", encoding="utf-8") as f:

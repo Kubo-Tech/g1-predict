@@ -8,6 +8,7 @@ import pandas as pd
 from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_chakusa_code, convert_ijo_kubun_code
 
+from g1_predict.modules.utils.output_path import validate_race_code
 from g1_predict.modules.utils.tfjv import race_code_to_tfjv, write_kek_comment
 
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
@@ -22,6 +23,7 @@ def generate_result_comments(race_code: str, base_dir: str) -> None:
         race_code: 16桁 JRA-VAN 形式の race_code。
         base_dir: TFJV データディレクトリのパス。
     """
+    validate_race_code(race_code)
     di = DataInterface("mykeibadb")
     race_info = di.get_race_basic_info(race_code)
     race_name = race_info["競走名略称6文字"].iloc[0]

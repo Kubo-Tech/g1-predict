@@ -25,6 +25,7 @@ from g1_predict.modules.gen_table.table_utils import (
     is_na,
     to_cell_value,
 )
+from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 
 load_dotenv(find_dotenv())
 
@@ -45,6 +46,7 @@ def generate_table(race_code: str) -> None:
     Args:
         race_code (str): 16桁レースコード。
     """
+    validate_race_code(race_code)
     di = DataInterface("mykeibadb")
     race_info = di.get_race_basic_info(race_code)
     race_name = str(race_info["競走名本題"].iloc[0])
@@ -100,7 +102,8 @@ def _write_xlsx(
     Returns:
         str: 生成したxlsxファイルの絶対パス。
     """
-    table_dir = os.path.join(_PUBLIC_DIR, str(race_year), f"{race_code}_{race_name}", "table")
+    race_dir = build_race_dir(_PUBLIC_DIR, str(race_year), race_code, race_name)
+    table_dir = os.path.join(race_dir, "table")
     os.makedirs(table_dir, exist_ok=True)
     output_path = os.path.join(table_dir, f"{race_code}_{race_name}.xlsx")
 
