@@ -12,10 +12,7 @@ import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from mykeibadb import RaceGetter
 
-from g1_predict.modules.gen_predict.prev_day_trend import (
-    GRADE_CODE_DISPLAY,
-    build_prev_day_trend_section,
-)
+from g1_predict.modules.gen_predict._constants import GRADE_CODE_DISPLAY
 from g1_predict.modules.utils.md_utils import replace_section
 from g1_predict.modules.utils.tfjv import (
     race_code_to_tfjv,
@@ -54,13 +51,10 @@ def generate_predict(race_code: str) -> None:
     dat_path = um_dat_path(race_code, tfjv_data_dir)
     marks = read_marks(dat_path, um_dat_record_no(race_code))
 
-    trend_section = build_prev_day_trend_section(race_code, race_shosai)
     points = _load_points(race_name)
     marks_section = _build_marks_section(marks, entry_raw)
     insight_section = _build_insight_section(marks, entry_raw, race_getter, tfjv_data_dir)
-    content = _render_from_template(
-        race_name, year, points, trend_section, marks_section, insight_section
-    )
+    content = _render_from_template(race_name, year, points, marks_section, insight_section)
 
     year_dir = os.path.join(_PUBLIC_DIR, year)
     race_dir = os.path.join(year_dir, f"{race_code}_{race_name}")
@@ -243,7 +237,6 @@ def _render_from_template(
     race_name: str,
     year: str,
     points_section: str,
-    trend_section: str,
     marks_section: str,
     insight_section: str,
 ) -> str:
@@ -253,7 +246,6 @@ def _render_from_template(
         race_name (str): レース名。
         year (str): 開催年。
         points_section (str): ポイントセクション。
-        trend_section (str): 前日の傾向セクション。
         marks_section (str): 印セクション。
         insight_section (str): 見解セクション。
 
@@ -265,7 +257,6 @@ def _render_from_template(
         content = f.read()
     content = content.replace("{RaceName}", race_name).replace("{Year}", year)
     content = replace_section(content, "## ポイント", points_section)
-    content = replace_section(content, "## 前日の傾向", trend_section)
     content = replace_section(content, "## 印", marks_section)
     content = replace_section(content, "## 見解", insight_section)
     return content

@@ -100,7 +100,7 @@ def dirs(tmp_path: Path) -> tuple[str, str]:
             "# {RaceName}{Year}予想\n\n"
             "## ポイント\n\n"
             "- \n\n"
-            "## 前日の傾向\n\n"
+            "## 関連記事\n\n"
             "## 印\n\n"
             "◎{Umaban}{HorseName}  \n\n"
             "## 見解\n\n"
@@ -117,7 +117,6 @@ def _run(
     race_code: str = "2026013105010110",
     marks: dict[int, str] | None = None,
     kek_comments_per_call: list[dict[int, str]] | None = None,
-    trend_section_return: str = "## 前日の傾向\n",
 ) -> None:
     """generate_predict をパッチ環境で実行する。
 
@@ -128,7 +127,6 @@ def _run(
         race_code (str): 16桁 JRA-VAN 形式の race_code。
         marks (dict[int, str] | None): 馬番 -> 印記号のdict。
         kek_comments_per_call (list[dict[int, str]] | None): 呼び出しごとの成績コメント。
-        trend_section_return (str): 前日の傾向セクション戻り値。
     """
     if marks is None:
         marks = {}
@@ -152,10 +150,6 @@ def _run(
         patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
         patch("scripts.gen_predict.read_marks", return_value=marks),
         patch("scripts.gen_predict.read_kek_comments", side_effect=_fake_read_kek_comments),
-        patch(
-            "scripts.gen_predict.build_prev_day_trend_section",
-            return_value=trend_section_return,
-        ),
         patch.dict("os.environ", {"TFJV_DATA_DIR": "/tmp/fake_tfjv"}),
     ):
         generate_predict(race_code)
@@ -575,24 +569,32 @@ def test_generate_predict_insight_section_no_grade_for_general_race(
     assert "前走一般戦凡走。" in content
 
 
-def test_generate_predict_prev_day_trend_section_content_is_embedded(
+def test_generate_predict_does_not_contain_prev_day_trend_section(
     dirs: tuple[str, str],
 ) -> None:
-    """build_prev_day_trend_section の戻り値が前日の傾向セクションに埋め込まれる。
+    """生成された予想記事に ## 前日の傾向 セクションが含まれない。
 
     Args:
         dirs (tuple[str, str]): public・templates ディレクトリ。
     """
     public_dir, templates_dir = dirs
-    _run(
-        _make_mock_race_getter(),
-        public_dir,
-        templates_dir,
-        race_code="2026013105010110",
-        trend_section_return="## 前日の傾向\n\nダート先行有利\n",
-    )
+    _run(_make_mock_race_getter(), public_dir, templates_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "ダート先行有利" in content
+    assert "## 前日の傾向" not in content
+
+
+def test_generate_predict_contains_related_articles_section(
+    dirs: tuple[str, str],
+) -> None:
+    """生成された予想記事に ## 関連記事 セクションが含まれる。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
+    public_dir, templates_dir = dirs
+    _run(_make_mock_race_getter(), public_dir, templates_dir)
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
+    assert "## 関連記事" in content
 
 
 def test_generate_predict_has_insight_section(dirs: tuple[str, str]) -> None:
@@ -751,7 +753,6 @@ def test_generate_predict_uses_default_data_dir_when_env_not_set(
         patch("scripts.gen_predict._TEMPLATES_DIR", templates_dir),
         patch("scripts.gen_predict.read_marks", return_value={}) as mock_read_marks,
         patch("scripts.gen_predict.read_kek_comments", return_value={}),
-        patch("scripts.gen_predict.build_prev_day_trend_section", return_value="## 前日の傾向\n"),
         patch("scripts.gen_predict.um_dat_path", return_value="/fake/path") as mock_um_dat_path,
     ):
         generate_predict("2026013105010110")
