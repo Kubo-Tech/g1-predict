@@ -77,7 +77,8 @@ def filter_df(df: pd.DataFrame, filters: list[dict[str, Any]]) -> pd.DataFrame:
 
     Args:
         df (pd.DataFrame): 絞り込む対象のDataFrame。
-        filters (list[dict[str, Any]]): YAMLのfilters設定リスト（field/op/valueキーを持つ辞書のリスト）。
+        filters (list[dict[str, Any]]): YAMLのfilters設定リスト
+            （field/op/valueキーを持つ辞書のリスト）。
 
     Returns:
         pd.DataFrame: フィルタ適用後のDataFrame。
@@ -179,7 +180,8 @@ def _match_op(value: Any, op: str, threshold: Any) -> bool:
 
     Args:
         value (Any): 比較対象の値。
-        op (str): 演算子文字列（"==" / "!=" / ">=" / "<=" / ">" / "<" / "in" / "not_in" / "contains" /
+        op (str): 演算子文字列
+            （"==" / "!=" / ">=" / "<=" / ">" / "<" / "in" / "not_in" / "contains" /
             "grade_finish_within"）。
         threshold (Any): 比較する基準値。
             "grade_finish_within" の場合は {グレードラベル: 着順上限} のdict。

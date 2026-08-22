@@ -4,15 +4,19 @@ on:
   push:
     branches: [main, develop]
     paths:
+      - 'g1_predict/**'
       - 'scripts/**'
       - 'test/**'
+      - 'configs/**'
       - 'pyproject.toml'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, develop]
     paths:
+      - 'g1_predict/**'
       - 'scripts/**'
       - 'test/**'
+      - 'configs/**'
       - 'pyproject.toml'
       - '.github/workflows/ci.yml'
 
@@ -41,7 +45,7 @@ jobs:
       - name: Run ruff
         run: |
           echo "::group::ruff check"
-          uvx "ruff@$RUFF_VERSION" check scripts/ test/ --output-format=github
+          uvx "ruff@$RUFF_VERSION" check g1_predict/ scripts/ test/ --output-format=github
           echo "::endgroup::"
 
       - name: Create virtual environment
@@ -55,7 +59,7 @@ jobs:
       - name: Run mypy
         run: |
           echo "::group::mypy check"
-          mypy scripts/
+          mypy g1_predict/ scripts/
           echo "::endgroup::"
 
       - name: Run unit test
