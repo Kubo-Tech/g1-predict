@@ -6,54 +6,57 @@ on:
     paths:
       - 'scripts/**'
       - 'test/**'
-      - 'pytest.ini'
-      - 'requirements*.txt'
+      - 'pyproject.toml'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'scripts/**'
       - 'test/**'
-      - 'pytest.ini'
-      - 'requirements*.txt'
+      - 'pyproject.toml'
       - '.github/workflows/ci.yml'
+
+env:
+  # KeibaAI共通のlibrary-workflowと同じ版に揃える。版がずれると同じコードでも
+  # 判定結果が変わるため、ここで固定する。
+  RUFF_VERSION: '0.16.3'
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      # setup-uvはv8以降メジャータグを提供していないため完全なコミットSHAで固定する。
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          version: '0.11.19'
           python-version: '3.12'
+          enable-cache: true
+          cache-suffix: g1-predict
 
-      - name: Install dev dependencies
+      # ruffはASTだけで動き依存の解決を必要としないため、インストールを待たずに先に流す。
+      - name: Run ruff
         run: |
-          pip install \
-            isort \
-            flake8 \
-            flake8-docstrings \
-            flake8-annotations \
-            pep8-naming \
-            darglint \
-            mypy \
-            pytest
-          pip install -r requirements.txt
+          echo "::group::ruff check"
+          uvx "ruff@$RUFF_VERSION" check scripts/ test/ --output-format=github
+          echo "::endgroup::"
 
-      - name: isort
-        run: isort --profile=black --line-length=100 --check-only --diff scripts/ test/
-
-      - name: flake8
+      - name: Create virtual environment
         run: |
-          flake8 scripts/ \
-            --max-line-length=100 \
-            --ignore=E203,W503,ANN101,ANN204,ANN401,D105,D107,D403,D415,DAR101,DAR201,DAR402 \
-            --select=E,W,F,N,D \
-            --docstring-convention=google
+          uv venv --python 3.12
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
-      - name: mypy
-        run: mypy scripts/ --ignore-missing-imports
+      - name: Install dependencies
+        run: uv pip install -e ".[dev]"
 
-      - name: pytest
+      - name: Run mypy
+        run: |
+          echo "::group::mypy check"
+          mypy scripts/
+          echo "::endgroup::"
+
+      - name: Run unit test
         run: pytest test/unit

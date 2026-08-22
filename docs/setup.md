@@ -13,14 +13,21 @@
 
 ## 依存インストール
 
+依存は `pyproject.toml` で管理している。
+
 ```bash
-pip install -r requirements.txt
+# 実行するだけなら
+pip install -e .
+
+# 開発する場合（テスト・静的解析ツールを含む）
+pip install -e ".[dev]"
 ```
 
-`requirements.txt` の内容:
+`[project] dependencies` の内容:
 
 | パッケージ | 用途 |
 | --- | --- |
+| `keiba-domain`（GitHub） | 競馬ドメインの定義・判定。`keiba-data-interface` が要求する |
 | `keiba-data-interface`（GitHub） | 日本語カラム名でのレース・出走表・過去成績取得 |
 | `mykeibadb-python`（GitHub / `develop` ブランチ） | DB 直接アクセスと着度数集計（`analytics`） |
 | `openpyxl` | 分析表（xlsx）の書き出し |
@@ -28,13 +35,9 @@ pip install -r requirements.txt
 | `pyyaml` | `configs/*.yml` の読み込み |
 | `requests` | はてなブログ AtomPub / Fotolife API |
 
-GitHub 上のプライベート／組織リポジトリを参照するため、インストール時に GitHub の認証が必要になる場合がある。
+`keiba-domain` は `keiba-data-interface` の依存だが、PyPI に存在せず GitHub からしか取得できないため、**このリポジトリの直接依存としても明示している**。書かないと依存解決が `No matching distribution found for keiba-domain` で失敗する。
 
-テスト・静的解析用の依存は `requirements.txt` に含まれていない。ローカルで CI と同じチェックを走らせる場合は別途入れる。
-
-```bash
-pip install pytest isort flake8 flake8-docstrings flake8-annotations pep8-naming darglint mypy
-```
+`[project.optional-dependencies] dev` には `pytest` / `pytest-cov` / `pytest-mock` と、静的解析用の `mypy` / 型スタブが入る。ruff は CI 側でバージョンを固定して実行するため、ここには含めない。
 
 ## 環境変数
 

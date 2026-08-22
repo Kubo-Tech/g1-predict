@@ -125,7 +125,8 @@ def _write_sheet(
 
     Args:
         ws (Worksheet): 書き込み対象のワークシート。
-        col_configs (list[dict[str, Any]]): カラム設定リスト（name/source/color_rules等を持つ辞書）。
+        col_configs (list[dict[str, Any]]): カラム設定リスト
+            （name/source/color_rules等を持つ辞書）。
         rows (list[dict[str, Any]]): 馬ごとのカラム名→値の辞書リスト。
     """
     headers = [c["name"] for c in col_configs]

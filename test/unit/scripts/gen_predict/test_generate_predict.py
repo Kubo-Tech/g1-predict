@@ -320,8 +320,20 @@ def test_generate_predict_insight_section_past_comment_zensou(
 
     mock_rg.get_umagoto_race_joho.side_effect = _umagoto
     mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2026"], "grade_code": ["A"]}),
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2025"], "grade_code": ["A"]}),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2025"],
+                "grade_code": ["A"],
+            }
+        ),
     ]
     _run(
         mock_rg,
@@ -367,7 +379,13 @@ def test_generate_predict_insight_section_past_comment_zenzensou(
 
     mock_rg.get_umagoto_race_joho.side_effect = _umagoto
     mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2026"], "grade_code": ["A"]}),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
         pd.DataFrame({"kyosomei_hondai": ["大阪杯"], "kaisai_nen": ["2025"], "grade_code": ["A"]}),
     ]
     _run(
@@ -418,8 +436,20 @@ def test_generate_predict_insight_section_ordinal_3plus(
 
     mock_rg.get_umagoto_race_joho.side_effect = _umagoto
     mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2026"], "grade_code": ["A"]}),
-        pd.DataFrame({"kyosomei_hondai": ["宝塚記念"], "kaisai_nen": ["2025"], "grade_code": ["A"]}),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["宝塚記念"],
+                "kaisai_nen": ["2025"],
+                "grade_code": ["A"],
+            }
+        ),
     ]
     _run(
         mock_rg,
@@ -465,7 +495,13 @@ def test_generate_predict_insight_race_without_comment_counted_in_ordinal(
 
     mock_rg.get_umagoto_race_joho.side_effect = _umagoto
     mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2026"], "grade_code": ["A"]}),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
         pd.DataFrame({"kyosomei_hondai": ["大阪杯"], "kaisai_nen": ["2025"], "grade_code": ["A"]}),
     ]
     _run(
@@ -511,7 +547,13 @@ def test_generate_predict_insight_section_grade_l(
 
     mock_rg.get_umagoto_race_joho.side_effect = _umagoto
     mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2026"], "grade_code": ["A"]}),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
         pd.DataFrame({"kyosomei_hondai": ["テストR"], "kaisai_nen": ["2025"], "grade_code": ["L"]}),
     ]
     _run(
@@ -555,7 +597,13 @@ def test_generate_predict_insight_section_no_grade_for_general_race(
 
     mock_rg.get_umagoto_race_joho.side_effect = _umagoto
     mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2026"], "grade_code": ["A"]}),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
         pd.DataFrame({"kyosomei_hondai": ["一般戦"], "kaisai_nen": ["2025"], "grade_code": ["_"]}),
     ]
     _run(
@@ -721,8 +769,20 @@ def test_generate_predict_insight_deduplicates_postponed_race(
 
     mock_rg.get_umagoto_race_joho.side_effect = _umagoto
     mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame({"kyosomei_hondai": ["天皇賞春"], "kaisai_nen": ["2026"], "grade_code": ["A"]}),
-        pd.DataFrame({"kyosomei_hondai": ["きさらぎ賞"], "kaisai_nen": ["2025"], "grade_code": ["C"]}),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["きさらぎ賞"],
+                "kaisai_nen": ["2025"],
+                "grade_code": ["C"],
+            }
+        ),
     ]
     _run(
         mock_rg,

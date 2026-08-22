@@ -207,7 +207,7 @@ def _load_state(state_path: Path) -> dict[str, dict[str, str]]:
     if not state_path.exists():
         return {"entries": {}, "images": {}}
     with open(state_path, encoding="utf-8") as f:
-        return json.load(f)  # type: ignore[no-any-return]
+        return json.load(f)
 
 
 def _save_state(state_path: Path, state: dict[str, dict[str, str]]) -> None:
