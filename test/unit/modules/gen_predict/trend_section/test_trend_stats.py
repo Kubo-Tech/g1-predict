@@ -391,7 +391,7 @@ def test_compute_stats_prev_race_finish_by_grade_with_grade_codes() -> None:
 
 
 def test_compute_stats_prev_race_finish_by_grade_with_exclude_grade_codes() -> None:
-    """prev_race_finish_by_grade の exclude_grade_codes は filters(grade_code not_in ...) に変換される。"""
+    """exclude_grade_codes は filters(grade_code not_in ...) に変換される。"""
     from unittest.mock import patch
 
     from mykeibadb.analytics import AttrSource
@@ -421,7 +421,7 @@ def test_compute_stats_prev_race_finish_by_grade_with_exclude_grade_codes() -> N
 
 
 def test_compute_stats_prev_race_finish_by_grade_both_grade_codes_raises() -> None:
-    """prev_race_finish_by_grade で grade_codes と exclude_grade_codes を両方指定すると ValueError。"""
+    """grade_codes と exclude_grade_codes を両方指定すると ValueError になる。"""
     metric_cfg = {
         "source": {
             "type": "prev_race_finish_by_grade",
