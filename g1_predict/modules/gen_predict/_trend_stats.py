@@ -180,7 +180,8 @@ def _build_group_by(
         GroupBy: 生成した GroupBy インスタンス。
 
     Raises:
-        ValueError: past_race_top_n_count の top_n が 1 未満、または filters に未対応fieldがある場合。
+        ValueError: past_race_top_n_count の top_n が 1 未満、
+            または filters に未対応fieldがある場合。
     """
     if src.get("type") == "past_race_top_n_count":
         top_n = src.get("top_n")

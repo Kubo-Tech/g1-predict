@@ -69,7 +69,8 @@ def kishu_course_stat(horse_id: str, source: dict[str, Any], cache: TableDataCac
         cache (TableDataCache): データキャッシュ。
 
     Returns:
-        Any: int（"wins"/"top3"）またはfloat（"win_rate"/"top3_rate"）。データがない場合は0系統計またはNone。
+        Any: int（"wins"/"top3"）またはfloat（"win_rate"/"top3_rate"）。
+            データがない場合は0系統計またはNone。
     """
     keibajo_code = str(source["keibajo_code"])
     track = source["track"]
@@ -146,12 +147,14 @@ def sire_race_stat(
 
     Args:
         horse_id (str): 血統登録番号。
-        source (dict[str, Any]): YAMLのsource設定（stat/"name"の場合はrace_name_for_history/years不要）。
+        source (dict[str, Any]): YAMLのsource設定
+            （stat/"name"の場合はrace_name_for_history/years不要）。
         race_name (str): デフォルトのレース名（race_name_for_history未指定時に使用）。
         cache (TableDataCache): データキャッシュ。
 
     Returns:
-        Any: stat="name"の場合は種牡馬名（str）。それ以外はint/float統計値。データがない場合は0系統計またはNone。
+        Any: stat="name"の場合は種牡馬名（str）。それ以外はint/float統計値。
+            データがない場合は0系統計またはNone。
     """
     stat = source["stat"]
 

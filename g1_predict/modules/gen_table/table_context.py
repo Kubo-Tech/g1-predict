@@ -229,7 +229,8 @@ class TableContext:
             source (dict[str, Any]): YAMLのsource設定（overseas_label等）。
 
         Returns:
-            Any: 前走のレース名。海外レースかつoverseas_label指定時はその値。データがない場合はNone。
+            Any: 前走のレース名。海外レースかつoverseas_label指定時はその値。
+                データがない場合はNone。
         """
         overseas_label = source.get("overseas_label")
         past_df = self._cache.build_past_df(horse_id)
