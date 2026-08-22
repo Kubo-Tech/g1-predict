@@ -394,6 +394,29 @@ def test_format_condition_note_years_only() -> None:
     assert format_condition_note({"years": 5}) == "※過去5年のみ"
 
 
+@pytest.mark.parametrize(
+    "babajotai_codes, expected_baba_str",
+    [
+        (["1"], "良"),
+        (["2"], "稍重"),
+        (["3"], "重"),
+        (["4"], "不良"),
+    ],
+)
+def test_format_condition_note_baba_display_matches_legacy_names(
+    babajotai_codes: list[str], expected_baba_str: str
+) -> None:
+    """馬場状態の表示名が従来どおりになる（keiba-domainの短縮名"稍"/"不"にならない）。"""
+    condition_cfg = {"years": 5, "babajotai_codes": babajotai_codes}
+    assert format_condition_note(condition_cfg) == f"※過去5年{expected_baba_str}馬場のみ"
+
+
+def test_format_condition_note_baba_code_zero_is_skipped() -> None:
+    """babajotai_codes に未設定コード"0"が含まれる場合、注記から除外される。"""
+    condition_cfg = {"years": 5, "babajotai_codes": ["0"]}
+    assert format_condition_note(condition_cfg) == "※過去5年のみ"
+
+
 # --- _build_metric_section: condition note ---
 
 
