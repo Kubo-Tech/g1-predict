@@ -82,7 +82,7 @@ g1-predict/
 │   │   ├── _trend_stats.py         # source.type → analytics 呼び出しと集計
 │   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル
 │   │   ├── trend_section.py        # 傾向セクション群の公開 API
-│   │   └── prev_day_trend.py       # 前日の同競馬場・同芝ダの結果集計
+│   │   └── prev_day_trend.py       # 前日の同競馬場・同芝ダの結果集計（前日の傾向記事）
 │   ├── gen_table/                  # 分析表（Excel）の生成ロジック
 │   │   ├── table_context.py        # source.type → 値取得のディスパッチ
 │   │   ├── table_data_cache.py     # DB アクセスとキャッシュ
