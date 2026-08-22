@@ -20,7 +20,7 @@ JRA-VAN のデータと TARGET frontier JV の自作メモをもとに、**JRA G
 ## クイックスタート
 
 ```bash
-# 1. 依存インストール（開発時は開発用ツールも入る ".[dev]" を使う）
+# 1. 依存インストール（開発する場合は docs/setup.md を参照）
 pip install -e .
 
 # 2. 環境変数（.env）を用意する
