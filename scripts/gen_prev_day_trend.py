@@ -12,6 +12,7 @@ from dotenv import find_dotenv, load_dotenv
 from mykeibadb import RaceGetter
 
 from g1_predict.modules.gen_predict.prev_day_trend import build_prev_day_trend_body
+from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 
 load_dotenv(find_dotenv())
 
@@ -25,6 +26,7 @@ def generate_prev_day_trend(race_code: str) -> None:
     Args:
         race_code (str): 16桁 JRA-VAN 形式の race_code。
     """
+    validate_race_code(race_code)
     race_getter = RaceGetter()
     race_shosai = race_getter.get_race_shosai(race_code=race_code, convert_codes=False)
     race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
@@ -33,8 +35,7 @@ def generate_prev_day_trend(race_code: str) -> None:
     body = build_prev_day_trend_body(race_code, race_shosai)
     content = _render_prev_day_trend_content(race_name, year, body)
 
-    year_dir = os.path.join(_PUBLIC_DIR, year)
-    race_dir = os.path.join(year_dir, f"{race_code}_{race_name}")
+    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_name)
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "前日の傾向.md")
     with open(output_path, "w", encoding="utf-8") as f:
