@@ -6,8 +6,8 @@ import pandas as pd
 import pytest
 from mykeibadb.analytics import RaceCondition, Subject
 
-from g1_predict.modules.gen_predict._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
-from g1_predict.modules.gen_predict._trend_renderer import (
+from g1_predict.modules.gen_trend._trend_models import OTHER_LABEL, TREND_YEARS, RowStats
+from g1_predict.modules.gen_trend._trend_renderer import (
     _aggregate_other_stats,
     _build_metric_section,
     _format_chakudo,
@@ -217,7 +217,7 @@ def _empty_stats_map(_metric_cfg: object, _manager: object, _condition: object) 
 def test_build_category_section_has_header() -> None:
     """## カテゴリ名 ヘッダーで始まる。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
@@ -229,7 +229,7 @@ def test_build_category_section_has_header() -> None:
 def test_build_category_section_has_hikaku_table() -> None:
     """### 比較表 プレースホルダーを含む。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
@@ -241,7 +241,7 @@ def test_build_category_section_has_hikaku_table() -> None:
 def test_build_category_section_has_metric_header() -> None:
     """Metric 名の h3 ヘッダーを含む。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
@@ -257,7 +257,7 @@ def test_build_category_section_has_metric_header() -> None:
 def test_build_category_section_hikaku_table_at_end() -> None:
     """### 比較表 が末尾に配置される。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
@@ -269,7 +269,7 @@ def test_build_category_section_hikaku_table_at_end() -> None:
 def test_build_category_section_trend_years_in_header() -> None:
     """過去N年の記述がヘッダーに含まれる。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         side_effect=_empty_stats_map,
     ):
         result = build_category_section(
@@ -304,11 +304,11 @@ def test_build_metric_section_always_include_grades_adds_missing_juusho() -> Non
 
     with (
         patch(
-            "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+            "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
             return_value=stats_map,
         ),
         patch(
-            "g1_predict.modules.gen_predict._trend_renderer.get_juusho_race_names",
+            "g1_predict.modules.gen_trend._trend_renderer.get_juusho_race_names",
             return_value={"天皇賞", "マイルCS", "スプリンターズS", "ヴィクトリアM"},
         ),
     ):
@@ -337,11 +337,11 @@ def test_build_metric_section_always_include_grades_overseas_not_added() -> None
 
     with (
         patch(
-            "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+            "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
             return_value=stats_map,
         ),
         patch(
-            "g1_predict.modules.gen_predict._trend_renderer.get_juusho_race_names",
+            "g1_predict.modules.gen_trend._trend_renderer.get_juusho_race_names",
             return_value={"マイルCS"},
         ),
     ):
@@ -438,7 +438,7 @@ def test_build_metric_section_with_condition_appends_note() -> None:
     }
 
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         return_value={},
     ):
         result = _build_metric_section(metric_cfg, _make_manager(), _make_condition(), RACE_YEAR)
@@ -449,7 +449,7 @@ def test_build_metric_section_with_condition_appends_note() -> None:
 def test_build_metric_section_without_condition_no_note() -> None:
     """metric_cfg に condition がない場合、※注記行は出力されない。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         return_value={},
     ):
         result = _build_metric_section(
@@ -554,11 +554,11 @@ def test_build_metric_section_all_entries_shows_all_runners() -> None:
 
     with (
         patch(
-            "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+            "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
             return_value=stats_map,
         ),
         patch(
-            "g1_predict.modules.gen_predict._trend_renderer.get_race_subject_entries",
+            "g1_predict.modules.gen_trend._trend_renderer.get_race_subject_entries",
             return_value=entries,
         ),
     ):
@@ -579,7 +579,7 @@ def test_build_metric_section_all_entries_shows_all_runners() -> None:
 def test_build_metric_section_all_entries_empty_race_code_raises() -> None:
     """all_entries 指定時、race_code が空なら ValueError になる。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         return_value={},
     ):
         with pytest.raises(ValueError):
@@ -595,7 +595,7 @@ def test_build_metric_section_all_entries_empty_race_code_raises() -> None:
 def test_build_metric_section_all_entries_unsupported_source_raises() -> None:
     """all_entries 指定時、SUBJECT_MAP に存在しない source.type は ValueError になる。"""
     with patch(
-        "g1_predict.modules.gen_predict._trend_renderer.compute_stats",
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
         return_value={},
     ):
         with pytest.raises(ValueError):

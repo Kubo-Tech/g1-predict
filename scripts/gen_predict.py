@@ -12,7 +12,7 @@ import pandas as pd
 from dotenv import find_dotenv, load_dotenv
 from mykeibadb import RaceGetter
 
-from g1_predict.modules.gen_predict._constants import GRADE_CODE_DISPLAY
+from g1_predict.modules.constants import GRADE_CODE_DISPLAY
 from g1_predict.modules.utils.md_utils import replace_section
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 from g1_predict.modules.utils.tfjv import (

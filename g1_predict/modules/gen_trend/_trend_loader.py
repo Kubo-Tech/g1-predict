@@ -8,7 +8,8 @@ from mykeibadb.analytics import RaceCondition
 from mykeibadb.config import ConfigManager
 from mykeibadb.connection import ConnectionManager
 
-from ._constants import TRACK_CODE_TO_SHIBA_DA
+from g1_predict.modules.constants import TRACK_CODE_TO_SHIBA_DA
+
 from ._trend_models import TREND_YEARS
 
 

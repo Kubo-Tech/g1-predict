@@ -11,7 +11,7 @@ import os
 from dotenv import find_dotenv, load_dotenv
 from mykeibadb import RaceGetter
 
-from g1_predict.modules.gen_predict.prev_day_trend import build_prev_day_trend_body
+from g1_predict.modules.gen_prev_day_trend.prev_day_trend import build_prev_day_trend_body
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 
 load_dotenv(find_dotenv())

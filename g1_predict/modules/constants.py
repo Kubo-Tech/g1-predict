@@ -1,4 +1,4 @@
-"""gen_predict モジュール共通定数。"""
+"""複数の機能から参照する共通定数。"""
 
 TRACK_CODE_TO_SHIBA_DA: dict[str, str] = {
     **{str(code): "芝" for code in range(10, 23)},

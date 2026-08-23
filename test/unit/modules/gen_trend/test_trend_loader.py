@@ -8,11 +8,11 @@ import pytest
 import yaml
 from mykeibadb.analytics import RaceCondition
 
-from g1_predict.modules.gen_predict._trend_loader import build_metric_condition, build_race_context
-from g1_predict.modules.gen_predict._trend_models import TREND_YEARS
+from g1_predict.modules.gen_trend._trend_loader import build_metric_condition, build_race_context
+from g1_predict.modules.gen_trend._trend_models import TREND_YEARS
 
 _CONFIGS_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "configs")
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "configs")
 )
 
 
@@ -37,8 +37,8 @@ def test_build_race_context_returns_correct_keibajo_codes() -> None:
     """keibajo_codes が RaceCondition に正しく設定される。"""
     race_info = _make_race_info(keibajo_code="05")
     with (
-        patch("g1_predict.modules.gen_predict._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_predict._trend_loader.ConnectionManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
     ):
         _, condition = build_race_context("2026050505010101", race_info)
     assert condition.keibajo_codes == ["05"]
@@ -48,8 +48,8 @@ def test_build_race_context_returns_correct_kyori() -> None:
     """kyori が RaceCondition に正しく設定される。"""
     race_info = _make_race_info(kyori=2400)
     with (
-        patch("g1_predict.modules.gen_predict._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_predict._trend_loader.ConnectionManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
     ):
         _, condition = build_race_context("2026050505010101", race_info)
     assert condition.kyori == 2400
@@ -59,8 +59,8 @@ def test_build_race_context_shiba_track_code() -> None:
     """芝トラックコードで shiba_da が '芝' になる。"""
     race_info = _make_race_info(track_code="10")
     with (
-        patch("g1_predict.modules.gen_predict._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_predict._trend_loader.ConnectionManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
     ):
         _, condition = build_race_context("2026050505010101", race_info)
     assert condition.shiba_da == "芝"
@@ -70,8 +70,8 @@ def test_build_race_context_dirt_track_code() -> None:
     """ダートトラックコードで shiba_da が 'ダ' になる。"""
     race_info = _make_race_info(track_code="23")
     with (
-        patch("g1_predict.modules.gen_predict._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_predict._trend_loader.ConnectionManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
     ):
         _, condition = build_race_context("2026050505010101", race_info)
     assert condition.shiba_da == "ダ"
@@ -81,8 +81,8 @@ def test_build_race_context_year_range() -> None:
     """year_from / year_to が TREND_YEARS 分遡った範囲になる。"""
     race_info = _make_race_info(kaisai_nen=2026)
     with (
-        patch("g1_predict.modules.gen_predict._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_predict._trend_loader.ConnectionManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
     ):
         _, condition = build_race_context("2026050505010101", race_info)
     assert condition.year_from == str(2026 - TREND_YEARS)
@@ -95,8 +95,8 @@ def test_build_race_context_returns_connection_manager() -> None:
     mock_manager = MagicMock()
     mock_cm_class = MagicMock(return_value=mock_manager)
     with (
-        patch("g1_predict.modules.gen_predict._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_predict._trend_loader.ConnectionManager", mock_cm_class),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
+        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager", mock_cm_class),
     ):
         manager, _ = build_race_context("2026050505010101", race_info)
     assert manager is mock_manager

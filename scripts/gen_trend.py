@@ -14,7 +14,7 @@ import yaml
 from dotenv import find_dotenv, load_dotenv
 from mykeibadb import RaceGetter
 
-from g1_predict.modules.gen_predict.trend_section import build_trend_sections
+from g1_predict.modules.gen_trend.trend_section import build_trend_sections
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 
 load_dotenv(find_dotenv())
