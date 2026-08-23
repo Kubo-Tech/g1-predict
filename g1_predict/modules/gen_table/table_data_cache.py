@@ -36,7 +36,7 @@ class TableDataCache:
         self._race_shosai_cache: dict[str, pd.Series | None] = {}
         self._kyosoba_cache: dict[str, pd.Series | None] = {}
         self._course_umagoto_cache: dict[
-            tuple[str, str, int, int, str | None, bool, str | None], pd.DataFrame
+            tuple[str, str, int, int, str | None, int | None, str | None], pd.DataFrame
         ] = {}
         self._course_kyosoba_cache: dict[
             tuple[str, str, int, int, str | None], pd.DataFrame
@@ -45,6 +45,7 @@ class TableDataCache:
         self._past_umagoto_cache: dict[tuple[str, int], pd.DataFrame] = {}
         self._past_kyosoba_cache: dict[tuple[str, int], pd.DataFrame] = {}
         self._horse_umagoto_cache: dict[str, pd.DataFrame] = {}
+        self._race_field_cache: dict[str, pd.DataFrame] = {}
 
     def get_kishu_df(self) -> pd.DataFrame:
         """現在レースの出走別騎手データを取得する（遅延初期化）。
@@ -117,6 +118,21 @@ class TableDataCache:
             self._horse_umagoto_cache[horse_id] = df
         return self._horse_umagoto_cache[horse_id]
 
+    def get_race_field_df(self, race_code: str) -> pd.DataFrame:
+        """指定レースの全頭分の馬ごとデータを取得する（キャッシュあり）。
+
+        Args:
+            race_code (str): 16桁レースコード。
+
+        Returns:
+            pd.DataFrame: UMAGOTO_RACE_JOHOデータ（convert_codes=False）。
+        """
+        if race_code not in self._race_field_cache:
+            self._race_field_cache[race_code] = self._race_getter.get_umagoto_race_joho(
+                race_code=race_code, convert_codes=False
+            )
+        return self._race_field_cache[race_code]
+
     def build_past_df(self, horse_id: str) -> pd.DataFrame:
         """過去成績にRACE_BASIC_INFOをマージしたDataFrameを返す（キャッシュあり）。
 
@@ -167,7 +183,7 @@ class TableDataCache:
         kyori: int,
         years: int,
         course_kubun: str | None = None,
-        first_week_only: bool = False,
+        week: int | None = None,
         track_condition: str | None = None,
     ) -> pd.DataFrame:
         """条件を指定してコース別の馬ごとデータを取得する（キャッシュあり）。
@@ -178,15 +194,14 @@ class TableDataCache:
             kyori (int): 距離（メートル）。
             years (int): 遡る年数。
             course_kubun (str | None): コース区分（"A"〜"E"）。Noneの場合は絞り込まない。
-            first_week_only (bool): Trueの場合、各開催のコース区分初週2日間のみに絞る。
+            week (int | None): 各開催のコース区分内で絞り込む週（1始まり、1週=2日間）。
+                Noneの場合は絞り込まない。
             track_condition (str | None): 馬場状態コード（例: "1"＝良）。Noneの場合は絞り込まない。
 
         Returns:
             pd.DataFrame: 条件に合致するUMAGOTO_RACE_JOHOデータ。
         """
-        cache_key = (
-            keibajo_code, track, kyori, years, course_kubun, first_week_only, track_condition
-        )
+        cache_key = (keibajo_code, track, kyori, years, course_kubun, week, track_condition)
         if cache_key in self._course_umagoto_cache:
             return self._course_umagoto_cache[cache_key]
 
@@ -219,7 +234,7 @@ class TableDataCache:
             filtered = filtered[
                 filtered["course_kubun"].astype(str).str.strip() == course_kubun
             ]
-            if first_week_only and not filtered.empty:
+            if week is not None and not filtered.empty:
                 filtered["_nichime"] = pd.to_numeric(
                     filtered["kaisai_nichime"], errors="coerce"
                 )
@@ -231,7 +246,10 @@ class TableDataCache:
                     + filtered["kaisai_nen"].astype(str).str.strip()
                 )
                 min_nichime = filtered.groupby("_kai_key")["_nichime"].transform("min")
-                filtered = filtered[filtered["_nichime"] <= min_nichime + 1]
+                week_start = min_nichime + (week - 1) * 2
+                filtered = filtered[
+                    (filtered["_nichime"] >= week_start) & (filtered["_nichime"] <= week_start + 1)
+                ]
 
         filtered_codes = filtered["race_code"].tolist()
 

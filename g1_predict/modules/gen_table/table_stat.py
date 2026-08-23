@@ -31,7 +31,7 @@ def waku_stat(horse_id: str, source: dict[str, Any], cache: TableDataCache) -> A
     years = int(source["years"])
     stat = source["stat"]
     course_kubun: str | None = source.get("course_kubun")
-    first_week_only = bool(source.get("first_week_only", False))
+    week: int | None = source.get("week")
 
     umagoto_df = cache.get_umagoto_df()
     if umagoto_df.empty:
@@ -44,9 +44,7 @@ def waku_stat(horse_id: str, source: dict[str, Any], cache: TableDataCache) -> A
         return None
     wakuban = int(wakuban_raw)
 
-    hist_df = cache.get_course_umagoto_df(
-        keibajo_code, track, kyori, years, course_kubun, first_week_only
-    )
+    hist_df = cache.get_course_umagoto_df(keibajo_code, track, kyori, years, course_kubun, week)
     if hist_df.empty or "wakuban" not in hist_df.columns:
         return None
 
@@ -71,7 +69,8 @@ def kishu_course_stat(horse_id: str, source: dict[str, Any], cache: TableDataCac
         cache (TableDataCache): データキャッシュ。
 
     Returns:
-        Any: int（"wins"/"top3"）またはfloat（"win_rate"/"top3_rate"）。データがない場合は0系統計またはNone。
+        Any: int（"wins"/"top3"）またはfloat（"win_rate"/"top3_rate"）。
+            データがない場合は0系統計またはNone。
     """
     keibajo_code = str(source["keibajo_code"])
     track = source["track"]
@@ -148,12 +147,14 @@ def sire_race_stat(
 
     Args:
         horse_id (str): 血統登録番号。
-        source (dict[str, Any]): YAMLのsource設定（stat/"name"の場合はrace_name_for_history/years不要）。
+        source (dict[str, Any]): YAMLのsource設定
+            （stat/"name"の場合はrace_name_for_history/years不要）。
         race_name (str): デフォルトのレース名（race_name_for_history未指定時に使用）。
         cache (TableDataCache): データキャッシュ。
 
     Returns:
-        Any: stat="name"の場合は種牡馬名（str）。それ以外はint/float統計値。データがない場合は0系統計またはNone。
+        Any: stat="name"の場合は種牡馬名（str）。それ以外はint/float統計値。
+            データがない場合は0系統計またはNone。
     """
     stat = source["stat"]
 
@@ -310,3 +311,97 @@ def sire_course_stat(horse_id: str, source: dict[str, Any], cache: TableDataCach
 
     past_rows = course_umagoto[course_umagoto["ketto_toroku_bango"].isin(matched_ids)]
     return aggregate_stat(past_rows, stat)
+
+
+def prev_race_kohan_3f_rank(horse_id: str, cache: TableDataCache) -> int | None:
+    """前走（直近の有効レース）における上がり3Fタイムの全頭中順位を返す。
+
+    Args:
+        horse_id (str): 血統登録番号。
+        cache (TableDataCache): データキャッシュ。
+
+    Returns:
+        int | None: 前走の上がり3F順位。算出できない場合はNone。
+    """
+    past_df = cache.get_horse_umagoto_df(horse_id)
+    if past_df.empty or "kohan_3f" not in past_df.columns:
+        return None
+    valid_past = past_df[_valid_finish_mask(past_df) & _valid_kohan_3f_mask(past_df)]
+    if valid_past.empty:
+        return None
+    prev_race_code = str(valid_past.iloc[0]["race_code"]).strip()
+
+    field_df = cache.get_race_field_df(prev_race_code)
+    if field_df.empty or "kohan_3f" not in field_df.columns:
+        return None
+    valid_field = field_df[_valid_finish_mask(field_df) & _valid_kohan_3f_mask(field_df)].copy()
+    if valid_field.empty:
+        return None
+    valid_field["_kohan_3f"] = pd.to_numeric(valid_field["kohan_3f"], errors="coerce")
+    valid_field["_jun"] = valid_field["_kohan_3f"].rank(method="min").astype(int)
+
+    horse_row = valid_field[valid_field["ketto_toroku_bango"].astype(str).str.strip() == horse_id]
+    if horse_row.empty:
+        return None
+    return int(horse_row.iloc[0]["_jun"])
+
+
+def same_race_prev_year_finish(
+    horse_id: str, source: dict[str, Any], race_year: int, cache: TableDataCache
+) -> Any:
+    """前年の同一特別競走における確定着順を返す。
+
+    Args:
+        horse_id (str): 血統登録番号。
+        source (dict[str, Any]): YAMLのsource設定（tokubetsu_kyoso_bango/absent_label）。
+        race_year (int): 今回のレース開催年。
+        cache (TableDataCache): データキャッシュ。
+
+    Returns:
+        Any: 確定着順（int）。前年に出走していない場合はsource["absent_label"]の値。
+    """
+    tokubetsu_kyoso_bango = str(source["tokubetsu_kyoso_bango"]).strip()
+    absent_label = source.get("absent_label")
+    target_year = race_year - 1
+
+    past_df = cache.build_past_df(horse_id)
+    if past_df.empty or "特別競走番号" not in past_df.columns:
+        return absent_label
+
+    mask = (past_df["特別競走番号"].astype(str).str.strip() == tokubetsu_kyoso_bango) & (
+        pd.to_numeric(past_df["開催年"], errors="coerce") == target_year
+    )
+    rows = past_df[mask]
+    if rows.empty:
+        return absent_label
+
+    chakujun = pd.to_numeric(rows.iloc[0]["確定着順"], errors="coerce")
+    if pd.isna(chakujun):
+        return absent_label
+    return int(chakujun)
+
+
+def _valid_finish_mask(df: pd.DataFrame) -> pd.Series:
+    """確定着順が有効値（2桁の数字かつ"00"以外）の行を示すマスクを返す。
+
+    Args:
+        df (pd.DataFrame): kakutei_chakujunカラムを持つDataFrame。
+
+    Returns:
+        pd.Series: 各行が有効な確定着順を持つかどうかの真偽値Series。
+    """
+    chakujun = df["kakutei_chakujun"].astype(str).str.strip()
+    return chakujun.str.match(r"^[0-9]{2}$") & (chakujun != "00")
+
+
+def _valid_kohan_3f_mask(df: pd.DataFrame) -> pd.Series:
+    """上がり3Fタイムが有効値（数字かつ"000"以外）の行を示すマスクを返す。
+
+    Args:
+        df (pd.DataFrame): kohan_3fカラムを持つDataFrame。
+
+    Returns:
+        pd.Series: 各行が有効な上がり3Fタイムを持つかどうかの真偽値Series。
+    """
+    kohan_3f = df["kohan_3f"].astype(str).str.strip()
+    return kohan_3f.str.match(r"^[0-9]+$") & (kohan_3f != "000")

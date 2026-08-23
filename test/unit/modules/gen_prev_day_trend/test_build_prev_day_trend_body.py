@@ -1,16 +1,16 @@
-"""build_prev_day_trend_section の単体テスト。"""
+"""build_prev_day_trend_body の単体テスト。"""
 from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
-from g1_predict.modules.gen_predict.prev_day_trend import build_prev_day_trend_section
+from g1_predict.modules.gen_prev_day_trend.prev_day_trend import build_prev_day_trend_body
 
 
-def _make_race_info(keibajo_code: str = "05", shiba_da: str = "芝") -> pd.DataFrame:
+def _make_race_info(keibajo_code: str = "05", track_code: str = "10") -> pd.DataFrame:
     """対象レースの基本情報DataFrameを生成する。"""
-    return pd.DataFrame({"競馬場コード": [keibajo_code], "芝ダ": [shiba_da]})
+    return pd.DataFrame({"keibajo_code": [keibajo_code], "track_code": [track_code]})
 
 
 def _make_raw_shosai(
@@ -83,7 +83,7 @@ def _call(
     raw_shosai: pd.DataFrame | None = None,
     venue_name: str = "東京",
 ) -> str:
-    """build_prev_day_trend_section をモック環境で実行する。"""
+    """build_prev_day_trend_body をモック環境で実行する。"""
     if race_info is None:
         race_info = _make_race_info()
     if mock_di is None:
@@ -95,10 +95,20 @@ def _call(
     mock_rg.get_race_shosai.return_value = raw_shosai
 
     with (
-        patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
-        patch("g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name", return_value=venue_name),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface",
+            return_value=mock_di,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            return_value=mock_rg,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
+            return_value=venue_name,
+        ),
     ):
-        return build_prev_day_trend_section(race_code, race_info, mock_di)
+        return build_prev_day_trend_body(race_code, race_info)
 
 
 @pytest.fixture
@@ -141,53 +151,43 @@ def simple_result_df() -> pd.DataFrame:
 
 
 # 正常系
-def test_build_prev_day_trend_section_returns_empty_when_no_races() -> None:
-    """前日のレースが0件の場合、空のセクション文字列を返す。"""
-    result = _call(raw_shosai=pd.DataFrame())
-    assert result == "## 前日の傾向\n"
+@pytest.mark.parametrize(
+    "raw_shosai",
+    [
+        pytest.param(pd.DataFrame(), id="no_races_on_prev_day"),
+        pytest.param(_make_raw_shosai(keibajo_code="06"), id="no_keibajo_match"),
+        pytest.param(_make_raw_shosai(track_code="23"), id="no_shiba_da_match"),
+        pytest.param(_make_raw_shosai(track_code="51"), id="barrier_race_excluded"),
+    ],
+)
+def test_build_prev_day_trend_body_returns_empty_when_no_target_races(
+    raw_shosai: pd.DataFrame,
+) -> None:
+    """対象レースが0件の場合、空文字列を返す。"""
+    result = _call(raw_shosai=raw_shosai)
+    assert result == ""
 
 
-def test_build_prev_day_trend_section_returns_empty_when_no_keibajo_match() -> None:
-    """前日に同競馬場のレースがない場合、空のセクション文字列を返す。"""
-    raw = _make_raw_shosai(keibajo_code="06")
-    result = _call(raw_shosai=raw)
-    assert result == "## 前日の傾向\n"
-
-
-def test_build_prev_day_trend_section_returns_empty_when_no_shiba_da_match() -> None:
-    """前日に同芝ダのレースがない場合、空のセクション文字列を返す。"""
-    raw = _make_raw_shosai(track_code="23")  # ダートコード
-    result = _call(raw_shosai=raw)  # target は芝
-    assert result == "## 前日の傾向\n"
-
-
-def test_build_prev_day_trend_section_excludes_barrier_races() -> None:
-    """障害コード（51-59）のレースは除外される。"""
-    raw = _make_raw_shosai(track_code="51")
-    result = _call(raw_shosai=raw)
-    assert result == "## 前日の傾向\n"
-
-
-def test_build_prev_day_trend_section_has_header() -> None:
-    """マッチするレースがある場合、## 前日の傾向 ヘッダーを含む。"""
+def test_build_prev_day_trend_body_has_dememe_header() -> None:
+    """マッチするレースがある場合、## 出目 ヘッダーを含む。"""
     result = _call()
-    assert "## 前日の傾向" in result
+    assert "## 出目" in result
 
 
-def test_build_prev_day_trend_section_has_dememe_section() -> None:
-    """出目セクション（### 出目）を含む。"""
+def test_build_prev_day_trend_body_has_each_race_header() -> None:
+    """マッチするレースがある場合、## 各レース ヘッダーを含む。"""
     result = _call()
-    assert "### 出目" in result
+    assert "## 各レース" in result
 
 
-def test_build_prev_day_trend_section_has_race_block_header() -> None:
-    """レースブロックの見出し（### {venue}{race_no}R）を含む。"""
+def test_build_prev_day_trend_body_race_block_starts_with_h3() -> None:
+    """レースブロックの見出しが ### {venue}{race_no}R で始まる。"""
     mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(race_no=6))
     result = _call(mock_di=mock_di, venue_name="東京")
     assert "### 東京6R" in result
 
 
-def test_build_prev_day_trend_section_grade_displayed_in_race_header() -> None:
+def test_build_prev_day_trend_body_grade_displayed_in_race_header() -> None:
     """グレードコード A は G1 としてレースヘッダーに表示される。"""
     mock_di = _make_mock_di(
         prev_race_info=_make_prev_race_info(grade_code="A", condition_name="天皇賞春")
@@ -196,7 +196,7 @@ def test_build_prev_day_trend_section_grade_displayed_in_race_header() -> None:
     assert "(G1)" in result
 
 
-def test_build_prev_day_trend_section_no_grade_for_unknown_code() -> None:
+def test_build_prev_day_trend_body_no_grade_for_unknown_code() -> None:
     """グレードコードが未定義（_）の場合、グレード表示なし。"""
     mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(grade_code="_"))
     result = _call(mock_di=mock_di)
@@ -205,7 +205,7 @@ def test_build_prev_day_trend_section_no_grade_for_unknown_code() -> None:
     assert "(G3)" not in result
 
 
-def test_build_prev_day_trend_section_uses_condition_name_when_present() -> None:
+def test_build_prev_day_trend_body_uses_condition_name_when_present() -> None:
     """競走条件名称がある場合、条件名称をレースヘッダーに使用する。"""
     mock_di = _make_mock_di(
         prev_race_info=_make_prev_race_info(condition_name="カトレア賞")
@@ -214,7 +214,7 @@ def test_build_prev_day_trend_section_uses_condition_name_when_present() -> None
     assert "カトレア賞" in result
 
 
-def test_build_prev_day_trend_section_uses_condition_code_when_name_absent() -> None:
+def test_build_prev_day_trend_body_uses_condition_code_when_name_absent() -> None:
     """競走条件名称が空の場合、条件コードから表示名を使用する。"""
     mock_di = _make_mock_di(
         prev_race_info=_make_prev_race_info(condition_name="", condition_code="703")
@@ -223,16 +223,23 @@ def test_build_prev_day_trend_section_uses_condition_code_when_name_absent() -> 
     assert "未勝利" in result
 
 
-def test_build_prev_day_trend_section_prev_date_passed_to_race_getter() -> None:
+def test_build_prev_day_trend_body_prev_date_passed_to_race_getter() -> None:
     """RaceGetter.get_race_shosai が前日の日付で呼ばれる。"""
     mock_rg = MagicMock()
     mock_rg.get_race_shosai.return_value = pd.DataFrame()
 
     with (
-        patch("g1_predict.modules.gen_predict.prev_day_trend.RaceGetter", return_value=mock_rg),
-        patch("g1_predict.modules.gen_predict.prev_day_trend.keibajo_code_to_name", return_value="東京"),
+        patch("g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface"),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            return_value=mock_rg,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
+            return_value="東京",
+        ),
     ):
-        build_prev_day_trend_section("2026050505010101", _make_race_info(), MagicMock())
+        build_prev_day_trend_body("2026050505010101", _make_race_info())
 
     mock_rg.get_race_shosai.assert_called_once_with(
         start_date=date(2026, 5, 4),
@@ -241,35 +248,35 @@ def test_build_prev_day_trend_section_prev_date_passed_to_race_getter() -> None:
     )
 
 
-def test_build_prev_day_trend_section_ninki_count(simple_result_df: pd.DataFrame) -> None:
+def test_build_prev_day_trend_body_ninki_count(simple_result_df: pd.DataFrame) -> None:
     """出目の人気カウントが正しい（1人気1頭, 4-6人気1頭, 10人気以下1頭）。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
     assert "| 1頭 | 0頭 | 0頭 | 1頭 | 0頭 | 1頭 |" in result
 
 
-def test_build_prev_day_trend_section_waku_count(simple_result_df: pd.DataFrame) -> None:
+def test_build_prev_day_trend_body_waku_count(simple_result_df: pd.DataFrame) -> None:
     """出目の枠番カウントが正しい（1枠1頭, 3枠1頭, 8枠1頭）。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
     assert "| 1頭 | 0頭 | 1頭 | 0頭 | 0頭 | 0頭 | 0頭 | 1頭 |" in result
 
 
-def test_build_prev_day_trend_section_kyakushitsu_count(simple_result_df: pd.DataFrame) -> None:
+def test_build_prev_day_trend_body_kyakushitsu_count(simple_result_df: pd.DataFrame) -> None:
     """出目の脚質カウントが正しい（逃1頭, 先1頭, 差0頭, 追1頭）。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
     assert "| 1頭 | 1頭 | 0頭 | 1頭 |" in result
 
 
-def test_build_prev_day_trend_section_agari_rank_count(simple_result_df: pd.DataFrame) -> None:
+def test_build_prev_day_trend_body_agari_rank_count(simple_result_df: pd.DataFrame) -> None:
     """出目の上がり順位カウントが正しい（1位1頭, 2位1頭, 3位1頭）。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
     assert "| 1頭 | 1頭 | 1頭 | 0頭 | 0頭 | 0頭 |" in result
 
 
-def test_build_prev_day_trend_section_multiple_races_sorted_by_race_bango() -> None:
+def test_build_prev_day_trend_body_multiple_races_sorted_by_race_bango() -> None:
     """複数レースが race_bango 昇順でレースブロックに出力される。"""
     raw = pd.DataFrame({
         "race_code": ["2026050405010108", "2026050405010103"],

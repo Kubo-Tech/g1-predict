@@ -15,12 +15,12 @@ def _make_kek_com(tmp_path: pytest.TempPathFactory, venue: str, year2: str, tfjv
     return str(tmp_path)
 
 
-def _make_mock_di(race_name: str, result_rows: list[dict]) -> MagicMock:
+def _make_mock_data_interface(race_name: str, result_rows: list[dict]) -> MagicMock:
     """DataInterface のモックを生成する。"""
-    mock_di = MagicMock()
-    mock_di.get_race_basic_info.return_value = pd.DataFrame({"競走名略称6文字": [race_name]})
-    mock_di.get_result.return_value = pd.DataFrame(result_rows)
-    return mock_di
+    mock = MagicMock()
+    mock.get_race_basic_info.return_value = pd.DataFrame({"競走名略称6文字": [race_name]})
+    mock.get_result.return_value = pd.DataFrame(result_rows)
+    return mock
 
 
 def _read_kek_com(base_dir: str, venue: str, year2: str, tfjv_code: str) -> list[str]:
@@ -49,11 +49,13 @@ def test_generate_result_comments_gap_format(
 ) -> None:
     """様々なタイム差・着差コードで正しい着差文字列が生成される。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
-            {"確定着順": 2, "タイム差": time_diff, "着差コード1": margin_code, "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"),
+             "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": time_diff, "着差コード1": margin_code,
+             "馬番": 1, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -69,11 +71,13 @@ def test_generate_result_comments_no_suffix_daisa(
 ) -> None:
     """大差は「差」サフィックスなしで生成される。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
-            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "T__", "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"),
+             "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "T__",
+             "馬番": 1, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -89,11 +93,13 @@ def test_generate_result_comments_no_suffix_dochaku(
 ) -> None:
     """同着は「差」サフィックスなしで生成される。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
-            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "D__", "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"),
+             "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.0, "着差コード1": "D__",
+             "馬番": 1, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -109,12 +115,15 @@ def test_generate_result_comments_writes_all_horses(
 ) -> None:
     """全馬分のコメントが書き込まれる。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": -0.1, "着差コード1": float("nan"), "馬番": 2, "異常区分コード": "0"},
-            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 1, "異常区分コード": "0"},
-            {"確定着順": 3, "タイム差": 0.5, "着差コード1": "_34", "馬番": 3, "異常区分コード": "0"},
+            {"確定着順": 1, "タイム差": -0.1, "着差コード1": float("nan"),
+             "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34",
+             "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 3, "タイム差": 0.5, "着差コード1": "_34",
+             "馬番": 3, "異常区分コード": "0"},
         ],
     )
     with patch("scripts.gen_result_comment.DataInterface", return_value=mock_di):
@@ -143,11 +152,13 @@ def test_generate_result_comments_abnormal_code(
 ) -> None:
     """異常区分コード1〜4の馬はコード名称のみのコメントが生成される。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "天皇賞春",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 1, "異常区分コード": "0"},
-            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"),
+             "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34",
+             "馬番": 2, "異常区分コード": "0"},
             {
                 "確定着順": float("nan"),
                 "タイム差": float("nan"),
@@ -173,11 +184,13 @@ def test_generate_result_comments_normal_horses_unaffected_by_abnormal(
 ) -> None:
     """異常区分馬が混在しても正常馬には着順コメントが生成される。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "天皇賞春",
         [
-            {"確定着順": 1, "タイム差": 0.1, "着差コード1": "_34", "馬番": 1, "異常区分コード": "0"},
-            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 1, "タイム差": 0.1, "着差コード1": "_34",
+             "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34",
+             "馬番": 2, "異常区分コード": "0"},
             {
                 "確定着順": float("nan"),
                 "タイム差": float("nan"),
@@ -202,7 +215,7 @@ def test_generate_result_comments_missing_ijo_column(
 ) -> None:
     """異常区分コード列が存在しない場合は正常馬として処理される。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "クロッカスステークス",
         [
             {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 1},
@@ -223,11 +236,13 @@ def test_generate_result_comments_numeric_ijo_code(
 ) -> None:
     """数値型（float）の異常区分コードでも正しく異常馬として処理される。"""
     base_dir = _make_kek_com(tmp_path, "05", "26", "11")
-    mock_di = _make_mock_di(
+    mock_di = _make_mock_data_interface(
         "クロッカスステークス",
         [
-            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"), "馬番": 1, "異常区分コード": "0"},
-            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34", "馬番": 2, "異常区分コード": "0"},
+            {"確定着順": 1, "タイム差": 0.0, "着差コード1": float("nan"),
+             "馬番": 1, "異常区分コード": "0"},
+            {"確定着順": 2, "タイム差": 0.1, "着差コード1": "_34",
+             "馬番": 2, "異常区分コード": "0"},
             {
                 "確定着順": float("nan"),
                 "タイム差": float("nan"),

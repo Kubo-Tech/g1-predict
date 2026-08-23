@@ -1,17 +1,13 @@
-"""前日の傾向セクションを生成するモジュール。"""
+"""前日の傾向記事の本文を生成するモジュール。"""
 
 from datetime import date, datetime, timedelta
 
 import pandas as pd
 from keiba_data_interface import DataInterface
-from keiba_data_interface.utils.race_code import keibajo_code_to_name
+from keiba_domain import keibajo_from_code
 from mykeibadb import RaceGetter
 
-_TRACK_CODE_TO_SHIBA_DA: dict[str, str] = {
-    **{str(code): "芝" for code in range(10, 23)},
-    **{str(code): "ダ" for code in range(23, 30)},
-    **{str(code): "芝" for code in range(51, 60)},
-}
+from g1_predict.modules.constants import GRADE_CODE_DISPLAY, TRACK_CODE_TO_SHIBA_DA
 
 _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "701": "新馬",
@@ -22,38 +18,28 @@ _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "999": "オープン",
 }
 
-GRADE_CODE_DISPLAY: dict[str, str] = {
-    "A": "G1",
-    "B": "G2",
-    "C": "G3",
-    "D": "重賞",
-    "E": "特別",
-    "F": "J・G1",
-    "G": "J・G2",
-    "H": "J・G3",
-    "L": "L",
-}
 
-
-def build_prev_day_trend_section(
+def build_prev_day_trend_body(
     race_code: str,
     race_info: pd.DataFrame,
-    di: DataInterface,
 ) -> str:
-    """前日の傾向セクションを生成する。
+    """前日の傾向記事の本文を生成する。
 
     対象レースの前日に同競馬場・同芝ダで行われたレースの上位3頭を列挙する。
+    戻り値はH1見出しを含まない記事本文で、`## 出目` と `## 各レース` の
+    2セクションから構成される。
 
     Args:
         race_code (str): 16桁レースコード。
-        race_info (pd.DataFrame): 対象レースの基本情報DataFrame。
-        di (DataInterface): DataInterface インスタンス。
+        race_info (pd.DataFrame): 対象レースの基本情報DataFrame（raw英語カラム名）。
 
     Returns:
-        str: 前日の傾向セクション文字列。
+        str: 前日の傾向記事本文。対象レースが1件もない場合は空文字列。
     """
-    keibajo_code = str(race_info["競馬場コード"].iloc[0])
-    target_shiba_da = str(race_info["芝ダ"].iloc[0])
+    di = DataInterface("mykeibadb")
+    keibajo_code = str(race_info["keibajo_code"].iloc[0])
+    track_code = str(race_info["track_code"].iloc[0]).strip()
+    target_shiba_da = TRACK_CODE_TO_SHIBA_DA.get(track_code, "")
 
     year = int(race_code[0:4])
     mmdd = race_code[4:8]
@@ -62,9 +48,9 @@ def build_prev_day_trend_section(
 
     matched = _get_prev_day_matched_races(prev_date, keibajo_code, target_shiba_da)
     if matched.empty:
-        return "## 前日の傾向\n"
+        return ""
 
-    venue_name = keibajo_code_to_name(keibajo_code)
+    venue_name = keibajo_from_code(keibajo_code)
 
     race_data: list[tuple[pd.DataFrame, pd.DataFrame]] = []
     for _, raw_row in matched.iterrows():
@@ -79,9 +65,7 @@ def build_prev_day_trend_section(
         for _, horse_row in top3.iterrows():
             top3_entries.append((horse_row, result_df))
 
-    blocks: list[str] = ["## 前日の傾向", ""]
-    blocks.append(_build_dememe_section(top3_entries))
-    blocks.append("")
+    blocks: list[str] = [_build_dememe_section(top3_entries), "", "## 各レース", ""]
 
     for prev_race_info, result_df in race_data:
         blocks.append(_format_race_block(prev_race_info, result_df, venue_name))
@@ -123,7 +107,7 @@ def _get_prev_day_matched_races(
     raw = raw[not_barrier]
 
     shiba_da_series = raw["track_code"].apply(
-        lambda tc: _TRACK_CODE_TO_SHIBA_DA.get(str(tc).strip(), "")
+        lambda tc: TRACK_CODE_TO_SHIBA_DA.get(str(tc).strip(), "")
     )
     raw = raw[shiba_da_series == shiba_da]
 
@@ -206,7 +190,7 @@ def _build_dememe_section(top3_entries: list[tuple[pd.Series, pd.DataFrame]]) ->
         top3_entries (list[tuple[pd.Series, pd.DataFrame]]): (horse_row, result_df) のリスト。
 
     Returns:
-        str: 出目セクション文字列（### 出目から始まる）。
+        str: 出目セクション文字列（## 出目から始まる）。
     """
     rows = [row for row, _ in top3_entries]
 
@@ -217,7 +201,7 @@ def _build_dememe_section(top3_entries: list[tuple[pd.Series, pd.DataFrame]]) ->
     agari_vals = [f"{c}頭" for c in _count_agari_rank(top3_entries)]
 
     lines: list[str] = [
-        "### 出目",
+        "## 出目",
         "",
         "3着以内に入った頭数",
         "",

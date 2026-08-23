@@ -9,6 +9,8 @@ from g1_predict.modules.gen_table.table_data_cache import TableDataCache
 from g1_predict.modules.gen_table.table_stat import (
     kishu_continuity,
     kishu_course_stat,
+    prev_race_kohan_3f_rank,
+    same_race_prev_year_finish,
     seisansha_race_stat,
     sire_course_stat,
     sire_race_chakujun,
@@ -16,6 +18,8 @@ from g1_predict.modules.gen_table.table_stat import (
     waku_stat,
 )
 from g1_predict.modules.gen_table.table_utils import filter_by_horse, filter_df, to_cell_value
+
+_PREV_RACE_GRADE_LABELS: dict[str, str] = {"A": "G1", "B": "G2", "C": "G3"}
 
 
 class TableContext:
@@ -61,12 +65,31 @@ class TableContext:
         if src_type == "entry_field":
             return to_cell_value(horse.get(source["field"]))
 
-        if src_type == "past_count":
-            filters = source.get("filters", [])
+        if src_type == "past_race_top_n_count":
             past_df = self._cache.build_past_df(horse_id)
             if past_df.empty:
                 return 0
-            return len(filter_df(past_df, filters))
+            filtered = past_df
+            keibajo_codes = source.get("keibajo_codes")
+            if keibajo_codes:
+                filtered = filtered[
+                    filtered["競馬場コード"].astype(str).str.strip().isin(keibajo_codes)
+                ]
+            grade_codes = source.get("grade_codes")
+            if grade_codes:
+                filtered = filtered[
+                    filtered["グレードコード"].astype(str).str.strip().isin(grade_codes)
+                ]
+            top_n = source.get("top_n")
+            if top_n is not None:
+                if int(top_n) < 1:
+                    raise ValueError("past_race_top_n_count の top_n は 1 以上で指定してください。")
+                kakutei = pd.to_numeric(filtered["確定着順"], errors="coerce")
+                filtered = filtered[(kakutei >= 1) & (kakutei <= int(top_n))]
+            filters = source.get("filters", [])
+            if filters:
+                filtered = filter_df(filtered, filters)
+            return len(filtered)
 
         if src_type == "past_field":
             filters = source.get("filters", [])
@@ -184,4 +207,58 @@ class TableContext:
         if src_type == "sire_course_stat":
             return sire_course_stat(horse_id, source, self._cache)
 
+        if src_type == "prev_race_name":
+            return self._get_prev_race_name(horse_id, source)
+
+        if src_type == "prev_race_grade_finish":
+            return self._get_prev_race_grade_finish(horse_id)
+
+        if src_type == "prev_race_kohan_3f_rank":
+            return prev_race_kohan_3f_rank(horse_id, self._cache)
+
+        if src_type == "same_race_prev_year_finish":
+            return same_race_prev_year_finish(horse_id, source, self.race_year, self._cache)
+
         raise ValueError(f"不明なsource type: {src_type}")
+
+    def _get_prev_race_name(self, horse_id: str, source: dict[str, Any]) -> Any:
+        """前走のレース名を取得する（海外レースはoverseas_labelにまとめる）。
+
+        Args:
+            horse_id (str): 血統登録番号。
+            source (dict[str, Any]): YAMLのsource設定（overseas_label等）。
+
+        Returns:
+            Any: 前走のレース名。海外レースかつoverseas_label指定時はその値。
+                データがない場合はNone。
+        """
+        overseas_label = source.get("overseas_label")
+        past_df = self._cache.build_past_df(horse_id)
+        if past_df.empty:
+            return None
+        row = past_df.iloc[0]
+        keibajo_code = str(row.get("競馬場コード", "")).strip()
+        if overseas_label and keibajo_code and not keibajo_code[:1].isdigit():
+            return overseas_label
+        return to_cell_value(row.get("競走名本題"))
+
+    def _get_prev_race_grade_finish(self, horse_id: str) -> Any:
+        """前走のグレードと確定着順を「{グレード} {n}着」形式で返す。
+
+        Args:
+            horse_id (str): 血統登録番号。
+
+        Returns:
+            Any: 例 "G1 5着"、"非重賞 3着"。前走データがない場合、
+                または確定着順が0/数値変換不能の場合はNone。
+        """
+        past_df = self._cache.build_past_df(horse_id)
+        if past_df.empty:
+            return None
+        row = past_df.iloc[0]
+        grade_code = str(row.get("グレードコード", "")).strip()
+        grade_label = _PREV_RACE_GRADE_LABELS.get(grade_code, "非重賞")
+        finish = pd.to_numeric(str(row.get("確定着順", "")), errors="coerce")
+        if pd.isna(finish) or int(finish) == 0:
+            return None
+        return f"{grade_label} {int(finish)}着"
