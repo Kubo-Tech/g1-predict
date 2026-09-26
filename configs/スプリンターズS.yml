@@ -200,17 +200,15 @@ trends:
         type: tokubetsu_race_finish
         tokubetsu_kyoso_bango: "0019"
         year_offset: 0
-        absent_label: 不出走
+        absent_label: 出走無し
       rows:
         type: fixed
         items:
-          - {label: "1着", op: "==", value: 1}
-          - {label: "2着", op: "==", value: 2}
-          - {label: "3着", op: "==", value: 3}
-          - {label: "4-5着", op: "in", value: [4, 5]}
-          - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
-          - {label: "10着以下", op: ">=", value: 10}
-          - {label: "不出走", op: "==", value: "不出走"}
+          - {label: "3着以内", op: "<=", value: 3}
+          - {label: "4着以内", op: "<=", value: 4}
+          - {label: "5着以内", op: "<=", value: 5}
+          - {label: "6着以下", op: ">=", value: 6}
+          - {label: "出走無し", op: "==", value: "出走無し"}
     - name: 当週/1週前坂路ラスト2F24.0秒未満
       source:
         type: chokyo_match_days
