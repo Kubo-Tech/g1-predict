@@ -13,6 +13,7 @@ from mykeibadb import RaceGetter
 
 from g1_predict.modules.gen_prev_day_trend.prev_day_trend import build_prev_day_trend_body
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
+from g1_predict.modules.utils.race_name import to_race_label
 
 load_dotenv(find_dotenv())
 
@@ -30,12 +31,13 @@ def generate_prev_day_trend(race_code: str) -> None:
     race_getter = RaceGetter()
     race_shosai = race_getter.get_race_shosai(race_code=race_code, convert_codes=False)
     race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
+    race_label = to_race_label(race_name)
     year = str(race_shosai["kaisai_nen"].iloc[0]).strip()
 
     body = build_prev_day_trend_body(race_code, race_shosai)
-    content = _render_prev_day_trend_content(race_name, year, body)
+    content = _render_prev_day_trend_content(race_label, year, body)
 
-    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_name)
+    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "前日の傾向.md")
     with open(output_path, "w", encoding="utf-8") as f:
@@ -51,18 +53,18 @@ def main() -> None:
     generate_prev_day_trend(args.race_code)
 
 
-def _render_prev_day_trend_content(race_name: str, year: str, body: str) -> str:
+def _render_prev_day_trend_content(race_label: str, year: str, body: str) -> str:
     """前日の傾向記事のMarkdown文字列を生成する。
 
     Args:
-        race_name (str): レース名。
+        race_label (str): 記事タイトルに使うレース名。
         year (str): 開催年。
         body (str): 前日の傾向記事本文。
 
     Returns:
         str: 生成済み前日の傾向記事Markdown文字列。
     """
-    title = f"# {race_name}{year}前日の傾向"
+    title = f"# {race_label}{year}前日の傾向"
     if not body:
         return title + "\n"
     return title + "\n\n" + body
