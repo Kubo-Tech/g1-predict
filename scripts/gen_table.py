@@ -26,6 +26,7 @@ from g1_predict.modules.gen_table.table_utils import (
     to_cell_value,
 )
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
+from g1_predict.modules.utils.race_name import to_race_label
 
 load_dotenv(find_dotenv())
 
@@ -50,13 +51,15 @@ def generate_table(race_code: str) -> None:
     di = DataInterface("mykeibadb")
     race_info = di.get_race_basic_info(race_code)
     race_name = str(race_info["競走名本題"].iloc[0])
+    race_label = to_race_label(race_name)
     race_year = int(str(race_info["開催年"].iloc[0]))
 
-    config_path = os.path.join(_CONFIGS_DIR, f"{race_name}.yml")
+    config_path = os.path.join(_CONFIGS_DIR, f"{race_label}.yml")
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     entry_df = di.get_entry(race_code)
+    # DB照合（sire_race_chakujun等のrace_name_for_history既定値）に使うため競走名本題を渡す
     ctx = TableContext(race_code, race_year, race_name, entry_df, di)
 
     sheet_data = []
@@ -73,7 +76,7 @@ def generate_table(race_code: str) -> None:
 
         sheet_data.append((sheet_name, col_configs, rows))
 
-    _write_xlsx(sheet_data, race_code, race_name, race_year)
+    _write_xlsx(sheet_data, race_code, race_label, race_year)
 
 
 def main() -> None:
@@ -87,7 +90,7 @@ def main() -> None:
 def _write_xlsx(
     sheet_data: list[tuple[str, list[dict[str, Any]], list[dict[str, Any]]]],
     race_code: str,
-    race_name: str,
+    race_label: str,
     race_year: int,
 ) -> str:
     """分析表データをxlsxファイルに書き出す。
@@ -96,16 +99,16 @@ def _write_xlsx(
         sheet_data (list[tuple[str, list[dict[str, Any]], list[dict[str, Any]]]]):
             (シート名, カラム設定リスト, 行データリスト) のタプルのリスト。
         race_code (str): 16桁レースコード。出力ファイル名に使用。
-        race_name (str): レース名。出力先ディレクトリ・ファイル名に使用。
+        race_label (str): 出力先ディレクトリ・ファイル名に使うレース名。
         race_year (int): レース開催年。出力先ディレクトリに使用。
 
     Returns:
         str: 生成したxlsxファイルの絶対パス。
     """
-    race_dir = build_race_dir(_PUBLIC_DIR, str(race_year), race_code, race_name)
+    race_dir = build_race_dir(_PUBLIC_DIR, str(race_year), race_code, race_label)
     table_dir = os.path.join(race_dir, "table")
     os.makedirs(table_dir, exist_ok=True)
-    output_path = os.path.join(table_dir, f"{race_code}_{race_name}.xlsx")
+    output_path = os.path.join(table_dir, f"{race_code}_{race_label}.xlsx")
 
     wb = Workbook()
     wb.remove(wb.active)

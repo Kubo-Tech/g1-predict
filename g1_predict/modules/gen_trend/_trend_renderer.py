@@ -43,7 +43,8 @@ def build_category_section(
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
     """
-    header = f"## {category_name}\n\n過去{TREND_YEARS}年{category_name}に関する傾向"
+    subject = category_name.removesuffix("傾向")
+    header = f"## {category_name}\n\n過去{TREND_YEARS}年{subject}に関する傾向"
 
     metric_sections = [
         _build_metric_section(metric_cfg, manager, condition, race_year, race_code)

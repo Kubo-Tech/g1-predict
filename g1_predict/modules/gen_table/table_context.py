@@ -10,11 +10,11 @@ from g1_predict.modules.gen_table.table_stat import (
     kishu_continuity,
     kishu_course_stat,
     prev_race_kohan_3f_rank,
-    same_race_prev_year_finish,
     seisansha_race_stat,
     sire_course_stat,
     sire_race_chakujun,
     sire_race_stat,
+    tokubetsu_race_finish,
     waku_stat,
 )
 from g1_predict.modules.gen_table.table_utils import filter_by_horse, filter_df, to_cell_value
@@ -216,8 +216,8 @@ class TableContext:
         if src_type == "prev_race_kohan_3f_rank":
             return prev_race_kohan_3f_rank(horse_id, self._cache)
 
-        if src_type == "same_race_prev_year_finish":
-            return same_race_prev_year_finish(horse_id, source, self.race_year, self._cache)
+        if src_type == "tokubetsu_race_finish":
+            return tokubetsu_race_finish(horse_id, source, self.race_year, self._cache)
 
         raise ValueError(f"不明なsource type: {src_type}")
 

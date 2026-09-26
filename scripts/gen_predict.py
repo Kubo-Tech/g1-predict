@@ -15,6 +15,7 @@ from mykeibadb import RaceGetter
 from g1_predict.modules.constants import GRADE_CODE_DISPLAY
 from g1_predict.modules.utils.md_utils import replace_section
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
+from g1_predict.modules.utils.race_name import to_race_label
 from g1_predict.modules.utils.tfjv import (
     race_code_to_tfjv,
     read_kek_comments,
@@ -45,6 +46,7 @@ def generate_predict(race_code: str) -> None:
     race_getter = RaceGetter()
     race_shosai = race_getter.get_race_shosai(race_code=race_code, convert_codes=False)
     race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
+    race_label = to_race_label(race_name)
     year = str(race_shosai["kaisai_nen"].iloc[0]).strip()
 
     entry_raw = race_getter.get_umagoto_race_joho(race_code=race_code, convert_codes=False)
@@ -53,12 +55,12 @@ def generate_predict(race_code: str) -> None:
     dat_path = um_dat_path(race_code, tfjv_data_dir)
     marks = read_marks(dat_path, um_dat_record_no(race_code))
 
-    points = _load_points(race_name)
+    points = _load_points(race_label)
     marks_section = _build_marks_section(marks, entry_raw)
     insight_section = _build_insight_section(marks, entry_raw, race_getter, tfjv_data_dir)
-    content = _render_from_template(race_name, year, points, marks_section, insight_section)
+    content = _render_from_template(race_label, year, points, marks_section, insight_section)
 
-    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_name)
+    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "予想.md")
     with open(output_path, "w", encoding="utf-8") as f:
@@ -78,16 +80,16 @@ def main() -> None:
     generate_predict(args.race_code)
 
 
-def _load_points(race_name: str) -> str:
+def _load_points(race_label: str) -> str:
     """ポイントセクションを読み込む。
 
     Args:
-        race_name (str): レース名。
+        race_label (str): pointsファイル名に使うレース名。
 
     Returns:
         str: ポイントセクションのMarkdown文字列。
     """
-    path = os.path.join(_TEMPLATES_DIR, "points", f"{race_name}.md")
+    path = os.path.join(_TEMPLATES_DIR, "points", f"{race_label}.md")
     if os.path.isfile(path):
         with open(path, encoding="utf-8") as f:
             return f.read()
@@ -235,7 +237,7 @@ def _format_ordinal(n: int) -> str:
 
 
 def _render_from_template(
-    race_name: str,
+    race_label: str,
     year: str,
     points_section: str,
     marks_section: str,
@@ -244,7 +246,7 @@ def _render_from_template(
     """予想テンプレートに各セクションを埋め込む。
 
     Args:
-        race_name (str): レース名。
+        race_label (str): 記事タイトルに使うレース名。
         year (str): 開催年。
         points_section (str): ポイントセクション。
         marks_section (str): 印セクション。
@@ -256,7 +258,7 @@ def _render_from_template(
     template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_PREDICT.md")
     with open(template_path, encoding="utf-8") as f:
         content = f.read()
-    content = content.replace("{RaceName}", race_name).replace("{Year}", year)
+    content = content.replace("{RaceName}", race_label).replace("{Year}", year)
     content = replace_section(content, "## ポイント", points_section)
     content = replace_section(content, "## 印", marks_section)
     content = replace_section(content, "## 見解", insight_section)

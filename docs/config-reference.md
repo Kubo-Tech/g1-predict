@@ -3,7 +3,8 @@
 レース1本分の「傾向表に何を出すか」「分析表にどの列を並べるか」を定義する設定ファイル。Python を触らずにこのファイルだけで表現できることを優先している。
 
 - ファイル名は **DB の競走名本題（`kyosomei_hondai`）と完全一致**させる（例: `configs/宝塚記念.yml`）。スクリプトはレースコードから引いたレース名でファイルを探す。
-- 現在ある設定: `東京優駿.yml` / `安田記念.yml` / `宝塚記念.yml`。新しいレースは近いものをコピーして作るのが早い。
+- ただし `g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録されているレースは、競走名本題ではなく対応表の略称をファイル名にする（例: 競走名本題「スプリンターズステークス」→ `configs/スプリンターズS.yml`）。この略称は `templates/points/{レース名}.md` の参照、`public/` の出力先ディレクトリ・ファイル名、記事タイトルにも共通して使われる。DB照合には使えないため、競走名本題での照合が必要な処理には対応表変換前の値を渡す。
+- 現在ある設定: `東京優駿.yml` / `安田記念.yml` / `宝塚記念.yml` / `スプリンターズS.yml`。新しいレースは近いものをコピーして作るのが早い。
 
 ```yaml
 race_name: 宝塚記念   # メモ用。スクリプトからは参照していない
@@ -76,8 +77,9 @@ rows:
 
 | `source.type` のグループ | 使える `op` |
 | --- | --- |
-| `race_col` 系 / `prev_race_grade` / `prev_race_finish` / `prev_race_finish_by_grade` / `same_race_prev_year_finish` | `==` `!=` `>=` `<=` `>` `<` `in` `not_in` |
+| `race_col` 系 / `prev_race_grade` / `prev_race_finish` / `prev_race_finish_by_grade` / `tokubetsu_race_finish` | `==` `!=` `>=` `<=` `>` `<` `in` `not_in` |
 | `past_race_top_n_count` / `career_count` / `prev_race_name` / `debut_venue` / `jockey_continuity` / `prev_race_col` | `==` `>=` `<=` `>` `<`（`in` は `ValueError`。`!=` `not_in` は無視され、その行は常に `0-0-0-0` になる） |
+| `chokyo_match_days` | `any_match` `none_match` `empty`（それ以外の `op` は `ValueError`。`value` は不要） |
 
 `value` は数値・文字列のどちらも指定できる。数値として解釈できる場合は数値比較、できない場合は文字列比較になる。
 
@@ -175,7 +177,8 @@ rows:
 | `prev_race_grade` | − | 前走のグレードコード（`A`/`B`/`C`/その他） |
 | `prev_race_finish` | − | 前走の確定着順 |
 | `prev_race_finish_by_grade` | `grade_codes` **または** `exclude_grade_codes` | 前走が指定グレード（または指定グレード以外）だった馬に限った前走着順。両方指定すると `ValueError` |
-| `same_race_prev_year_finish` | `tokubetsu_kyoso_bango` / `absent_label` | 前年の同一レースでの着順。未出走は `absent_label` の値 |
+| `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）に行われた、特別競走番号が `tokubetsu_kyoso_bango` のレースでの着順。未出走は `absent_label` の値 |
+| `chokyo_match_days` | `chokyo_condition` / `days_from` / `days_to` | 対象レース日の `days_to` 日前〜`days_from` 日前（両端含む）に行われた、対象コースの有効な調教記録それぞれについて、レース何日前かと調教閾値条件（`ChokyoThreshold` 形式のリスト。`course` はすべて同一にする）を満たすかを判定した結果。属性値は `[[何日前, 該当bool], ...]` 形式のJSON配列テキスト（記録なしは `[]`） |
 
 `past_race_top_n_count` の `filters` は「過去走を絞り込む追加条件」。`field` に指定できるのは以下だけで、他を書くと `ValueError` になる。
 
@@ -297,7 +300,7 @@ filters:
 | `prev_race_name` | `overseas_label` | 前走レース名。海外レースは `overseas_label` の値に置き換える |
 | `prev_race_grade_finish` | − | 前走を `"G1 5着"` 形式で返す（`A`→G1, `B`→G2, `C`→G3, その他→`非重賞`）。中止等で着順が取れない場合は空 |
 | `prev_race_kohan_3f_rank` | − | 前走の上がり3F順位（同レース出走馬中） |
-| `same_race_prev_year_finish` | `tokubetsu_kyoso_bango` / `absent_label` | 前年の同一レースでの着順。未出走なら `absent_label` |
+| `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）に行われた、特別競走番号が `tokubetsu_kyoso_bango` のレースでの着順。未出走なら `absent_label` |
 | `kishu_continuity` | − | `継続` / `乗り戻り` / `テン乗り` |
 
 ### 統計値（`stat` を指定する）
@@ -321,9 +324,9 @@ filters:
 # 新しいレースの設定を作る手順
 
 1. 近いレースの YAML をコピーする（開催場が変わるレースなら `宝塚記念.yml`、素直なレースなら `安田記念.yml`）。
-2. ファイル名を新しいレースの競走名本題に合わせる。
+2. ファイル名を新しいレースの競走名本題に合わせる。`g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録するレースなら、その略称をファイル名にする。
 3. `race_name` と、距離・競馬場コードを含む箇所（`kyori` / `keibajo_code` / `keibajo_codes` / 前走距離の閾値など）を書き換える。
-4. `race_name_for_history` を新しいレース名にする。
+4. `race_name_for_history` を新しいレースの競走名本題にする（DB照合に使うため、略称ではなく競走名本題を書く）。
 5. 開催条件が年によって変わるレースなら、metric ごとに `condition` を付ける。
 6. `templates/points/{レース名}.md` にそのレースの狙い・格言を書いておく（`gen_predict` が `## ポイント` に流し込む）。
 7. `python -m scripts.gen_trend --race-code ...` で表が欠損なく出るか確認する。動作確認で生成した記事はコミットしない。

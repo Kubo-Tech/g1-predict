@@ -16,6 +16,7 @@ from mykeibadb import RaceGetter
 
 from g1_predict.modules.gen_trend.trend_section import build_trend_sections
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
+from g1_predict.modules.utils.race_name import to_race_label
 
 load_dotenv(find_dotenv())
 
@@ -34,12 +35,13 @@ def generate_trend(race_code: str) -> None:
     race_getter = RaceGetter()
     race_shosai = race_getter.get_race_shosai(race_code=race_code, convert_codes=False)
     race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
+    race_label = to_race_label(race_name)
     year = str(race_shosai["kaisai_nen"].iloc[0]).strip()
 
-    trend_sections_map = _build_trend_sections(race_code, race_name, race_shosai)
-    content = _render_trend_content(race_name, year, trend_sections_map)
+    trend_sections_map = _build_trend_sections(race_code, race_label, race_shosai)
+    content = _render_trend_content(race_label, year, trend_sections_map)
 
-    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_name)
+    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "傾向.md")
     with open(output_path, "w", encoding="utf-8") as f:
@@ -57,20 +59,20 @@ def main() -> None:
 
 def _build_trend_sections(
     race_code: str,
-    race_name: str,
+    race_label: str,
     race_info: pd.DataFrame,
 ) -> dict[str, str]:
     """傾向セクション群を生成する。
 
     Args:
         race_code (str): 16桁 JRA-VAN 形式の race_code。
-        race_name (str): レース名。
+        race_label (str): configファイル名に使うレース名。
         race_info (pd.DataFrame): レース基本情報DataFrame。
 
     Returns:
         dict[str, str]: カテゴリ名 -> Markdownセクション文字列。
     """
-    config_path = os.path.join(_CONFIGS_DIR, f"{race_name}.yml")
+    config_path = os.path.join(_CONFIGS_DIR, f"{race_label}.yml")
     if not os.path.isfile(config_path):
         return {}
     with open(config_path, encoding="utf-8") as f:
@@ -82,21 +84,21 @@ def _build_trend_sections(
 
 
 def _render_trend_content(
-    race_name: str,
+    race_label: str,
     year: str,
     trend_sections_map: dict[str, str],
 ) -> str:
     """傾向分析記事のMarkdown文字列を生成する。
 
     Args:
-        race_name (str): レース名。
+        race_label (str): 記事タイトルに使うレース名。
         year (str): 開催年。
         trend_sections_map (dict[str, str]): カテゴリ名 -> Markdownセクション文字列。
 
     Returns:
         str: 生成済み傾向分析記事Markdown文字列。
     """
-    title = f"# {race_name}{year}傾向分析"
+    title = f"# {race_label}{year}傾向分析"
     if not trend_sections_map:
         return title + "\n"
     return title + "\n\n" + "\n\n".join(trend_sections_map.values()) + "\n"
