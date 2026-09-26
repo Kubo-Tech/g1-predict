@@ -273,8 +273,8 @@ table:
         field: kyakushitsu
       color_rules:
         - condition:
-            op: "=="
-            value: "差"
+            op: in
+            value: ["逃", "先"]
           color: yellow
 
     - name: 前走上がり順位
