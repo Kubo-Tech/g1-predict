@@ -278,6 +278,18 @@ def test_build_category_section_trend_years_in_header() -> None:
     assert f"過去{TREND_YEARS}年" in result
 
 
+def test_build_category_section_header_omits_trend_suffix() -> None:
+    """カテゴリ名末尾の「傾向」を除いた対象名で説明文を作る。"""
+    with patch(
+        "g1_predict.modules.gen_trend._trend_renderer.compute_stats",
+        side_effect=_empty_stats_map,
+    ):
+        result = build_category_section(
+            "出走馬傾向", [_make_fixed_metric_cfg()], _make_manager(), _make_condition(), RACE_YEAR
+        )
+    assert f"## 出走馬傾向\n\n過去{TREND_YEARS}年出走馬に関する傾向" in result
+
+
 # --- _build_metric_section: always_include_grades ---
 
 
