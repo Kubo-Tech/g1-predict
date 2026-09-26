@@ -84,3 +84,10 @@ def test_tokubetsu_race_finish_raises_when_year_offset_missing(mock_cache: Magic
     source = {"tokubetsu_kyoso_bango": "0010", "absent_label": "前年出走無し"}
     with pytest.raises(ValueError, match="tokubetsu_kyoso_bango と year_offset"):
         tokubetsu_race_finish(_HORSE_ID, source, 2026, mock_cache)
+
+
+def test_tokubetsu_race_finish_raises_when_year_offset_negative(mock_cache: MagicMock) -> None:
+    """year_offsetが負の場合ValueError。"""
+    source = {"tokubetsu_kyoso_bango": "0010", "year_offset": -1, "absent_label": "前年出走無し"}
+    with pytest.raises(ValueError, match="year_offset は0以上"):
+        tokubetsu_race_finish(_HORSE_ID, source, 2026, mock_cache)

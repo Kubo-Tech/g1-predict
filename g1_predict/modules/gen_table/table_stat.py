@@ -362,7 +362,8 @@ def tokubetsu_race_finish(
         Any: 確定着順（int）。対象年に出走していない場合はsource["absent_label"]の値。
 
     Raises:
-        ValueError: tokubetsu_kyoso_bango または year_offset が指定されていない場合。
+        ValueError: tokubetsu_kyoso_bango または year_offset が指定されていない場合、
+            または year_offset が負の場合。
     """
     if "tokubetsu_kyoso_bango" not in source or "year_offset" not in source:
         raise ValueError(
@@ -370,6 +371,8 @@ def tokubetsu_race_finish(
         )
     tokubetsu_kyoso_bango = str(source["tokubetsu_kyoso_bango"]).strip()
     year_offset = int(source["year_offset"])
+    if year_offset < 0:
+        raise ValueError(f"year_offset は0以上で指定してください: {year_offset!r}")
     absent_label = source.get("absent_label")
     target_year = race_year - year_offset
 
