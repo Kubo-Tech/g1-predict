@@ -1,5 +1,7 @@
 """TableDataCache クラス。"""
 
+from typing import Any
+
 import pandas as pd
 from keiba_data_interface import DataInterface
 from keiba_data_interface.providers.mykeibadb_converters.convert_race_basic_info import (
@@ -7,6 +9,7 @@ from keiba_data_interface.providers.mykeibadb_converters.convert_race_basic_info
 )
 from keiba_data_interface.schema.columns import RACE_BASIC_INFO_COLUMNS
 from mykeibadb import MasterGetter, RaceGetter, ShussobetsuGetter
+from mykeibadb.analytics import ChokyoCondition, get_chokyo_match_days, get_race_display_names
 
 from g1_predict.modules.gen_table.table_utils import DIRT_TRACK_CODES, SHIBA_TRACK_CODES, year_range
 
@@ -46,6 +49,10 @@ class TableDataCache:
         self._past_kyosoba_cache: dict[tuple[str, int], pd.DataFrame] = {}
         self._horse_umagoto_cache: dict[str, pd.DataFrame] = {}
         self._race_field_cache: dict[str, pd.DataFrame] = {}
+        self._race_display_name_cache: dict[str, str | None] = {}
+        self._chokyo_match_days_cache: dict[
+            tuple[Any, ...], dict[str, list[tuple[int, bool]]]
+        ] = {}
 
     def get_kishu_df(self) -> pd.DataFrame:
         """現在レースの出走別騎手データを取得する（遅延初期化）。
@@ -132,6 +139,61 @@ class TableDataCache:
                 race_code=race_code, convert_codes=False
             )
         return self._race_field_cache[race_code]
+
+    def get_race_display_name(self, race_code: str) -> str | None:
+        """指定レースの表示用レース名を取得する（キャッシュあり）。
+
+        重賞（JRA開催）は特別競走番号ごとに、開催日が最も新しいレースの
+        競走名本題へ統一した名称を返す（mykeibadb.analytics.get_race_display_names）。
+
+        Args:
+            race_code (str): 16桁レースコード。
+
+        Returns:
+            str | None: 表示用レース名。race_shosaiに存在しない場合はNone。
+        """
+        if race_code not in self._race_display_name_cache:
+            names = get_race_display_names(self._race_getter.connection_manager, [race_code])
+            self._race_display_name_cache[race_code] = names.get(race_code)
+        return self._race_display_name_cache[race_code]
+
+    def get_chokyo_match_days(
+        self,
+        chokyo_condition: ChokyoCondition,
+        days_from: int,
+        days_to: int,
+    ) -> dict[str, list[tuple[int, bool]]]:
+        """現在レースの出走馬について、期間内の調教ごとの(何日前, 該当か)を取得する.
+
+        chokyo_condition・days_from・days_toの組み合わせごとに1レース分を
+        1回だけ問い合わせてキャッシュする（mykeibadb.analytics.get_chokyo_match_days）。
+
+        Args:
+            chokyo_condition (ChokyoCondition): 調教閾値条件リスト。
+            days_from (int): 対象レース日から遡る日数の下限。
+            days_to (int): 対象レース日から遡る日数の上限。
+
+        Returns:
+            dict[str, list[tuple[int, bool]]]: 血統登録番号 -> [(何日前, 該当か), ...]。
+                調教記録なしの馬は空リスト。
+        """
+        cache_key = (
+            tuple(
+                (t.course, t.metric, t.furlong, t.max_value, t.min_value, t.tracen_kubun)
+                for t in chokyo_condition
+            ),
+            days_from,
+            days_to,
+        )
+        if cache_key not in self._chokyo_match_days_cache:
+            self._chokyo_match_days_cache[cache_key] = get_chokyo_match_days(
+                self._race_getter.connection_manager,
+                self.race_code,
+                chokyo_condition,
+                days_from,
+                days_to,
+            )
+        return self._chokyo_match_days_cache[cache_key]
 
     def build_past_df(self, horse_id: str) -> pd.DataFrame:
         """過去成績にRACE_BASIC_INFOをマージしたDataFrameを返す（キャッシュあり）。
@@ -230,26 +292,13 @@ class TableDataCache:
                 filtered["babajotai_code"].astype(str).str.strip() == track_condition
             ]
 
+        if week is not None and not filtered.empty:
+            filtered = self._filter_by_week_in_course(filtered, raw_shosai, keibajo_code, week)
+
         if course_kubun is not None and "course_kubun" in filtered.columns:
             filtered = filtered[
                 filtered["course_kubun"].astype(str).str.strip() == course_kubun
             ]
-            if week is not None and not filtered.empty:
-                filtered["_nichime"] = pd.to_numeric(
-                    filtered["kaisai_nichime"], errors="coerce"
-                )
-                filtered["_kai_key"] = (
-                    filtered["keibajo_code"].astype(str).str.strip()
-                    + "_"
-                    + filtered["kaisai_kai"].astype(str).str.strip()
-                    + "_"
-                    + filtered["kaisai_nen"].astype(str).str.strip()
-                )
-                min_nichime = filtered.groupby("_kai_key")["_nichime"].transform("min")
-                week_start = min_nichime + (week - 1) * 2
-                filtered = filtered[
-                    (filtered["_nichime"] >= week_start) & (filtered["_nichime"] <= week_start + 1)
-                ]
 
         filtered_codes = filtered["race_code"].tolist()
 
@@ -405,6 +454,81 @@ class TableDataCache:
         past_codes = raw_shosai.loc[mask, "race_code"].tolist()
         self._past_race_codes_cache[cache_key] = past_codes
         return past_codes
+
+    def _filter_by_week_in_course(
+        self,
+        filtered: pd.DataFrame,
+        raw_shosai: pd.DataFrame,
+        keibajo_code: str,
+        week: int,
+    ) -> pd.DataFrame:
+        """開催回・コース区分ごとの週番号でfilteredを絞り込む。
+
+        週番号は「その開催回で、そのレースのコース区分が使われ始めた日から数えた暦週」
+        （(開催日 − 同一開催回・同一コース区分の最初の開催日).days // 7 + 1）とする。
+        course_kubunを絞り込んでいない場合も、レースごとに自身のコース区分を基準に
+        週番号を計算するため、コース区分をまたいで正しく絞り込める。
+
+        Args:
+            filtered (pd.DataFrame): keibajo_code・track・kyori等で絞り込み済みのデータ。
+            raw_shosai (pd.DataFrame): 期間内のRACE_SHOSAI生データ（convert_codes=False）。
+            keibajo_code (str): 競馬場コード。
+            week (int): 絞り込む週番号（1始まり）。
+
+        Returns:
+            pd.DataFrame: 週番号が一致する行のみのDataFrame。
+        """
+        week_df = self._build_week_in_course_df(raw_shosai, keibajo_code)
+        merge_keys = ["keibajo_code", "kaisai_nen", "kaisai_kai", "kaisai_nichime"]
+        filtered = filtered.copy()
+        for col in merge_keys:
+            filtered[col] = filtered[col].astype(str).str.strip()
+        merged = filtered.merge(week_df, on=merge_keys, how="left")
+        merged = merged[merged["week_in_course"] == week]
+        return merged.drop(columns=["week_in_course"])
+
+    def _build_week_in_course_df(
+        self, raw_shosai: pd.DataFrame, keibajo_code: str
+    ) -> pd.DataFrame:
+        """競馬場ごとの開催日単位で週番号（暦週）を計算する。
+
+        Args:
+            raw_shosai (pd.DataFrame): 期間内のRACE_SHOSAI生データ（convert_codes=False）。
+            keibajo_code (str): 競馬場コード。
+
+        Returns:
+            pd.DataFrame: keibajo_code・kaisai_nen・kaisai_kai・kaisai_nichime・
+                week_in_courseの開催日単位DataFrame。
+        """
+        key_cols = [
+            "keibajo_code",
+            "kaisai_nen",
+            "kaisai_kai",
+            "kaisai_nichime",
+            "kaisai_gappi",
+            "course_kubun",
+        ]
+        day_df = raw_shosai[key_cols].astype(str)
+        for col in key_cols:
+            day_df[col] = day_df[col].str.strip()
+        day_df = day_df[
+            (day_df["keibajo_code"] == str(keibajo_code)) & (day_df["course_kubun"] != "")
+        ]
+        day_df = day_df.drop_duplicates(
+            subset=["keibajo_code", "kaisai_nen", "kaisai_kai", "kaisai_nichime"]
+        )
+        day_df["race_date"] = pd.to_datetime(
+            day_df["kaisai_nen"] + day_df["kaisai_gappi"], format="%Y%m%d"
+        )
+        day_df["first_date"] = day_df.groupby(
+            ["keibajo_code", "kaisai_nen", "kaisai_kai", "course_kubun"]
+        )["race_date"].transform("min")
+        day_df["week_in_course"] = (
+            (day_df["race_date"] - day_df["first_date"]).dt.days // 7
+        ) + 1
+        return day_df[
+            ["keibajo_code", "kaisai_nen", "kaisai_kai", "kaisai_nichime", "week_in_course"]
+        ]
 
     def _load_race_shosai_batch(self, race_codes: list[str]) -> None:
         """レースコード一覧を一括でRACE_SHOSAIから取得してキャッシュに格納する。

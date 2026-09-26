@@ -170,7 +170,7 @@ rows:
 | --- | --- | --- |
 | `past_race_top_n_count` | `keibajo_codes` / `grade_codes` / `top_n` / `filters` | 対象レースより前の出走のうち、条件に一致し `top_n` 着以内だった回数。`top_n` 未指定なら単なる該当レース数（キャリア） |
 | `career_count` | − | 出走数 |
-| `prev_race_name` | `overseas_label` | 前走のレース名 |
+| `prev_race_name` | `overseas_label` | 前走のレース名。重賞（グレードコード `A`/`B`/`C`/`D`/`F`/`G`/`H`）かつJRA開催（競馬場コードが数字）で特別競走番号が `0000` 以外のレースは、同じ特別競走番号を持つ重賞レースのうち開催日が最も新しいレースの競走名本題に統一する（例: セントウルステークス → 産経賞セントウルステークス） |
 | `debut_venue` | `allowed_values` | デビュー競馬場コード |
 | `jockey_continuity` | − | `継続` / `乗り戻り` / `テン乗り` |
 | `prev_race_col` | `column` | 前走の任意カラム。実績のある値は `kyakushitsu_hantei`（前走脚質）、`kohan_3f_jun`（前走上がり順位）、`kyori`（前走距離） |
@@ -297,11 +297,12 @@ filters:
 | `debut_field` | `field` / `filters` | 最も古い過去走の値（デビュー戦） |
 | `past_best` | `field` / `agg`（`min`\|`max`） / `filters` | 過去走の最小値または最大値 |
 | `past_race_top_n_count` | `keibajo_codes` / `grade_codes` / `top_n` / `filters` | 条件に一致する過去走のうち `top_n` 着以内だった回数。`top_n` 省略で該当レース数 |
-| `prev_race_name` | `overseas_label` | 前走レース名。海外レースは `overseas_label` の値に置き換える |
+| `prev_race_name` | `overseas_label` | 前走レース名。海外レースは `overseas_label` の値に置き換える。重賞（グレードコード `A`/`B`/`C`/`D`/`F`/`G`/`H`）かつJRA開催（競馬場コードが数字）で特別競走番号が `0000` 以外のレースは、同じ特別競走番号を持つ重賞レースのうち開催日が最も新しいレースの競走名本題に統一する |
 | `prev_race_grade_finish` | − | 前走を `"G1 5着"` 形式で返す（`A`→G1, `B`→G2, `C`→G3, その他→`非重賞`）。中止等で着順が取れない場合は空 |
 | `prev_race_kohan_3f_rank` | − | 前走の上がり3F順位（同レース出走馬中） |
 | `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）に行われた、特別競走番号が `tokubetsu_kyoso_bango` のレースでの着順。未出走なら `absent_label` |
 | `kishu_continuity` | − | `継続` / `乗り戻り` / `テン乗り` |
+| `chokyo_match_days` | `chokyo_condition` / `days_from` / `days_to` | 対象レース日の `days_to` 日前〜`days_from` 日前（両端含む）に行われた、対象コースの調教のうち調教閾値条件（`chokyo_condition`。`ChokyoThreshold` 形式のリストで `course` はすべて同一にする）に該当した本数（int）。確定着順の有無を問わず出走馬を対象にする。期間内に対象コースの調教記録が1本も無い場合は空セル（None） |
 
 ### 統計値（`stat` を指定する）
 
@@ -309,7 +310,7 @@ filters:
 
 | `type` | パラメータ | 内容 |
 | --- | --- | --- |
-| `waku_stat` | `stat` / `keibajo_code` / `track`(`shiba`\|`dirt`) / `kyori` / `years` / `course_kubun` / `week` | その馬の枠番の、指定コースでの成績。`course_kubun` は A〜E のコース区分、`week` は各開催回のコース区分内での週（1週=2日） |
+| `waku_stat` | `stat` / `keibajo_code` / `track`(`shiba`\|`dirt`) / `kyori` / `years` / `course_kubun` / `week` | その馬の枠番の、指定コースでの成績。`course_kubun` は A〜E のコース区分。`week` は「その開催回でそのレースのコース区分が使われ始めた日から数えた暦週」（`(開催日 − 同一開催回・同一コース区分の最初の開催日).days // 7 + 1`）で、`course_kubun` の指定有無に関わらず適用される。`course_kubun` 未指定時はコース区分ごとに週を数えたうえで絞り込む |
 | `kishu_course_stat` | `stat` / `keibajo_code` / `track` / `kyori` / `years` | 騎手の指定コース成績 |
 | `sire_course_stat` | `stat` / `keibajo_code` / `track` / `kyori` / `years` / `track_condition` | 父の産駒の指定コース成績。`track_condition` は馬場状態コード |
 | `sire_race_stat` | `stat`（`name` も可） / `race_name_for_history` / `years` | 父の産駒の指定レース成績。`stat: name` のときは種牡馬名を返す |
