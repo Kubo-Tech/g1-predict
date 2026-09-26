@@ -175,8 +175,8 @@ rows:
 | `prev_race_grade` | − | 前走のグレードコード（`A`/`B`/`C`/その他） |
 | `prev_race_finish` | − | 前走の確定着順 |
 | `prev_race_finish_by_grade` | `grade_codes` **または** `exclude_grade_codes` | 前走が指定グレード（または指定グレード以外）だった馬に限った前走着順。両方指定すると `ValueError` |
-| `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）の同一特別競走番号のレースでの着順。未出走は `absent_label` の値 |
-| `chokyo_week_match` | `chokyo_condition` | 対象レースの当該週（6日前〜前日）・1週前（13日前〜7日前）で坂路・ウッドの調教閾値条件（`ChokyoThreshold` 形式のリスト）を満たしたかの区分。属性値は `both`（両週該当）/ `current_week`（当該週のみ）/ `prev_week`（1週前のみ）/ `none`（両週とも非該当）/ `no_record`（調教記録なし） |
+| `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）に行われた、特別競走番号が `tokubetsu_kyoso_bango` のレースでの着順。未出走は `absent_label` の値 |
+| `chokyo_week_match` | `chokyo_condition` | 対象レースの当該週（6日前〜前日）・1週前（13日前〜7日前）に、調教閾値条件（`ChokyoThreshold` 形式のリスト。`course` はすべて同一にする）をすべて満たす調教が1本以上あったかの区分。属性値は `both`（両週該当）/ `current_week`（当該週のみ）/ `prev_week`（1週前のみ）/ `none`（両週とも非該当）/ `no_record`（2週間に対象コースの調教記録なし） |
 
 `past_race_top_n_count` の `filters` は「過去走を絞り込む追加条件」。`field` に指定できるのは以下だけで、他を書くと `ValueError` になる。
 
@@ -298,7 +298,7 @@ filters:
 | `prev_race_name` | `overseas_label` | 前走レース名。海外レースは `overseas_label` の値に置き換える |
 | `prev_race_grade_finish` | − | 前走を `"G1 5着"` 形式で返す（`A`→G1, `B`→G2, `C`→G3, その他→`非重賞`）。中止等で着順が取れない場合は空 |
 | `prev_race_kohan_3f_rank` | − | 前走の上がり3F順位（同レース出走馬中） |
-| `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）の同一特別競走番号のレースでの着順。未出走なら `absent_label` |
+| `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）に行われた、特別競走番号が `tokubetsu_kyoso_bango` のレースでの着順。未出走なら `absent_label` |
 | `kishu_continuity` | − | `継続` / `乗り戻り` / `テン乗り` |
 
 ### 統計値（`stat` を指定する）
