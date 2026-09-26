@@ -14,6 +14,8 @@ from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_ijo_kubun_code
 
 from g1_predict.modules.utils.md_utils import replace_section
+from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
+from g1_predict.modules.utils.race_name import to_race_label
 from g1_predict.modules.utils.tfjv import (
     race_code_to_tfjv,
     read_kek_comments,
@@ -38,11 +40,13 @@ def generate_result(race_code: str) -> None:
     Args:
         race_code: 16桁 JRA-VAN 形式の race_code。
     """
+    validate_race_code(race_code)
     tfjv_data_dir = os.environ.get("TFJV_DATA_DIR", _DEFAULT_DATA_DIR)
 
     di = DataInterface("mykeibadb")
     race_info = di.get_race_basic_info(race_code)
     race_name = str(race_info["競走名本題"].iloc[0])
+    race_label = to_race_label(race_name)
     year = str(race_info["開催年"].iloc[0])
 
     result_df = di.get_result(race_code)
@@ -57,10 +61,9 @@ def generate_result(race_code: str) -> None:
     result_section = _build_result_section(result_df, marks)
     review_section = _build_review_section(result_df, marks, comments)
 
-    content = _render_from_template(race_name, year, result_section, review_section)
+    content = _render_from_template(race_label, year, result_section, review_section)
 
-    year_dir = os.path.join(_PUBLIC_DIR, year)
-    race_dir = os.path.join(year_dir, f"{race_code}_{race_name}")
+    race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "結果.md")
     with open(output_path, "w", encoding="utf-8") as f:
@@ -128,7 +131,7 @@ def _build_review_section(
 
 
 def _render_from_template(
-    race_name: str,
+    race_label: str,
     year: str,
     result_section: str,
     review_section: str,
@@ -136,7 +139,7 @@ def _render_from_template(
     template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_RESULT.md")
     with open(template_path, encoding="utf-8") as f:
         content = f.read()
-    content = content.replace("{RaceName}", race_name).replace("{Year}", year)
+    content = content.replace("{RaceName}", race_label).replace("{Year}", year)
     content = replace_section(content, "## 結果", result_section)
     content = replace_section(content, "## 回顧", review_section)
     return content

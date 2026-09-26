@@ -1,5 +1,6 @@
 """テーブル生成で使うユーティリティ関数と定数。"""
 
+import re
 from datetime import date
 from typing import Any
 
@@ -12,6 +13,7 @@ _COLOR_FILLS: dict[str, PatternFill] = {
     "blue": PatternFill(patternType="solid", fgColor="FF9DC3E6"),
     "red": PatternFill(patternType="solid", fgColor="FFFF9999"),
     "orange": PatternFill(patternType="solid", fgColor="FFFFC000"),
+    "gray": PatternFill(patternType="solid", fgColor="FFBFBFBF"),
 }
 
 HEADER_FILL = PatternFill(patternType="solid", fgColor="FFD9D9D9")
@@ -31,6 +33,8 @@ SHIBA_TRACK_CODES: frozenset[str] = frozenset(
     {str(c) for c in range(10, 23)} | {str(c) for c in range(51, 60)}
 )
 DIRT_TRACK_CODES: frozenset[str] = frozenset({str(c) for c in range(23, 30)})
+
+_GRADE_FINISH_PATTERN = re.compile(r"^(.+) (\d+)着$")
 
 
 def is_na(value: Any) -> bool:
@@ -73,7 +77,8 @@ def filter_df(df: pd.DataFrame, filters: list[dict[str, Any]]) -> pd.DataFrame:
 
     Args:
         df (pd.DataFrame): 絞り込む対象のDataFrame。
-        filters (list[dict[str, Any]]): YAMLのfilters設定リスト（field/op/valueキーを持つ辞書のリスト）。
+        filters (list[dict[str, Any]]): YAMLのfilters設定リスト
+            （field/op/valueキーを持つ辞書のリスト）。
 
     Returns:
         pd.DataFrame: フィルタ適用後のDataFrame。
@@ -175,8 +180,11 @@ def _match_op(value: Any, op: str, threshold: Any) -> bool:
 
     Args:
         value (Any): 比較対象の値。
-        op (str): 演算子文字列（"==" / "!=" / ">=" / "<=" / ">" / "<" / "in" / "not_in" / "contains"）。
+        op (str): 演算子文字列
+            （"==" / "!=" / ">=" / "<=" / ">" / "<" / "in" / "not_in" / "contains" /
+            "grade_finish_within"）。
         threshold (Any): 比較する基準値。
+            "grade_finish_within" の場合は {グレードラベル: 着順上限} のdict。
 
     Returns:
         bool: 比較結果。valueがNaN、またはTypeError/ValueErrorが発生した場合はFalse。
@@ -205,6 +213,28 @@ def _match_op(value: Any, op: str, threshold: Any) -> bool:
             return value not in threshold
         if op == "contains":
             return str(threshold) in str(value)
+        if op == "grade_finish_within":
+            return _match_grade_finish_within(value, threshold)
     except (TypeError, ValueError):
         return False
     raise ValueError(f"不明なop: {op}")
+
+
+def _match_grade_finish_within(value: Any, threshold: dict[str, int]) -> bool:
+    """「{グレード} {n}着」形式の値が、グレードごとの着順上限以内か判定する。
+
+    Args:
+        value (Any): "{グレード} {n}着" 形式の文字列（例: "G1 5着"）。
+        threshold (dict[str, int]): {グレードラベル: 着順上限}。
+
+    Returns:
+        bool: valueの形式が不正、またはグレードがthresholdに存在しない場合はFalse。
+            着順がthreshold[グレード]以下の場合True。
+    """
+    match = _GRADE_FINISH_PATTERN.match(str(value))
+    if not match:
+        return False
+    grade, finish = match.group(1), int(match.group(2))
+    if grade not in threshold:
+        return False
+    return finish <= threshold[grade]

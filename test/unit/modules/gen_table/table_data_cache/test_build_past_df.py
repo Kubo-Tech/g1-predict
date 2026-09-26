@@ -64,7 +64,10 @@ def test_build_past_df_merges_race_basic_info(cache: TableDataCache) -> None:
 
     with (
         patch("g1_predict.modules.gen_table.table_data_cache.RACE_INFO_RENAME", rename_map),
-        patch("g1_predict.modules.gen_table.table_data_cache.RACE_BASIC_INFO_COLUMNS", basic_info_cols),
+        patch(
+            "g1_predict.modules.gen_table.table_data_cache.RACE_BASIC_INFO_COLUMNS",
+            basic_info_cols,
+        ),
     ):
         result = cache.build_past_df("0000000001")
 

@@ -12,7 +12,8 @@ def hatena_config(tmp_path: Path) -> Path:
     """テスト用hatena.yml"""
     config_path = tmp_path / "hatena.yml"
     config_path.write_text(
-        "categories:\n  default:\n    - 競馬\n  予想:\n    - G1予想\n  結果:\n    - G1結果\n    - レース結果\n",
+        "categories:\n  default:\n    - 競馬\n  予想:\n    - G1予想\n"
+        "  結果:\n    - G1結果\n    - レース結果\n",
         encoding="utf-8",
     )
     return config_path

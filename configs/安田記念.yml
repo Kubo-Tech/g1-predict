@@ -122,8 +122,9 @@ table:
 
     - name: リピーター
       source:
-        type: same_race_prev_year_finish
+        type: tokubetsu_race_finish
         tokubetsu_kyoso_bango: "0010"
+        year_offset: 1
         absent_label: "-"
       color_rules:
         - condition:
@@ -456,7 +457,7 @@ trends:
           - {label: "同距離", op: "==", value: 1600}
           - {label: "距離短縮", op: ">", value: 1600}
     - name: リピーター
-      source: {type: same_race_prev_year_finish, tokubetsu_kyoso_bango: "0010", absent_label: 前年出走無し}
+      source: {type: tokubetsu_race_finish, tokubetsu_kyoso_bango: "0010", year_offset: 1, absent_label: 前年出走無し}
       rows:
         type: fixed
         items:
@@ -468,7 +469,7 @@ trends:
   騎手傾向:
     - name: 騎手
       source: {type: jockey_name}
-      rows: {type: all_jockeys}
+      rows: {type: all_entries}
   生産者傾向:
     - name: 生産者
       source: {type: breeder_name}
