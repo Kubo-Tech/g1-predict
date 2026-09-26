@@ -211,7 +211,7 @@ trends:
           - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
           - {label: "10着以下", op: ">=", value: 10}
           - {label: "不出走", op: "==", value: "不出走"}
-    - name: 坂路ラスト2F24.0秒未満
+    - name: 当週/1週前坂路ラスト2F24.0秒未満
       source:
         type: chokyo_match_days
         chokyo_condition:
