@@ -4,6 +4,7 @@ from typing import Any
 
 import pandas as pd
 from keiba_data_interface import DataInterface
+from mykeibadb.analytics import ChokyoThreshold
 
 from g1_predict.modules.gen_table.table_data_cache import TableDataCache
 from g1_predict.modules.gen_table.table_stat import (
@@ -219,10 +220,16 @@ class TableContext:
         if src_type == "tokubetsu_race_finish":
             return tokubetsu_race_finish(horse_id, source, self.race_year, self._cache)
 
+        if src_type == "chokyo_match_days":
+            return self._get_chokyo_match_days_count(horse_id, source)
+
         raise ValueError(f"不明なsource type: {src_type}")
 
     def _get_prev_race_name(self, horse_id: str, source: dict[str, Any]) -> Any:
-        """前走のレース名を取得する（海外レースはoverseas_labelにまとめる）。
+        """前走のレース名を取得する（海外レースはoverseas_labelに、重賞は統一後の名称にする）。
+
+        重賞（JRA開催）は特別競走番号ごとに、開催日が最も新しいレースの
+        競走名本題へ統一した名称を返す。
 
         Args:
             horse_id (str): 血統登録番号。
@@ -230,7 +237,7 @@ class TableContext:
 
         Returns:
             Any: 前走のレース名。海外レースかつoverseas_label指定時はその値。
-                データがない場合はNone。
+                前走データまたはレース情報がない場合はNone。
         """
         overseas_label = source.get("overseas_label")
         past_df = self._cache.build_past_df(horse_id)
@@ -240,7 +247,30 @@ class TableContext:
         keibajo_code = str(row.get("競馬場コード", "")).strip()
         if overseas_label and keibajo_code and not keibajo_code[:1].isdigit():
             return overseas_label
-        return to_cell_value(row.get("競走名本題"))
+        race_code = str(row.get("レースコード", "")).strip()
+        if not race_code:
+            return None
+        return self._cache.get_race_display_name(race_code)
+
+    def _get_chokyo_match_days_count(self, horse_id: str, source: dict[str, Any]) -> int | None:
+        """坂路等の調教が期間内で条件に該当した本数を取得する。
+
+        Args:
+            horse_id (str): 血統登録番号。
+            source (dict[str, Any]): YAMLのsource設定
+                （chokyo_condition/days_from/days_to）。
+
+        Returns:
+            int | None: 条件に該当した調教の本数。期間内に対象コースの調教記録が
+                1本も無い場合はNone。
+        """
+        condition = [ChokyoThreshold.from_dict(t) for t in source["chokyo_condition"]]
+        days_from = int(source["days_from"])
+        days_to = int(source["days_to"])
+        records = self._cache.get_chokyo_match_days(condition, days_from, days_to).get(horse_id)
+        if not records:
+            return None
+        return sum(1 for _, matched in records if matched)
 
     def _get_prev_race_grade_finish(self, horse_id: str) -> Any:
         """前走のグレードと確定着順を「{グレード} {n}着」形式で返す。

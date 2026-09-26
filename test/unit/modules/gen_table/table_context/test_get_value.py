@@ -20,6 +20,7 @@ def mock_cache() -> MagicMock:
     cache.get_umagoto_df.return_value = pd.DataFrame()
     cache.get_kyosoba_row.return_value = None
     cache.get_horse_umagoto_df.return_value = pd.DataFrame()
+    cache.get_chokyo_match_days.return_value = {}
     return cache
 
 
@@ -283,6 +284,66 @@ def test_get_value_waku_stat_delegates_to_stat(
     assert result == 2
 
 
+def test_get_value_prev_race_name_uses_cache_display_name(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """prev_race_nameは前走のレースコードから統一後の表示名を取得する。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame(
+        {
+            "レースコード": ["2017091009040211"],
+            "競馬場コード": ["09"],
+            "競走名本題": ["セントウルステークス"],
+        }
+    )
+    mock_cache.get_race_display_name.return_value = "産経賞セントウルステークス"
+
+    result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_name"})
+
+    mock_cache.get_race_display_name.assert_called_once_with("2017091009040211")
+    assert result == "産経賞セントウルステークス"
+
+
+def test_get_value_prev_race_name_returns_none_when_no_past(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """prev_race_nameは過去成績がないときNoneを返す。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame()
+    result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_name"})
+    assert result is None
+
+
+def test_get_value_prev_race_name_returns_none_when_race_code_missing(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """prev_race_nameは前走のレースコードがないときNoneを返しキャッシュを呼ばない。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame(
+        {"競馬場コード": ["09"], "競走名本題": ["セントウルステークス"]}
+    )
+    result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_name"})
+    assert result is None
+    mock_cache.get_race_display_name.assert_not_called()
+
+
+def test_get_value_prev_race_name_overseas_returns_overseas_label(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """海外開催（競馬場コードが数字始まりでない）はoverseas_labelを返す。"""
+    mock_cache.build_past_df.return_value = pd.DataFrame(
+        {
+            "レースコード": ["2025000000000000"],
+            "競馬場コード": ["A1"],
+            "競走名本題": ["凱旋門賞"],
+        }
+    )
+
+    result = ctx.get_value(
+        _horse(), _HORSE_ID, {"type": "prev_race_name", "overseas_label": "海外"}
+    )
+
+    assert result == "海外"
+    mock_cache.get_race_display_name.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "grade_code, expected",
     [
@@ -331,6 +392,45 @@ def test_get_value_prev_race_grade_finish_returns_none_for_invalid_finish(
     )
     result = ctx.get_value(_horse(), _HORSE_ID, {"type": "prev_race_grade_finish"})
     assert result == expected
+
+
+_CHOKYO_SOURCE = {
+    "type": "chokyo_match_days",
+    "chokyo_condition": [
+        {"course": "hanro", "metric": "gokei", "furlong": 2, "max_value": 239}
+    ],
+    "days_from": 1,
+    "days_to": 13,
+}
+
+
+def test_get_value_chokyo_match_days_counts_matched(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """chokyo_match_daysは該当した調教の本数を返す。"""
+    mock_cache.get_chokyo_match_days.return_value = {
+        _HORSE_ID: [(1, True), (7, False), (8, True)]
+    }
+    result = ctx.get_value(_horse(), _HORSE_ID, _CHOKYO_SOURCE)
+    assert result == 2
+
+
+def test_get_value_chokyo_match_days_returns_none_when_no_records(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """chokyo_match_daysは対象コースの調教記録が1本も無い場合Noneを返す。"""
+    mock_cache.get_chokyo_match_days.return_value = {_HORSE_ID: []}
+    result = ctx.get_value(_horse(), _HORSE_ID, _CHOKYO_SOURCE)
+    assert result is None
+
+
+def test_get_value_chokyo_match_days_returns_zero_when_none_matched(
+    ctx: TableContext, mock_cache: MagicMock
+) -> None:
+    """chokyo_match_daysは記録はあるが該当0件のとき0を返す。"""
+    mock_cache.get_chokyo_match_days.return_value = {_HORSE_ID: [(1, False), (7, False)]}
+    result = ctx.get_value(_horse(), _HORSE_ID, _CHOKYO_SOURCE)
+    assert result == 0
 
 
 # 準正常系

@@ -3,6 +3,7 @@
 from typing import Any
 from unittest.mock import MagicMock
 
+import pandas as pd
 import pytest
 from mykeibadb.analytics import ChakudoResult, ChakudoRow, RaceCondition
 
@@ -15,6 +16,7 @@ from g1_predict.modules.gen_trend._trend_stats import (
     _merge_stats,
     _yaml_rows_to_rowsdef,
     compute_stats,
+    get_juusho_race_names,
 )
 
 
@@ -696,3 +698,35 @@ def test_yaml_rows_to_rowsdef_lt_gt(op: str, value: int, expected: tuple[int, in
     }
     result = _yaml_rows_to_rowsdef(rows_cfg)
     assert result["test"] == expected
+
+
+# --- get_juusho_race_names ---
+
+
+def test_get_juusho_race_names_returns_unified_display_names() -> None:
+    """grade_code該当レースの表示用レース名（統一後）のセットを返す。"""
+    manager = _make_manager()
+    manager.fetch_dataframe.side_effect = [
+        pd.DataFrame({"race_code": ["2016091109040211", "2017091009040211"]}),
+        pd.DataFrame(
+            {
+                "race_code": ["2016091109040211", "2017091009040211"],
+                "display_name": ["産経賞セントウルステークス", "産経賞セントウルステークス"],
+            }
+        ),
+    ]
+
+    result = get_juusho_race_names(manager, ["A", "B", "C"])
+
+    assert result == {"産経賞セントウルステークス"}
+
+
+def test_get_juusho_race_names_empty_when_no_races() -> None:
+    """該当レースが無ければ空集合を返しdisplay_name解決を呼ばない。"""
+    manager = _make_manager()
+    manager.fetch_dataframe.return_value = pd.DataFrame()
+
+    result = get_juusho_race_names(manager, ["A"])
+
+    assert result == set()
+    assert manager.fetch_dataframe.call_count == 1

@@ -11,6 +11,7 @@ from mykeibadb.analytics import (
     RaceCondition,
     Subject,
     analyze_chakudo,
+    get_race_display_names,
 )
 from mykeibadb.connection import ConnectionManager
 
@@ -136,24 +137,28 @@ def get_juusho_race_names(
     manager: ConnectionManager,
     grades: list[str],
 ) -> set[str]:
-    """grade_code が grades に含まれるレースの競走名本題セットを返す。
+    """grade_code が grades に含まれるレースの表示用レース名セットを返す。
+
+    表示用レース名は get_race_display_names と同じ統一ロジックで解決するため、
+    prev_race_name の集計結果（stats_map のキー）と整合する。
 
     Args:
         manager (ConnectionManager): DB接続マネージャ。
         grades (list[str]): 対象グレードコードのリスト（例: ["A", "B", "C"]）。
 
     Returns:
-        set[str]: 競走名本題の文字列セット（空白トリム済み）。
+        set[str]: 表示用レース名の文字列セット。
     """
     sql = """
-        SELECT DISTINCT TRIM(r.kyosomei_hondai) AS race_name
+        SELECT DISTINCT r.race_code
         FROM race_shosai r
         WHERE r.grade_code = ANY(%s)
     """
     df = manager.fetch_dataframe(sql, params=(grades,))
     if df.empty:
         return set()
-    return set(df["race_name"].astype(str).str.strip().tolist())
+    race_codes = df["race_code"].astype(str).str.strip().tolist()
+    return set(get_race_display_names(manager, race_codes).values())
 
 
 def _src_cache_key(src: dict[str, Any]) -> tuple[Any, ...]:
