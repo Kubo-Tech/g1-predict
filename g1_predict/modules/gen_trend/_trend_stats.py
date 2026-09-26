@@ -1,5 +1,6 @@
 """過去レースの統計値を analytics 経由で計算するモジュール。"""
 
+import json
 from typing import Any
 
 from mykeibadb.analytics import (
@@ -45,6 +46,9 @@ _PREV_RACE_COL_TYPES: dict[str, str] = {
     "prev_race_finish": "kakutei_chakujun",
     "prev_race_finish_by_grade": "kakutei_chakujun",
 }
+
+# chokyo_match_days の rows.items で使える op
+_CHOKYO_MATCH_DAYS_OPS = frozenset({"any_match", "none_match", "empty"})
 
 # past_race_top_n_count の filters で指定する field名 -> mykeibadb horse_hist の column名
 _HIST_FILTER_FIELD_MAP: dict[str, str] = {
@@ -109,10 +113,15 @@ def compute_stats(
         result = analyze_chakudo(manager, [], condition, group_by)
         return _chakudo_to_stats_map(result)
 
-    if src_type in ("tokubetsu_race_finish", "chokyo_week_match"):
+    if src_type == "tokubetsu_race_finish":
         group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
         result = analyze_chakudo(manager, [], condition, group_by)
         return _group_by_rows_cfg(result, rows_cfg)
+
+    if src_type == "chokyo_match_days":
+        group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
+        result = analyze_chakudo(manager, [], condition, group_by)
+        return _group_by_chokyo_match_days_rows_cfg(result, rows_cfg)
 
     if src_type in _PREV_RACE_COL_TYPES:
         attr_source = AttrSource.from_dict(_convert_prev_race_source(src))
@@ -509,6 +518,61 @@ def _group_matches(group_str: str, op: str, threshold: Any) -> bool:
     if op == "!=":
         return group_str != str(threshold)
     return False
+
+
+def _group_by_chokyo_match_days_rows_cfg(
+    result: ChakudoResult,
+    rows_cfg: dict[str, Any],
+) -> dict[str, RowStats]:
+    """chokyo_match_days の ChakudoResult を YAML rows.items に従ってグループ化する。
+
+    各行の group（`[[何日前, 該当bool], ...]` 形式のJSON配列テキスト）を
+    any_match / none_match / empty のいずれかで判定し、条件に合致する行を集約する。
+
+    Args:
+        result (ChakudoResult): analytics 集計結果。
+        rows_cfg (dict[str, Any]): rows の YAML 設定dict。
+
+    Returns:
+        dict[str, RowStats]: 行ラベル -> RowStats。
+
+    Raises:
+        ValueError: item の op が any_match / none_match / empty 以外の場合。
+    """
+    if not result.success:
+        return {}
+
+    stats_map: dict[str, RowStats] = {}
+    for item in rows_cfg.get("items", []):
+        label = item["label"]
+        op = item["op"]
+        if op not in _CHOKYO_MATCH_DAYS_OPS:
+            raise ValueError(f"chokyo_match_days の rows.items で未対応の op です: {op!r}")
+        matching = [
+            _chakudo_row_to_stats(row)
+            for row in result.rows
+            if _chokyo_match_days_matches(row.group, op)
+        ]
+        stats_map[label] = _merge_stats(matching) if matching else RowStats()
+    return stats_map
+
+
+def _chokyo_match_days_matches(group_text: str, op: str) -> bool:
+    """chokyo_match_days の group テキストが op の条件に一致するか判定する。
+
+    Args:
+        group_text (str): `[[何日前, 該当bool], ...]` 形式のJSON配列テキスト。
+        op (str): "any_match" / "none_match" / "empty" のいずれか。
+
+    Returns:
+        bool: 条件に一致する場合 True。
+    """
+    records: list[list[Any]] = json.loads(group_text)
+    if op == "empty":
+        return len(records) == 0
+    if op == "any_match":
+        return any(rec[1] for rec in records)
+    return len(records) > 0 and not any(rec[1] for rec in records)
 
 
 def _merge_stats(stats_list: list[RowStats]) -> RowStats:

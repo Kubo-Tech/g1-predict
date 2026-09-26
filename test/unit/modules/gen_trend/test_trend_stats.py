@@ -1,5 +1,6 @@
 """_trend_stats の単体テスト。"""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -288,46 +289,107 @@ def test_compute_stats_tokubetsu_race_finish_cumulative() -> None:
     assert stats["前年出走無し"].fourth_plus == 5
 
 
-def test_compute_stats_chokyo_week_match_groups_by_attr_val() -> None:
-    """chokyo_week_match は history 取得 + _group_by_rows_cfg で区分ごとに集計される。"""
+def _chokyo_match_days_metric_cfg() -> dict[str, Any]:
+    """chokyo_match_days 用の metric_cfg を生成する。"""
+    return {
+        "source": {
+            "type": "chokyo_match_days",
+            "chokyo_condition": [
+                {"course": "hanro", "metric": "gokei", "furlong": 2, "max_value": 239}
+            ],
+            "days_from": 1,
+            "days_to": 13,
+        },
+        "rows": {
+            "type": "fixed",
+            "items": [
+                {"label": "該当", "op": "any_match"},
+                {"label": "非該当", "op": "none_match"},
+                {"label": "坂路記録なし", "op": "empty"},
+            ],
+        },
+    }
+
+
+def test_compute_stats_chokyo_match_days_classifies_any_match_none_match_empty() -> None:
+    """chokyo_match_days は行ごとの JSON 配列を any_match/none_match/empty で分類する。"""
     from unittest.mock import patch
 
     from mykeibadb.analytics import AttrSource
 
     raw_rows = [
-        _make_chakudo_row(group="both", wins=1, total=3),
-        _make_chakudo_row(group="none", wins=0, total=2),
-        _make_chakudo_row(group="no_record", wins=0, total=1),
+        _make_chakudo_row(group="[[3, true], [10, false]]", wins=1, total=3),
+        _make_chakudo_row(group="[[5, false], [12, false]]", wins=0, total=2),
+        _make_chakudo_row(group="[]", wins=0, total=1),
     ]
     mock_result = _make_chakudo_result(raw_rows)
     with patch(
         "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
         return_value=mock_result,
     ) as mock_analyze:
-        metric_cfg = {
-            "source": {
-                "type": "chokyo_week_match",
-                "chokyo_condition": [
-                    {"course": "hanro", "metric": "gokei", "furlong": 2, "max_value": 239}
-                ],
-            },
-            "rows": {
-                "type": "fixed",
-                "items": [
-                    {"label": "両週該当", "op": "==", "value": "both"},
-                    {"label": "坂路記録なし", "op": "==", "value": "no_record"},
-                ],
-            },
-        }
-        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+        stats = compute_stats(
+            _chokyo_match_days_metric_cfg(), _make_manager(), _make_condition()
+        )
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert group_by.kind == "history"
     assert isinstance(group_by.source, AttrSource)
-    assert group_by.source.type == "chokyo_week_match"
-    assert "両週該当" in stats
-    assert stats["両週該当"].first == 1
+    assert group_by.source.type == "chokyo_match_days"
+    assert stats["該当"].first == 1
+    assert stats["該当"].total == 3
+    assert stats["非該当"].total == 2
     assert stats["坂路記録なし"].total == 1
+
+
+def test_compute_stats_chokyo_match_days_merges_rows_with_same_label() -> None:
+    """同じ分類に属する複数行の RowStats が合算される。"""
+    from unittest.mock import patch
+
+    raw_rows = [
+        _make_chakudo_row(group="[[1, true]]", wins=1, total=2),
+        _make_chakudo_row(group="[[2, true], [9, false]]", wins=0, total=4),
+    ]
+    mock_result = _make_chakudo_result(raw_rows)
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ):
+        stats = compute_stats(
+            _chokyo_match_days_metric_cfg(), _make_manager(), _make_condition()
+        )
+
+    assert stats["該当"].total == 6
+    assert stats["該当"].first == 1
+    assert stats["非該当"].total == 0
+    assert stats["坂路記録なし"].total == 0
+
+
+def test_compute_stats_chokyo_match_days_unsupported_op_raises() -> None:
+    """chokyo_match_days の rows.items で any_match/none_match/empty 以外の op は ValueError。"""
+    from unittest.mock import patch
+
+    raw_rows = [_make_chakudo_row(group="[]", wins=0, total=1)]
+    mock_result = _make_chakudo_result(raw_rows)
+    metric_cfg = {
+        "source": {
+            "type": "chokyo_match_days",
+            "chokyo_condition": [
+                {"course": "hanro", "metric": "gokei", "furlong": 2, "max_value": 239}
+            ],
+            "days_from": 1,
+            "days_to": 13,
+        },
+        "rows": {
+            "type": "fixed",
+            "items": [{"label": "該当", "op": "=="}],
+        },
+    }
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ):
+        with pytest.raises(ValueError, match="op"):
+            compute_stats(metric_cfg, _make_manager(), _make_condition())
 
 
 def test_compute_stats_prev_race_grade_groups_by_grade_code() -> None:

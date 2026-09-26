@@ -213,17 +213,17 @@ trends:
           - {label: "不出走", op: "==", value: "不出走"}
     - name: 坂路ラスト2F24.0秒未満
       source:
-        type: chokyo_week_match
+        type: chokyo_match_days
         chokyo_condition:
           - {course: hanro, metric: gokei, furlong: 2, max_value: 239}
+        days_from: 1
+        days_to: 13
       rows:
         type: fixed
         items:
-          - {label: "両週該当", op: "==", value: "both"}
-          - {label: "当該週のみ該当", op: "==", value: "current_week"}
-          - {label: "1週前のみ該当", op: "==", value: "prev_week"}
-          - {label: "両週とも非該当", op: "==", value: "none"}
-          - {label: "坂路記録なし", op: "==", value: "no_record"}
+          - {label: "該当", op: any_match}
+          - {label: "非該当", op: none_match}
+          - {label: "坂路記録なし", op: empty}
   騎手傾向:
     - name: 騎手
       source: {type: jockey_name}

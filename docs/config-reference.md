@@ -76,8 +76,9 @@ rows:
 
 | `source.type` のグループ | 使える `op` |
 | --- | --- |
-| `race_col` 系 / `prev_race_grade` / `prev_race_finish` / `prev_race_finish_by_grade` / `tokubetsu_race_finish` / `chokyo_week_match` | `==` `!=` `>=` `<=` `>` `<` `in` `not_in` |
+| `race_col` 系 / `prev_race_grade` / `prev_race_finish` / `prev_race_finish_by_grade` / `tokubetsu_race_finish` | `==` `!=` `>=` `<=` `>` `<` `in` `not_in` |
 | `past_race_top_n_count` / `career_count` / `prev_race_name` / `debut_venue` / `jockey_continuity` / `prev_race_col` | `==` `>=` `<=` `>` `<`（`in` は `ValueError`。`!=` `not_in` は無視され、その行は常に `0-0-0-0` になる） |
+| `chokyo_match_days` | `any_match` `none_match` `empty`（それ以外の `op` は `ValueError`。`value` は不要） |
 
 `value` は数値・文字列のどちらも指定できる。数値として解釈できる場合は数値比較、できない場合は文字列比較になる。
 
@@ -176,7 +177,7 @@ rows:
 | `prev_race_finish` | − | 前走の確定着順 |
 | `prev_race_finish_by_grade` | `grade_codes` **または** `exclude_grade_codes` | 前走が指定グレード（または指定グレード以外）だった馬に限った前走着順。両方指定すると `ValueError` |
 | `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）に行われた、特別競走番号が `tokubetsu_kyoso_bango` のレースでの着順。未出走は `absent_label` の値 |
-| `chokyo_week_match` | `chokyo_condition` | 対象レースの当該週（6日前〜前日）・1週前（13日前〜7日前）に、調教閾値条件（`ChokyoThreshold` 形式のリスト。`course` はすべて同一にする）をすべて満たす調教が1本以上あったかの区分。属性値は `both`（両週該当）/ `current_week`（当該週のみ）/ `prev_week`（1週前のみ）/ `none`（両週とも非該当）/ `no_record`（2週間に対象コースの調教記録なし） |
+| `chokyo_match_days` | `chokyo_condition` / `days_from` / `days_to` | 対象レース日の `days_to` 日前〜`days_from` 日前（両端含む）に行われた、対象コースの有効な調教記録それぞれについて、レース何日前かと調教閾値条件（`ChokyoThreshold` 形式のリスト。`course` はすべて同一にする）を満たすかを判定した結果。属性値は `[[何日前, 該当bool], ...]` 形式のJSON配列テキスト（記録なしは `[]`） |
 
 `past_race_top_n_count` の `filters` は「過去走を絞り込む追加条件」。`field` に指定できるのは以下だけで、他を書くと `ValueError` になる。
 
