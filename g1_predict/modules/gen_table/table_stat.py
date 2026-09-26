@@ -346,23 +346,32 @@ def prev_race_kohan_3f_rank(horse_id: str, cache: TableDataCache) -> int | None:
     return int(horse_row.iloc[0]["_jun"])
 
 
-def same_race_prev_year_finish(
+def tokubetsu_race_finish(
     horse_id: str, source: dict[str, Any], race_year: int, cache: TableDataCache
 ) -> Any:
-    """前年の同一特別競走における確定着順を返す。
+    """指定特別競走番号のレースにおける、対象年の確定着順を返す。
 
     Args:
         horse_id (str): 血統登録番号。
-        source (dict[str, Any]): YAMLのsource設定（tokubetsu_kyoso_bango/absent_label）。
+        source (dict[str, Any]): YAMLのsource設定
+            （tokubetsu_kyoso_bango/year_offset/absent_label）。
         race_year (int): 今回のレース開催年。
         cache (TableDataCache): データキャッシュ。
 
     Returns:
-        Any: 確定着順（int）。前年に出走していない場合はsource["absent_label"]の値。
+        Any: 確定着順（int）。対象年に出走していない場合はsource["absent_label"]の値。
+
+    Raises:
+        ValueError: tokubetsu_kyoso_bango または year_offset が指定されていない場合。
     """
+    if "tokubetsu_kyoso_bango" not in source or "year_offset" not in source:
+        raise ValueError(
+            "tokubetsu_race_finish には tokubetsu_kyoso_bango と year_offset の指定が必要です。"
+        )
     tokubetsu_kyoso_bango = str(source["tokubetsu_kyoso_bango"]).strip()
+    year_offset = int(source["year_offset"])
     absent_label = source.get("absent_label")
-    target_year = race_year - 1
+    target_year = race_year - year_offset
 
     past_df = cache.build_past_df(horse_id)
     if past_df.empty or "特別競走番号" not in past_df.columns:

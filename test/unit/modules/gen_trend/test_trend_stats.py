@@ -243,8 +243,8 @@ def test_compute_stats_prev_race_col_builds_fixed_group_by() -> None:
     assert group_by.source.column == "kyakushitsu_hantei"
 
 
-def test_compute_stats_same_race_prev_year_finish_cumulative() -> None:
-    """same_race_prev_year_finish は history 取得 + _group_by_rows_cfg で累積計上される。"""
+def test_compute_stats_tokubetsu_race_finish_cumulative() -> None:
+    """tokubetsu_race_finish は history 取得 + _group_by_rows_cfg で累積計上される。"""
     from unittest.mock import patch
 
     from mykeibadb.analytics import AttrSource
@@ -261,8 +261,9 @@ def test_compute_stats_same_race_prev_year_finish_cumulative() -> None:
     ) as mock_analyze:
         metric_cfg = {
             "source": {
-                "type": "same_race_prev_year_finish",
+                "type": "tokubetsu_race_finish",
                 "tokubetsu_kyoso_bango": "0010",
+                "year_offset": 1,
                 "absent_label": "前年出走無し",
             },
             "rows": {
@@ -278,12 +279,55 @@ def test_compute_stats_same_race_prev_year_finish_cumulative() -> None:
     _, _, _, group_by = mock_analyze.call_args[0]
     assert group_by.kind == "history"
     assert isinstance(group_by.source, AttrSource)
-    assert group_by.source.type == "same_race_prev_year_finish"
+    assert group_by.source.type == "tokubetsu_race_finish"
+    assert group_by.source.year_offset == 1
     assert "前年3着以内" in stats
     assert stats["前年3着以内"].first == 1
     assert stats["前年3着以内"].second == 1
     assert "前年出走無し" in stats
     assert stats["前年出走無し"].fourth_plus == 5
+
+
+def test_compute_stats_chokyo_week_match_groups_by_attr_val() -> None:
+    """chokyo_week_match は history 取得 + _group_by_rows_cfg で区分ごとに集計される。"""
+    from unittest.mock import patch
+
+    from mykeibadb.analytics import AttrSource
+
+    raw_rows = [
+        _make_chakudo_row(group="both", wins=1, total=3),
+        _make_chakudo_row(group="none", wins=0, total=2),
+        _make_chakudo_row(group="no_record", wins=0, total=1),
+    ]
+    mock_result = _make_chakudo_result(raw_rows)
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {
+                "type": "chokyo_week_match",
+                "chokyo_condition": [
+                    {"course": "hanro", "metric": "gokei", "furlong": 2, "max_value": 239}
+                ],
+            },
+            "rows": {
+                "type": "fixed",
+                "items": [
+                    {"label": "両週該当", "op": "==", "value": "both"},
+                    {"label": "坂路記録なし", "op": "==", "value": "no_record"},
+                ],
+            },
+        }
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by.kind == "history"
+    assert isinstance(group_by.source, AttrSource)
+    assert group_by.source.type == "chokyo_week_match"
+    assert "両週該当" in stats
+    assert stats["両週該当"].first == 1
+    assert stats["坂路記録なし"].total == 1
 
 
 def test_compute_stats_prev_race_grade_groups_by_grade_code() -> None:

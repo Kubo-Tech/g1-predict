@@ -109,7 +109,7 @@ def compute_stats(
         result = analyze_chakudo(manager, [], condition, group_by)
         return _chakudo_to_stats_map(result)
 
-    if src_type == "same_race_prev_year_finish":
+    if src_type in ("tokubetsu_race_finish", "chokyo_week_match"):
         group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
         result = analyze_chakudo(manager, [], condition, group_by)
         return _group_by_rows_cfg(result, rows_cfg)
