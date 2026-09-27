@@ -57,7 +57,9 @@ def generate_predict(race_code: str) -> None:
 
     points = _load_points(race_label)
     marks_section = _build_marks_section(marks, entry_raw)
-    insight_section = _build_insight_section(marks, entry_raw, race_getter, tfjv_data_dir)
+    insight_section = _build_insight_section(
+        race_code, marks, entry_raw, race_getter, tfjv_data_dir
+    )
     content = _render_from_template(race_label, year, points, marks_section, insight_section)
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
@@ -132,6 +134,7 @@ def _build_marks_section(marks: dict[int, str], entry_raw: pd.DataFrame) -> str:
 
 
 def _build_insight_section(
+    race_code: str,
     marks: dict[int, str],
     entry_raw: pd.DataFrame,
     race_getter: RaceGetter,
@@ -139,7 +142,10 @@ def _build_insight_section(
 ) -> str:
     """見解セクションを生成する。
 
+    過去走は今回のレースの開催日より前のレースに限り、新しい順に前走・前々走と数える。
+
     Args:
+        race_code (str): 今回のレースの16桁 JRA-VAN 形式の race_code。
         marks (dict[int, str]): 馬番 -> 印記号のdict。
         entry_raw (pd.DataFrame): 出走馬情報DataFrame。
         race_getter (RaceGetter): レース情報取得オブジェクト。
@@ -164,6 +170,8 @@ def _build_insight_section(
         past_raw = race_getter.get_umagoto_race_joho(
             ketto_toroku_bango=horse_id, convert_codes=False
         )
+        # race_code の先頭8桁は開催年月日。今回のレースとそれ以降の出走を除く
+        past_raw = past_raw[past_raw["race_code"].astype(str).str[:8] < race_code[:8]]
         past_raw = past_raw.sort_values("race_code", ascending=False).reset_index(drop=True)
         seen_race_codes: set[str] = set()
         count = 0
