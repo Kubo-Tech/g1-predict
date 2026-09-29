@@ -174,6 +174,23 @@ def test_build_prev_day_trend_body_has_dememe_header() -> None:
     assert "## 出目" in result
 
 
+@pytest.mark.parametrize(
+    "label, header_row",
+    [
+        pytest.param("人気", "| 1人気 |", id="ninki"),
+        pytest.param("枠番", "| 1枠 |", id="waku"),
+        pytest.param("脚質", "| 逃げ |", id="kyakushitsu"),
+        pytest.param("上がり順位", "| 1位 |", id="agari"),
+    ],
+)
+def test_build_prev_day_trend_body_blank_line_between_label_and_table(
+    label: str, header_row: str
+) -> None:
+    """出目の各見出しと表の間に空行を入れる（はてなブログで表として描画されるため）。"""
+    result = _call()
+    assert f"**{label}**\n\n{header_row}" in result
+
+
 def test_build_prev_day_trend_body_has_each_race_header() -> None:
     """マッチするレースがある場合、## 各レース ヘッダーを含む。"""
     result = _call()

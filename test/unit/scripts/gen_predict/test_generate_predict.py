@@ -410,65 +410,6 @@ def test_generate_predict_insight_section_excludes_target_race_from_past(
     assert "前々走" not in content
 
 
-def test_generate_predict_insight_section_excludes_target_race_from_past(
-    dirs: tuple[str, str],
-) -> None:
-    """過去走に今回のレースが含まれていても、直前のレースを「前走」と表記する。
-
-    Args:
-        dirs (tuple[str, str]): public・templates ディレクトリ。
-    """
-    public_dir, templates_dir = dirs
-    horses = [_make_horse_raw(5, "ホースA", "2020100001")]
-    marks = {5: "◎"}
-    mock_rg = _make_mock_race_getter(horses=horses)
-
-    past_df = pd.DataFrame(
-        {"race_code": ["2026013105010110", "2025050205021011"], "umaban": [5, 5]}
-    )
-
-    def _umagoto(**kwargs: object) -> pd.DataFrame:
-        """出走馬情報または過去走情報を返す。
-
-        Args:
-            **kwargs (object): RaceGetter 呼び出し引数。
-
-        Returns:
-            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
-        """
-        if "race_code" in kwargs:
-            return pd.DataFrame(horses)
-        return past_df
-
-    mock_rg.get_umagoto_race_joho.side_effect = _umagoto
-    mock_rg.get_race_shosai.side_effect = [
-        pd.DataFrame(
-            {
-                "kyosomei_hondai": ["天皇賞春"],
-                "kaisai_nen": ["2026"],
-                "grade_code": ["A"],
-            }
-        ),
-        pd.DataFrame(
-            {
-                "kyosomei_hondai": ["天皇賞春"],
-                "kaisai_nen": ["2025"],
-                "grade_code": ["A"],
-            }
-        ),
-    ]
-    _run(
-        mock_rg,
-        public_dir,
-        templates_dir,
-        marks=marks,
-        kek_comments_by_year2={"25": {5: "[天皇賞春] 好内容。"}},
-    )
-    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "前走G1天皇賞春好内容。" in content
-    assert "前々走" not in content
-
-
 def test_generate_predict_insight_section_past_comment_zenzensou(
     dirs: tuple[str, str],
 ) -> None:
