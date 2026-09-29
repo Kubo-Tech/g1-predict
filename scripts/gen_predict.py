@@ -83,19 +83,23 @@ def main() -> None:
 
 
 def _load_points(race_label: str) -> str:
-    """ポイントセクションを読み込む。
+    """ポイントセクションを生成する。
+
+    `templates/points/{レース名}.md` には見出しを含まない本文を書く。
+    ファイルが無い場合は空の箇条書きを本文とする。
 
     Args:
         race_label (str): pointsファイル名に使うレース名。
 
     Returns:
-        str: ポイントセクションのMarkdown文字列。
+        str: `## ポイント` 見出しから始まるポイントセクションのMarkdown文字列。
     """
     path = os.path.join(_TEMPLATES_DIR, "points", f"{race_label}.md")
+    body = "- \n"
     if os.path.isfile(path):
         with open(path, encoding="utf-8") as f:
-            return f.read()
-    return "## ポイント\n\n- \n"
+            body = f.read()
+    return "## ポイント\n\n" + body
 
 
 def _sort_marks(marks: dict[int, str]) -> list[tuple[int, str]]:

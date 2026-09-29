@@ -329,7 +329,7 @@ filters:
 3. `race_name` と、距離・競馬場コードを含む箇所（`kyori` / `keibajo_code` / `keibajo_codes` / 前走距離の閾値など）を書き換える。
 4. `race_name_for_history` を新しいレースの競走名本題にする（DB照合に使うため、略称ではなく競走名本題を書く）。
 5. 開催条件が年によって変わるレースなら、metric ごとに `condition` を付ける。
-6. `templates/points/{レース名}.md` にそのレースの狙い・格言を書いておく（`gen_predict` が `## ポイント` に流し込む）。
+6. `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書いておく（`gen_predict` が `## ポイント` 見出しの下に流し込む）。
 7. `python -m scripts.gen_trend --race-code ...` で表が欠損なく出るか確認する。動作確認で生成した記事はコミットしない。
 
 `source.type` で表現できない集計が必要になったときは、`_trend_stats.py`（trends 側）または `table_context.py` / `table_stat.py`（table 側）に新しい type を追加する。追加の進め方は [development.md](development.md) を参照。

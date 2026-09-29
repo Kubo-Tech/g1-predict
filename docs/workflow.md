@@ -18,7 +18,7 @@ flowchart LR
 ## 0. 事前準備（そのレースを初めて扱うとき）
 
 - `configs/{レース名}.yml` を用意する → [config-reference.md](config-reference.md)
-- `templates/points/{レース名}.md` にそのレースの狙い・格言を書く（`gen_predict` の `## ポイント` に流し込まれる）
+- `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書く（`gen_predict` の `## ポイント` 見出しの下に流し込まれる）
 
 ## 1. 傾向分析（週の前半）
 
