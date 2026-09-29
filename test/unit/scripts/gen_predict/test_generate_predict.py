@@ -348,7 +348,66 @@ def test_generate_predict_insight_section_past_comment_zensou(
         kek_comments_per_call=[{5: "[天皇賞春] 好内容。"}],
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "前走G1天皇賞春好内容。" in content
+    assert "前走G1天皇賞春は好内容。" in content
+
+
+def test_generate_predict_insight_section_excludes_target_race_from_past(
+    dirs: tuple[str, str],
+) -> None:
+    """過去走に今回のレースが含まれていても、直前のレースを「前走」と表記する。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
+    public_dir, templates_dir = dirs
+    horses = [_make_horse_raw(5, "ホースA", "2020100001")]
+    marks = {5: "◎"}
+    mock_rg = _make_mock_race_getter(horses=horses)
+
+    past_df = pd.DataFrame(
+        {"race_code": ["2026013105010110", "2025050205021011"], "umaban": [5, 5]}
+    )
+
+    def _umagoto(**kwargs: object) -> pd.DataFrame:
+        """出走馬情報または過去走情報を返す。
+
+        Args:
+            **kwargs (object): RaceGetter 呼び出し引数。
+
+        Returns:
+            pd.DataFrame: 出走馬情報または過去走情報DataFrame。
+        """
+        if "race_code" in kwargs:
+            return pd.DataFrame(horses)
+        return past_df
+
+    mock_rg.get_umagoto_race_joho.side_effect = _umagoto
+    mock_rg.get_race_shosai.side_effect = [
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2026"],
+                "grade_code": ["A"],
+            }
+        ),
+        pd.DataFrame(
+            {
+                "kyosomei_hondai": ["天皇賞春"],
+                "kaisai_nen": ["2025"],
+                "grade_code": ["A"],
+            }
+        ),
+    ]
+    _run(
+        mock_rg,
+        public_dir,
+        templates_dir,
+        marks=marks,
+        kek_comments_by_year2={"25": {5: "[天皇賞春] 好内容。"}},
+    )
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
+    assert "前走G1天皇賞春は好内容。" in content
+    assert "前々走" not in content
 
 
 def test_generate_predict_insight_section_excludes_target_race_from_past(
@@ -460,7 +519,7 @@ def test_generate_predict_insight_section_past_comment_zenzensou(
         kek_comments_per_call=[{}, {5: "[大阪杯] 手応え良好。"}],
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "前々走G1大阪杯手応え良好。" in content
+    assert "前々走G1大阪杯は手応え良好。" in content
 
 
 def test_generate_predict_insight_section_ordinal_3plus(
@@ -523,7 +582,7 @@ def test_generate_predict_insight_section_ordinal_3plus(
         kek_comments_per_call=[{}, {}, {1: "[宝塚記念] 馬場不向き。"}],
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "3走前G1宝塚記念馬場不向き。" in content
+    assert "3走前G1宝塚記念は馬場不向き。" in content
 
 
 def test_generate_predict_insight_race_without_comment_counted_in_ordinal(
@@ -577,7 +636,7 @@ def test_generate_predict_insight_race_without_comment_counted_in_ordinal(
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     insight_section = content[content.index("## 見解") :]
-    assert "前々走G1大阪杯好走。" in insight_section
+    assert "前々走G1大阪杯は好走。" in insight_section
     assert "前走G1" not in insight_section
 
 
@@ -628,7 +687,7 @@ def test_generate_predict_insight_section_grade_l(
         kek_comments_per_call=[{1: "[テストR] 内容良好。"}],
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "前走LテストR内容良好。" in content
+    assert "前走LテストRは内容良好。" in content
 
 
 def test_generate_predict_insight_section_no_grade_for_general_race(
@@ -678,7 +737,7 @@ def test_generate_predict_insight_section_no_grade_for_general_race(
         kek_comments_per_call=[{1: "[一般戦] 凡走。"}],
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "前走一般戦凡走。" in content
+    assert "前走一般戦は凡走。" in content
 
 
 def test_generate_predict_does_not_contain_prev_day_trend_section(
@@ -766,19 +825,19 @@ def test_generate_predict_does_not_create_trend_file(
 def test_generate_predict_uses_points_template_when_exists(
     dirs: tuple[str, str],
 ) -> None:
-    """ポイントテンプレートが存在する場合、その内容が記事に含まれる。
+    """ポイントテンプレートが存在する場合、見出しの下にその内容が記事に含まれる。
 
     Args:
         dirs (tuple[str, str]): public・templates ディレクトリ。
     """
     public_dir, templates_dir = dirs
     with open(os.path.join(templates_dir, "points", "天皇賞春.md"), "w", encoding="utf-8") as f:
-        f.write("## ポイント\n\n- 先行有利\n")
+        f.write("- 先行有利\n")
 
     _run(_make_mock_race_getter(), public_dir, templates_dir)
 
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "先行有利" in content
+    assert "## ポイント\n\n- 先行有利\n" in content
 
 
 def test_generate_predict_uses_default_points_when_template_missing(
@@ -856,7 +915,7 @@ def test_generate_predict_insight_deduplicates_postponed_race(
         kek_comments_per_call=[{1: "[きさらぎ賞] 好走。"}],
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert content.count("きさらぎ賞好走。") == 1
+    assert content.count("きさらぎ賞は好走。") == 1
 
 
 def test_generate_predict_uses_default_data_dir_when_env_not_set(
