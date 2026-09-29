@@ -200,7 +200,7 @@ def _build_insight_section(
             comment = comments[past_umaban]
             race_name_str, body = _parse_kek_comment(comment)
             ordinal = _format_ordinal(count)
-            lines.append(f"{ordinal}{grade}{race_name_str}{body}  ")
+            lines.append(f"{ordinal}{grade}{race_name_str}は{body}  ")
 
     return "\n".join(lines)
 
