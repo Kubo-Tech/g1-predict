@@ -75,7 +75,7 @@ flowchart TD
 ```
 g1-predict/
 ├── configs/
-│   ├── hatena.yml                  # 記事種別 → はてなカテゴリの対応
+│   ├── hatena.yml                  # 記事の置き場所・種別 → はてなカテゴリの対応
 │   └── {レース名}.yml               # trends（傾向表）と table（分析表）の定義
 ├── g1_predict/modules/
 │   ├── constants.py                # 複数機能で共有する定数（トラックコード → 芝/ダ、グレード表示）

@@ -24,6 +24,9 @@ _DC_NS = "http://purl.org/dc/elements/1.1/"
 
 _REQUEST_TIMEOUT = 30
 
+# レース記事の親ディレクトリ名（{16桁race_code}_{レース名}）
+_RACE_DIR_PATTERN = re.compile(r"\d{16}_(.+)")
+
 _CONTENT_TYPES: dict[str, str] = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -89,27 +92,41 @@ def build_wsse_header(hatena_id: str, api_key: str) -> str:
     )
 
 
-def load_categories(config_path: Path, stem: str) -> list[str]:
-    """hatena.ymlからファイルstemに対応するカテゴリ一覧を取得する
+def load_categories(config_path: Path, md_path: Path) -> list[str]:
+    """hatena.ymlから記事ファイルに付けるカテゴリ一覧を取得する
+
+    親ディレクトリ名が `{race_code}_{レース名}` 形式のレース記事には、
+    `race` のカテゴリ、ファイルstemに対応する `article` のカテゴリ、レース名の順に付ける。
+    それ以外の記事には `default` のカテゴリを付ける。
 
     Args:
         config_path (Path): hatena.ymlのパス
-        stem (str): ファイルstem（例: "予想", "回顧"）
+        md_path (Path): 記事Markdownファイルのパス
 
     Returns:
-        list[str]: カテゴリ名のリスト
+        list[str]: 重複を除いたカテゴリ名のリスト
 
     Raises:
-        KeyError: stemに対応するカテゴリが設定ファイルに存在しない場合
+        KeyError: 必要なカテゴリ設定が設定ファイルに存在しない場合
     """
     with open(config_path, encoding="utf-8") as f:
         config: dict[str, object] = yaml.safe_load(f) or {}
-    categories: dict[str, list[str]] = config.get("categories", {})  # type: ignore[assignment]
-    if stem in categories:
-        return categories[stem]
-    if "default" in categories:
-        return categories["default"]
-    raise KeyError(f"カテゴリ設定が見つかりません: {stem}")
+    categories: dict[str, object] = config.get("categories", {})  # type: ignore[assignment]
+
+    race_dir_match = _RACE_DIR_PATTERN.fullmatch(md_path.parent.name)
+    if race_dir_match is None:
+        if "default" not in categories:
+            raise KeyError(f"カテゴリ設定が見つかりません: default ({md_path.name})")
+        return list(categories["default"])  # type: ignore[call-overload]
+
+    if "race" not in categories or "article" not in categories:
+        raise KeyError(f"カテゴリ設定が見つかりません: race / article ({md_path.name})")
+    article_categories: dict[str, list[str]] = categories["article"]  # type: ignore[assignment]
+    if md_path.stem not in article_categories:
+        raise KeyError(f"カテゴリ設定が見つかりません: article.{md_path.stem}")
+    race_categories: list[str] = categories["race"]  # type: ignore[assignment]
+    names = [*race_categories, *article_categories[md_path.stem], race_dir_match.group(1)]
+    return list(dict.fromkeys(names))
 
 
 def main() -> None:
@@ -445,7 +462,7 @@ def _publish_md(
     """
     content = md_path.read_text(encoding="utf-8")
     title = extract_title(content)
-    categories = load_categories(config_path, md_path.stem)
+    categories = load_categories(config_path, md_path)
     content_without_h1 = _remove_h1(content)
 
     content_with_urls = _replace_image_paths(
