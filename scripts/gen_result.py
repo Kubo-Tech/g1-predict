@@ -65,7 +65,7 @@ def generate_result(race_code: str) -> None:
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     os.makedirs(race_dir, exist_ok=True)
-    output_path = os.path.join(race_dir, "結果.md")
+    output_path = os.path.join(race_dir, "回顧.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"Generated: {output_path}")

@@ -58,10 +58,10 @@ flowchart TD
     TPL --> GP
     TPL --> GR
 
-    GT --> MD1[public/年/race/傾向.md]
+    GT --> MD1[public/年/race/過去の傾向.md]
     GTB --> XLSX[public/年/race/table/*.xlsx]
     GP --> MD2[public/年/race/予想.md]
-    GR --> MD3[public/年/race/結果.md]
+    GR --> MD3[public/年/race/回顧.md]
 
     MD1 --> PUSH[main へ push]
     MD2 --> PUSH
@@ -102,7 +102,7 @@ g1-predict/
 │   ├── TEMPLATE_RESULT.md          # 結果記事の骨組み
 │   └── points/{レース名}.md         # レース固有の「ポイント」原稿（手書き）
 ├── public/{年}/{race_code}_{レース名}/
-│   ├── 傾向.md / 前日の傾向.md / 予想.md / 結果.md
+│   ├── 過去の傾向.md / 前日の傾向.md / 予想.md / 回顧.md
 │   ├── table/{race_code}_{レース名}.xlsx
 │   ├── img/                        # 記事に貼る画像（table/ patrol/ result/ など任意）
 │   └── ../.hatena_entry_ids.json   # 投稿済みエントリ ID と画像 URL の記録

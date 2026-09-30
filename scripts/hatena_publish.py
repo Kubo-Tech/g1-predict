@@ -94,7 +94,7 @@ def load_categories(config_path: Path, stem: str) -> list[str]:
 
     Args:
         config_path (Path): hatena.ymlのパス
-        stem (str): ファイルstem（例: "予想", "結果"）
+        stem (str): ファイルstem（例: "予想", "回顧"）
 
     Returns:
         list[str]: カテゴリ名のリスト

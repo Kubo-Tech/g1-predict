@@ -751,7 +751,7 @@ def test_generate_predict_creates_file_in_race_subdir(
 def test_generate_predict_does_not_create_trend_file(
     dirs: tuple[str, str],
 ) -> None:
-    """gen_predict は傾向.md を生成しない。
+    """gen_predict は過去の傾向.md を生成しない。
 
     Args:
         dirs (tuple[str, str]): public・templates ディレクトリ。
@@ -759,7 +759,7 @@ def test_generate_predict_does_not_create_trend_file(
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(), public_dir, templates_dir)
     assert not os.path.exists(
-        os.path.join(public_dir, "2026", "2026013105010110_天皇賞春", "傾向.md")
+        os.path.join(public_dir, "2026", "2026013105010110_天皇賞春", "過去の傾向.md")
     )
 
 

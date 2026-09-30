@@ -91,4 +91,4 @@ pytest test/unit
 python -m scripts.gen_trend --race-code 2026061409030411
 ```
 
-生成物は `public/{年}/{race_code}_{レース名}/傾向.md` に出力される。動作確認で作った生成物をコミットしないよう注意する。
+生成物は `public/{年}/{race_code}_{レース名}/過去の傾向.md` に出力される。動作確認で作った生成物をコミットしないよう注意する。

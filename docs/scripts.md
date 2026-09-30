@@ -10,12 +10,12 @@
 
 | スクリプト | DB | TFJV | configs | templates | 出力 |
 | --- | --- | --- | --- | --- | --- |
-| `gen_trend` | ○ | − | `trends` | − | `傾向.md` |
+| `gen_trend` | ○ | − | `trends` | − | `過去の傾向.md` |
 | `gen_table` | ○ | − | `table` | − | `table/*.xlsx` |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_predict` | ○ | 読み | − | `TEMPLATE_PREDICT.md`, `points/` | `予想.md` |
 | `gen_result_comment` | ○ | 書き | − | − | TFJV の `KEK_COM` |
-| `gen_result` | ○ | 読み | − | `TEMPLATE_RESULT.md` | `結果.md` |
+| `gen_result` | ○ | 読み | − | `TEMPLATE_RESULT.md` | `回顧.md` |
 | `hatena_publish` | − | − | `hatena.yml` | − | はてなブログ記事 |
 
 ---
@@ -26,12 +26,12 @@
 python -m scripts.gen_trend --race-code 2026061409030411
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/傾向.md`
+出力: `public/{開催年}/{race_code}_{レース名}/過去の傾向.md`
 
 処理:
 
 1. `RaceGetter.get_race_shosai()` でレース名（`kyosomei_hondai`）と開催年を取得する。
-2. `configs/{レース名}.yml` の `trends` を読み込む。**ファイルが無い場合や `trends` が空の場合は、見出し行だけの `傾向.md` を出力する**（エラーにはならない）。
+2. `configs/{レース名}.yml` の `trends` を読み込む。**ファイルが無い場合や `trends` が空の場合は、見出し行だけの `過去の傾向.md` を出力する**（エラーにはならない）。
 3. `build_trend_sections()` が、カテゴリ（`出走馬傾向` / `騎手傾向` など YAML のキー）ごとに metric を集計し、Markdown テーブルへ整形する。
 4. `# {レース名}{年}傾向分析` を先頭に、カテゴリセクションを連結して書き出す。
 
@@ -168,7 +168,7 @@ python -m scripts.gen_result_comment --race-code 2026061409030411
 python -m scripts.gen_result --race-code 2026061409030411
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/結果.md`
+出力: `public/{開催年}/{race_code}_{レース名}/回顧.md`
 
 タイトルは `# {レース名}{年}回顧`。`templates/TEMPLATE_RESULT.md` の `## 結果` と `## 回顧` を埋める（`## 総評` は空のまま。手で書く）。
 
