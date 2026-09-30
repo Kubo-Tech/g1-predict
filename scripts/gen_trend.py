@@ -43,7 +43,7 @@ def generate_trend(race_code: str) -> None:
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     os.makedirs(race_dir, exist_ok=True)
-    output_path = os.path.join(race_dir, "傾向.md")
+    output_path = os.path.join(race_dir, "過去の傾向.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"Generated: {output_path}")
@@ -66,18 +66,17 @@ def _build_trend_sections(
 
     Args:
         race_code (str): 16桁 JRA-VAN 形式の race_code。
-        race_label (str): configファイル名に使うレース名。
+        race_label (str): configディレクトリ名に使うレース名。
         race_info (pd.DataFrame): レース基本情報DataFrame。
 
     Returns:
         dict[str, str]: カテゴリ名 -> Markdownセクション文字列。
     """
-    config_path = os.path.join(_CONFIGS_DIR, f"{race_label}.yml")
+    config_path = os.path.join(_CONFIGS_DIR, race_label, "trends.yml")
     if not os.path.isfile(config_path):
         return {}
     with open(config_path, encoding="utf-8") as f:
-        config: dict[str, Any] = yaml.safe_load(f) or {}
-    trends_config = config.get("trends")
+        trends_config: dict[str, Any] | None = yaml.safe_load(f)
     if not trends_config:
         return {}
     return build_trend_sections(race_code, race_info, trends_config)

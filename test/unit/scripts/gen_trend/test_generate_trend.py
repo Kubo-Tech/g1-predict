@@ -80,21 +80,21 @@ def _read_output(public_dir: str, year: str, race_code: str, race_name: str) -> 
     Returns:
         str: 生成ファイルの内容。
     """
-    path = os.path.join(public_dir, year, f"{race_code}_{race_name}", "傾向.md")
+    path = os.path.join(public_dir, year, f"{race_code}_{race_name}", "過去の傾向.md")
     with open(path, encoding="utf-8") as f:
         return f.read()
 
 
 # 正常系
 def test_generate_trend_creates_file_in_race_subdir(public_dir: str) -> None:
-    """生成ファイルが {race_code}_{race_name}/傾向.md に作成される。
+    """生成ファイルが {race_code}_{race_name}/過去の傾向.md に作成される。
 
     Args:
         public_dir (str): public ディレクトリパス。
     """
     _run(_make_mock_race_getter(), public_dir)
     assert os.path.exists(
-        os.path.join(public_dir, "2026", "2026013105010110_天皇賞春", "傾向.md")
+        os.path.join(public_dir, "2026", "2026013105010110_天皇賞春", "過去の傾向.md")
     )
 
 

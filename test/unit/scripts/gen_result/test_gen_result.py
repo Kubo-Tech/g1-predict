@@ -51,7 +51,7 @@ def dirs(tmp_path: pytest.TempPathFactory) -> tuple[str, str]:
     os.makedirs(templates_dir)
     with open(os.path.join(templates_dir, "TEMPLATE_RESULT.md"), "w", encoding="utf-8") as f:
         f.write(
-            "# {RaceName}{Year}結果\n\n"
+            "# {RaceName}{Year}回顧\n\n"
             "## 結果\n\n"
             "## 総評\n\n"
             "## 回顧\n"
@@ -84,19 +84,19 @@ def _run(
 
 
 def _read_md(public_dir: str, race_code: str, race_name: str, year: str) -> str:
-    path = os.path.join(public_dir, year, f"{race_code}_{race_name}", "結果.md")
+    path = os.path.join(public_dir, year, f"{race_code}_{race_name}", "回顧.md")
     with open(path, encoding="utf-8") as f:
         return f.read()
 
 
 # 正常系
 def test_gen_result_creates_file_in_race_subdir(dirs: tuple[str, str]) -> None:
-    """結果.md が {race_code}_{race_name}/結果.md に作成される。"""
+    """回顧.md が {race_code}_{race_name}/回顧.md に作成される。"""
     public_dir, templates_dir = dirs
     mock_di = _make_mock_di([_normal_row(1, 5, "ホースA")])
     _run(mock_di, public_dir, templates_dir)
     assert os.path.exists(
-        os.path.join(public_dir, _YEAR, f"{_RACE_CODE}_{_RACE_NAME}", "結果.md")
+        os.path.join(public_dir, _YEAR, f"{_RACE_CODE}_{_RACE_NAME}", "回顧.md")
     )
 
 
@@ -106,7 +106,7 @@ def test_gen_result_title_format(dirs: tuple[str, str]) -> None:
     mock_di = _make_mock_di([_normal_row(1, 5, "ホースA")])
     _run(mock_di, public_dir, templates_dir)
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
-    assert content.startswith(f"# {_RACE_NAME}{_YEAR}結果")
+    assert content.startswith(f"# {_RACE_NAME}{_YEAR}回顧")
 
 
 def test_gen_result_has_sohyo_section(dirs: tuple[str, str]) -> None:

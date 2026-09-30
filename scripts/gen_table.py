@@ -54,16 +54,16 @@ def generate_table(race_code: str) -> None:
     race_label = to_race_label(race_name)
     race_year = int(str(race_info["開催年"].iloc[0]))
 
-    config_path = os.path.join(_CONFIGS_DIR, f"{race_label}.yml")
+    config_path = os.path.join(_CONFIGS_DIR, race_label, "table.yml")
     with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+        table_config = yaml.safe_load(f)
 
     entry_df = di.get_entry(race_code)
     # DB照合（sire_race_chakujun等のrace_name_for_history既定値）に使うため競走名本題を渡す
     ctx = TableContext(race_code, race_year, race_name, entry_df, di)
 
     sheet_data = []
-    for sheet_name, columns in config["table"].items():
+    for sheet_name, columns in table_config.items():
         col_configs = _FIXED_COLS + columns
 
         rows = []

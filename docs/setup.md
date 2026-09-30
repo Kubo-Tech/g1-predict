@@ -32,7 +32,7 @@ pip install -e ".[dev]"
 | `mykeibadb-python`（GitHub / `develop` ブランチ） | DB 直接アクセスと着度数集計（`analytics`） |
 | `openpyxl` | 分析表（xlsx）の書き出し |
 | `python-dotenv` | `.env` の読み込み |
-| `pyyaml` | `configs/*.yml` の読み込み |
+| `pyyaml` | `configs/` 配下の YAML の読み込み |
 | `requests` | はてなブログ AtomPub / Fotolife API |
 
 `keiba-domain` は `keiba-data-interface` の依存だが、PyPI に存在せず GitHub からしか取得できないため、**このリポジトリの直接依存としても明示している**。書かないと依存解決が `No matching distribution found for keiba-domain` で失敗する。
@@ -91,4 +91,4 @@ pytest test/unit
 python -m scripts.gen_trend --race-code 2026061409030411
 ```
 
-生成物は `public/{年}/{race_code}_{レース名}/傾向.md` に出力される。動作確認で作った生成物をコミットしないよう注意する。
+生成物は `public/{年}/{race_code}_{レース名}/過去の傾向.md` に出力される。動作確認で作った生成物をコミットしないよう注意する。

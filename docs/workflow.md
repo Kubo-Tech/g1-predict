@@ -4,21 +4,21 @@
 
 ```mermaid
 flowchart LR
-    A[configs/レース名.yml<br/>templates/points/] --> B[gen_trend<br/>傾向.md]
+    A[configs/レース名/<br/>templates/points/] --> B[gen_trend<br/>過去の傾向.md]
     B --> C[gen_table<br/>xlsx → img/table]
     C --> D[TARGET で印を付ける]
     D --> P[gen_prev_day_trend<br/>前日の傾向.md]
     P --> E[gen_predict<br/>予想.md]
     E --> F[レース]
     F --> G[gen_result_comment<br/>TARGET へ書き戻し]
-    G --> H[gen_result<br/>結果.md]
+    G --> H[gen_result<br/>回顧.md]
     H --> I[main へ push → 自動投稿]
 ```
 
 ## 0. 事前準備（そのレースを初めて扱うとき）
 
-- `configs/{レース名}.yml` を用意する → [config-reference.md](config-reference.md)
-- `templates/points/{レース名}.md` にそのレースの狙い・格言を書く（`gen_predict` の `## ポイント` に流し込まれる）
+- `configs/{レース名}/trends.yml` と `table.yml` を用意する → [config-reference.md](config-reference.md)
+- `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書く（`gen_predict` の `## ポイント` 見出しの下に流し込まれる）
 
 ## 1. 傾向分析（週の前半）
 
@@ -26,7 +26,7 @@ flowchart LR
 python -m scripts.gen_trend --race-code 2026061409030411
 ```
 
-`public/2026/2026061409030411_宝塚記念/傾向.md` が生成される。ここから手で仕上げる。
+`public/2026/2026061409030411_宝塚記念/過去の傾向.md` が生成される。ここから手で仕上げる。
 
 - 各表の下に `> 一言コメント` を足す（引用記法で書くのが既存記事のスタイル）。
 - 見出し直下に「※ 展開に関係する項目は開催4日目良馬場の21,22年のみを集計」のような集計方針の但し書きを足す。
@@ -83,7 +83,7 @@ TARGET 側で回顧コメントを手入力する運用でもよい。その場�
 python -m scripts.gen_result --race-code 2026061409030411
 ```
 
-`結果.md` が生成される。`## 結果`（3着まで）と `## 回顧`（各馬のコメント）が埋まった状態なので、`## 総評` を書き、レース当日の写真やパトロールビデオのキャプチャ（`img/result/`、`img/patrol/`）を貼って仕上げる。
+`回顧.md` が生成される。`## 結果`（3着まで）と `## 回顧`（各馬のコメント）が埋まった状態なので、`## 総評` を書き、レース当日の写真やパトロールビデオのキャプチャ（`img/result/`、`img/patrol/`）を貼って仕上げる。
 
 ## 8. 公開
 
@@ -99,9 +99,9 @@ python -m scripts.gen_result --race-code 2026061409030411
 
 | ファイル名 | 用途 | はてなカテゴリ |
 | --- | --- | --- |
-| `傾向.md` | 傾向分析 | `競馬` |
-| `前日の傾向.md` | 前日の馬場傾向 | `競馬` |
-| `予想.md` | 予想 | `競馬` `競馬予想` `G1予想` |
-| `結果.md` | 結果・回顧 | `競馬` `競馬予想` `G1回顧` `G1結果` |
+| `過去の傾向.md` | 傾向分析 | `競馬` `G1` `傾向分析` レース名 |
+| `前日の傾向.md` | 前日の馬場傾向 | `競馬` `G1` `馬場傾向` レース名 |
+| `予想.md` | 予想 | `競馬` `G1` `競馬予想` レース名 |
+| `回顧.md` | 結果・回顧 | `競馬` `G1` `レース回顧` レース名 |
 
-カテゴリはファイル名（拡張子を除いた stem）で決まる。`configs/hatena.yml` に無いファイル名は `default` のカテゴリになる。
+カテゴリは `configs/hatena.yml` の設定とファイル名（拡張子を除いた stem）で決まり、ディレクトリ名のレース名（例: `スプリンターズS`）も付く。レース記事のディレクトリに上記以外のファイル名の md を置くと、投稿時に `KeyError` で失敗する。

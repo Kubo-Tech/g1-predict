@@ -170,16 +170,15 @@ def test_build_metric_condition_years_less_than_one_raises() -> None:
         build_metric_condition(base_condition, 2026, {"years": 0})
 
 
-# --- configs/宝塚記念.yml ---
+# --- configs/宝塚記念/trends.yml ---
 
 
 def test_takarazuka_yaml_loads_all_trend_categories() -> None:
-    """宝塚記念.yml の trends が全カテゴリを欠損なく読み込める。"""
-    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念.yml")
+    """宝塚記念/trends.yml が全カテゴリを欠損なく読み込める。"""
+    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念", "trends.yml")
     with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+        trends = yaml.safe_load(f)
 
-    trends = config["trends"]
     assert set(trends.keys()) == {"出走馬傾向", "騎手傾向", "生産者傾向", "血統傾向"}
 
     metric_names = [m["name"] for m in trends["出走馬傾向"]]
@@ -206,23 +205,22 @@ def test_takarazuka_yaml_loads_all_trend_categories() -> None:
 
 
 def test_takarazuka_yaml_jockey_and_breeder_use_all_entries() -> None:
-    """宝塚記念.yml の騎手・生産者が all_entries で今回出走対象を全表示する。"""
-    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念.yml")
+    """宝塚記念/trends.yml の騎手・生産者が all_entries で今回出走対象を全表示する。"""
+    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念", "trends.yml")
     with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+        trends = yaml.safe_load(f)
 
-    trends = config["trends"]
     assert trends["騎手傾向"][0]["rows"] == {"type": "all_entries"}
     assert trends["生産者傾向"][0]["rows"] == {"type": "all_entries"}
 
 
 def test_takarazuka_yaml_gate_number_condition_is_hanshin_4th_day_good_track() -> None:
     """枠順は阪神4日目良馬場のみのconditionを持つ。"""
-    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念.yml")
+    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念", "trends.yml")
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    gate_number_cfg = config["trends"]["出走馬傾向"][0]
+    gate_number_cfg = config["出走馬傾向"][0]
     assert gate_number_cfg["name"] == "枠順"
     assert gate_number_cfg["condition"] == {
         "years": 10,
