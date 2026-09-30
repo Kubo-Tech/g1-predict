@@ -66,5 +66,5 @@ test/unit/
    - 傾向表（trends）: `g1_predict/modules/gen_trend/_trend_stats.py` の `compute_stats()` に分岐を追加する。行の出し方を変える場合は `_trend_renderer.py`、集計範囲を変える場合は `_trend_loader.py`。
    - 分析表（table）: `g1_predict/modules/gen_table/table_context.py` の `get_value()` に分岐を追加する。統計計算は `table_stat.py`、DB アクセスは `table_data_cache.py`、色ルール・フィルタは `table_utils.py`。
 4. 単体テストを追加する。
-5. `configs/{レース名}.yml` を更新し、実データで生成して表が欠損なく出ることを確認する。**動作確認で生成した記事や xlsx はコミットしない**。
+5. `configs/{レース名}/` の YAML を更新し、実データで生成して表が欠損なく出ることを確認する。**動作確認で生成した記事や xlsx はコミットしない**。
 6. [config-reference.md](config-reference.md) の一覧に追記する。

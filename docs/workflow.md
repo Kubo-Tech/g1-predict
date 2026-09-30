@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    A[configs/レース名.yml<br/>templates/points/] --> B[gen_trend<br/>過去の傾向.md]
+    A[configs/レース名/<br/>templates/points/] --> B[gen_trend<br/>過去の傾向.md]
     B --> C[gen_table<br/>xlsx → img/table]
     C --> D[TARGET で印を付ける]
     D --> P[gen_prev_day_trend<br/>前日の傾向.md]
@@ -17,7 +17,7 @@ flowchart LR
 
 ## 0. 事前準備（そのレースを初めて扱うとき）
 
-- `configs/{レース名}.yml` を用意する → [config-reference.md](config-reference.md)
+- `configs/{レース名}/trends.yml` と `table.yml` を用意する → [config-reference.md](config-reference.md)
 - `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書く（`gen_predict` の `## ポイント` 見出しの下に流し込まれる）
 
 ## 1. 傾向分析（週の前半）

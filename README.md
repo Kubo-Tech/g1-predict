@@ -28,7 +28,7 @@ pip install -e .
 #    MYKEIBADB_HOST / MYKEIBADB_PORT / MYKEIBADB_DATABASE / MYKEIBADB_USER / MYKEIBADB_PASSWORD
 #    TFJV_DATA_DIR（TARGET frontier JV のデータディレクトリ。既定は ./MY_DATA）
 
-# 3. レースごとの設定ファイルを用意する（configs/{レース名}.yml）
+# 3. レースごとの設定ファイルを用意する（configs/{レース名}/trends.yml, table.yml）
 
 # 4. 実行（race_code は16桁の JRA-VAN レースコード）
 python -m scripts.gen_trend          --race-code 2026061409030411
@@ -60,7 +60,7 @@ g1-predict/
 - [docs/setup.md](docs/setup.md) — セットアップと環境変数
 - [docs/workflow.md](docs/workflow.md) — レース1本分の作業手順
 - [docs/scripts.md](docs/scripts.md) — 各スクリプトの仕様
-- [docs/config-reference.md](docs/config-reference.md) — `configs/*.yml` の全リファレンス
+- [docs/config-reference.md](docs/config-reference.md) — `configs/{レース名}/*.yml` の全リファレンス
 - [docs/tfjv-data.md](docs/tfjv-data.md) — TARGET frontier JV 連携
 - [docs/hatena-publish.md](docs/hatena-publish.md) — はてなブログ自動投稿
 - [docs/development.md](docs/development.md) — 開発フロー・CI・テスト

@@ -6,12 +6,12 @@
 
 - 記事生成系はいずれも出力ファイルを**上書き**する。手で書き足した後に再実行すると編集内容は失われる。
 - `race_code` は16桁の数字であることを検証する。出力先のディレクトリ名にはレース名（DB の値）が入るため、パス区切り文字などが混ざっていないこと、組み立てたパスが `public/` 配下に収まることも確認してから書き込む。いずれかに反する場合は `ValueError` で停止する。
-- 出力先ディレクトリ・ファイル名、`configs/{レース名}.yml` / `templates/points/{レース名}.md` の参照、記事タイトルで使う「レース名」は、`g1_predict/modules/utils/race_name.py` の `to_race_label()` で競走名本題（`kyosomei_hondai`）を変換した値。`RACE_NAME_ABBREVIATIONS` に登録されているレースは略称になる（例: 「スプリンターズステークス」→「スプリンターズS」）。登録が無いレースは競走名本題がそのまま使われる。DB照合が必要な箇所（`gen_table` の `TableContext` など）には競走名本題（変換前の値）を渡す。
+- 出力先ディレクトリ・ファイル名、`configs/{レース名}/` / `templates/points/{レース名}.md` の参照、記事タイトルで使う「レース名」は、`g1_predict/modules/utils/race_name.py` の `to_race_label()` で競走名本題（`kyosomei_hondai`）を変換した値。`RACE_NAME_ABBREVIATIONS` に登録されているレースは略称になる（例: 「スプリンターズステークス」→「スプリンターズS」）。登録が無いレースは競走名本題がそのまま使われる。DB照合が必要な箇所（`gen_table` の `TableContext` など）には競走名本題（変換前の値）を渡す。
 
 | スクリプト | DB | TFJV | configs | templates | 出力 |
 | --- | --- | --- | --- | --- | --- |
-| `gen_trend` | ○ | − | `trends` | − | `過去の傾向.md` |
-| `gen_table` | ○ | − | `table` | − | `table/*.xlsx` |
+| `gen_trend` | ○ | − | `trends.yml` | − | `過去の傾向.md` |
+| `gen_table` | ○ | − | `table.yml` | − | `table/*.xlsx` |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_predict` | ○ | 読み | − | `TEMPLATE_PREDICT.md`, `points/` | `予想.md` |
 | `gen_result_comment` | ○ | 書き | − | − | TFJV の `KEK_COM` |
@@ -31,7 +31,7 @@ python -m scripts.gen_trend --race-code 2026061409030411
 処理:
 
 1. `RaceGetter.get_race_shosai()` でレース名（`kyosomei_hondai`）と開催年を取得する。
-2. `configs/{レース名}.yml` の `trends` を読み込む。**ファイルが無い場合や `trends` が空の場合は、見出し行だけの `過去の傾向.md` を出力する**（エラーにはならない）。
+2. `configs/{レース名}/trends.yml` を読み込む。**ファイルが無い場合や中身が空の場合は、見出し行だけの `過去の傾向.md` を出力する**（エラーにはならない）。
 3. `build_trend_sections()` が、カテゴリ（`出走馬傾向` / `騎手傾向` など YAML のキー）ごとに metric を集計し、Markdown テーブルへ整形する。
 4. `# {レース名}{年}傾向分析` を先頭に、カテゴリセクションを連結して書き出す。
 
@@ -66,8 +66,8 @@ python -m scripts.gen_table --race-code 2026061409030411
 処理:
 
 1. `DataInterface.get_race_basic_info()` でレース名・開催年を取得する。
-2. `configs/{レース名}.yml` の `table` を読み込む。**`table` セクションが無い場合は `KeyError` になる**（`trends` と違い、未定義は許容されない）。
-3. `table` 直下のキーがシート名（例: `出走馬` / `騎手` / `生産者` / `種牡馬`）。
+2. `configs/{レース名}/table.yml` を読み込む。**ファイルが無い場合は `FileNotFoundError` になる**（`trends.yml` と違い、未定義は許容されない）。
+3. `table.yml` の最上位のキーがシート名（例: `出走馬` / `騎手` / `生産者` / `種牡馬`）。
 4. 各シートは、固定列（`枠` / `馬番` / `馬名`）＋ YAML で定義した列で構成される。
 5. 出走各馬について `TableContext.get_value()` が `source.type` に従い値を取得する。
 6. `openpyxl` で xlsx に書き出す。
