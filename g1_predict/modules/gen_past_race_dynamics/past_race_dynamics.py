@@ -7,7 +7,7 @@ import pandas as pd
 from evaluation import RaceDynamicsResult
 from keiba_data_interface import DataInterface
 from keiba_data_interface.utils.race_code import race_code_to_race_id
-from keiba_domain import RaceShubetsu
+from keiba_domain import CENTRAL_KEIBAJO_CODES, RaceShubetsu
 from matplotlib.figure import Figure
 from mykeibadb import RaceGetter
 from mykeibadb.analytics import get_race_display_names
@@ -24,7 +24,7 @@ from g1_predict.modules.utils.race_result import grade_display, race_display_nam
 
 # 標準化散布図を保存する、記事ディレクトリからの相対ディレクトリ
 _IMAGE_DIR = "img/past_dynamics"
-_NETKEIBA_SHUTUBA_URL = "https://race.netkeiba.com/race/shutuba.html?race_id={race_id}"
+_NETKEIBA_RESULT_URL = "https://race.netkeiba.com/race/result.html?race_id={race_id}"
 _STRAIGHT_RACE_NOTE = "1000m直線コースのため展開評価の対象外。"
 _NO_PAST_RACE_NOTE = "中央の平地で出走した過去走なし。"
 _SUMMARY_TEXT = "過去走の展開評価を開く"
@@ -107,7 +107,7 @@ def build_past_race_dynamics_body(
     for umaban in race_data.valid_horse_num:
         horse_name = str(horses.loc[umaban, "馬名"]).strip()
         other_ids = {horse_id for num, horse_id in horse_ids.items() if num != umaban}
-        horse_races = [past_races[code] for code in selected[umaban]]
+        horse_races = [(runs_ago, past_races[code]) for runs_ago, code in selected[umaban]]
         args = (umaban, horse_name, horse_ids[umaban], other_ids, horse_races)
         lines.extend(_build_horse_details_lines(*args))
         lines.append("")
@@ -120,12 +120,14 @@ def build_past_race_dynamics_body(
     return PastRaceDynamicsBody(text="\n".join(lines), images=images)
 
 
-def _select_past_race_codes(race_data: RaceData, umaban: int, num_past_races: int) -> list[str]:
-    """馬の直近の過去走のrace_codeを新しい順に選ぶ。
+def _select_past_race_codes(
+    race_data: RaceData, umaban: int, num_past_races: int
+) -> list[tuple[int, str]]:
+    """馬の直近の過去走のうち、展開評価を載せるレースを新しい順に選ぶ。
 
-    対象レースより前に、中央の平地で実際に出走したレースだけを数える。
-    出走取消・発走除外・競走除外のレースと、レース自体が成立していない（結果が無い）レース、
-    障害レースは数えない。
+    何走前かは、地方・海外・障害を含めて実際に出走したレースで数える。出走取消・発走除外・
+    競走除外のレースと、レース自体が成立していない（結果が無い）レースは走数に数えない。
+    そのうち中央の平地のレースだけを、num_past_races 件まで選ぶ。
 
     Args:
         race_data (RaceData): 対象レースのRaceData（過去成績・過去走の基本情報を取得済み）。
@@ -133,9 +135,9 @@ def _select_past_race_codes(race_data: RaceData, umaban: int, num_past_races: in
         num_past_races (int): 選ぶ過去走の数。
 
     Returns:
-        list[str]: 過去走のrace_codeのリスト（新しい順、最大num_past_races件）。
+        list[tuple[int, str]]: (何走前, 過去走のrace_code) のリスト（新しい順）。
     """
-    pp_df = race_data.get_filtered_past_performances(umaban)
+    pp_df = race_data.past_performances_dict[umaban]
     basic_info = race_data.past_race_basic_info_df.set_index("レースコード")
     ijo_codes = pp_df["異常区分コード"].astype(str).str.strip()
     # 結果が1件も無いレース（開催中止など）は、確定着順が無く異常区分も正常のまま
@@ -143,32 +145,37 @@ def _select_past_race_codes(race_data: RaceData, umaban: int, num_past_races: in
     started = held & ~ijo_codes.isin(_NOT_STARTED_IJO_CODES)
     pp_df = pp_df[started].sort_values("レースコード", ascending=False)
 
-    codes: list[str] = []
-    for code in pp_df["レースコード"].astype(str):
+    selected: list[tuple[int, str]] = []
+    for runs_ago, (_, row) in enumerate(pp_df.iterrows(), start=1):
+        code = str(row["レースコード"])
+        if str(row["競馬場コード"]).strip() not in CENTRAL_KEIBAJO_CODES:
+            continue
         if basic_info.loc[code, "レース種別"] != RaceShubetsu.HEICHI:
             continue
-        codes.append(code)
-        if len(codes) == num_past_races:
+        selected.append((runs_ago, code))
+        if len(selected) == num_past_races:
             break
-    return codes
+    return selected
 
 
 def _evaluate_past_races(
     race_data: RaceData,
-    selected: dict[int, list[str]],
+    selected: dict[int, list[tuple[int, str]]],
     data_interface: DataInterface,
 ) -> dict[str, _PastRace]:
     """選ばれた過去走を、重複を除いて1レースずつ展開評価する。
 
     Args:
         race_data (RaceData): 対象レースのRaceData（過去走の基本情報を取得済み）。
-        selected (dict[int, list[str]]): 馬番 → 過去走のrace_codeのリスト。
+        selected (dict[int, list[tuple[int, str]]]): 馬番 → (何走前, 過去走のrace_code) のリスト。
         data_interface (DataInterface): 展開評価に使うDataInterface。
 
     Returns:
         dict[str, _PastRace]: 過去走のrace_code → 展開評価を終えた過去走。
     """
-    race_codes = list(dict.fromkeys(code for codes in selected.values() for code in codes))
+    race_codes = list(
+        dict.fromkeys(code for horse_races in selected.values() for _, code in horse_races)
+    )
     basic_info = race_data.past_race_basic_info_df.set_index("レースコード", drop=False)
     unified_names = get_race_display_names(RaceGetter().connection_manager, race_codes)
 
@@ -201,11 +208,11 @@ def _build_race_title(
         unified_names (dict[str, str]): race_code → 統一した競走名本題。
 
     Returns:
-        str: `{年}年{月}月{日}日 [{レース名}]({出馬表URL}) ({グレード})`。
+        str: `{年}年{月}月{日}日 [{レース名}]({結果ページのURL}) ({グレード})`。
             グレードが無いレースは括弧を付けない。
     """
     race_date = datetime.strptime(race_code[0:8], "%Y%m%d")
-    url = _NETKEIBA_SHUTUBA_URL.format(race_id=race_code_to_race_id(race_code))
+    url = _NETKEIBA_RESULT_URL.format(race_id=race_code_to_race_id(race_code))
     name = race_display_name(race_info, unified_names)
     title = f"{race_date.year}年{race_date.month}月{race_date.day}日 [{name}]({url})"
     grade = grade_display(race_info)
@@ -219,7 +226,7 @@ def _build_horse_details_lines(
     horse_name: str,
     horse_id: str,
     other_horse_ids: set[str],
-    horse_races: list[_PastRace],
+    horse_races: list[tuple[int, _PastRace]],
 ) -> list[str]:
     """1頭分のセクション（馬名のh2見出しと、過去走を収めた折りたたみ要素）の行リストを生成する。
 
@@ -231,7 +238,7 @@ def _build_horse_details_lines(
         horse_name (str): 馬名。
         horse_id (str): 馬の血統登録番号。
         other_horse_ids (set[str]): 対象レースの他の出走馬の血統登録番号。
-        horse_races (list[_PastRace]): 馬の過去走（新しい順）。
+        horse_races (list[tuple[int, _PastRace]]): (何走前, 過去走) のリスト（新しい順）。
 
     Returns:
         list[str]: Markdownの行リスト。
@@ -244,14 +251,15 @@ def _build_horse_details_lines(
     ]
     if not horse_races:
         lines.extend([_NO_PAST_RACE_NOTE, ""])
-    for past_race in horse_races:
-        lines.extend(_build_past_race_lines(past_race, horse_id, other_horse_ids))
+    for runs_ago, past_race in horse_races:
+        lines.extend(_build_past_race_lines(runs_ago, past_race, horse_id, other_horse_ids))
         lines.append("")
     lines.append("</details>")
     return lines
 
 
 def _build_past_race_lines(
+    runs_ago: int,
     past_race: _PastRace,
     horse_id: str,
     other_horse_ids: set[str],
@@ -259,6 +267,7 @@ def _build_past_race_lines(
     """過去走1レース分の行リストを生成する。
 
     Args:
+        runs_ago (int): 何走前か。
         past_race (_PastRace): 展開評価を終えた過去走。
         horse_id (str): 折りたたみの主の馬の血統登録番号。
         other_horse_ids (set[str]): 対象レースの他の出走馬の血統登録番号。
@@ -266,7 +275,7 @@ def _build_past_race_lines(
     Returns:
         list[str]: Markdownの行リスト（末尾に空行は含まない）。
     """
-    lines = [f"### {past_race.title}", ""]
+    lines = [f"### {runs_ago}走前: {past_race.title}", ""]
     dynamics = past_race.dynamics
     if dynamics is None:
         lines.append(_STRAIGHT_RACE_NOTE)
