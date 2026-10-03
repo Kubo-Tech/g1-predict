@@ -1,11 +1,79 @@
-"""レース結果の馬毎の行を記事の表示用に整形するユーティリティ。"""
+"""レース名・レース結果の馬毎の行を記事の表示用に整形するユーティリティ。"""
+
+from collections.abc import Mapping
 
 import pandas as pd
+
+from g1_predict.modules.constants import GRADE_CODE_DISPLAY
 
 # 脚質判定コード → 表示名
 KYAKUSHITSU_DISPLAY: dict[str, str] = {"1": "逃げ", "2": "先行", "3": "差し", "4": "追込"}
 # 脚質の表示名 → 表で使う1文字の略称
 KYAKUSHITSU_SHORT: dict[str, str] = {"逃げ": "逃", "先行": "先", "差し": "差", "追込": "追"}
+# 競走条件コード → 条件名の表示名
+_KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
+    "701": "新馬",
+    "703": "未勝利",
+    "005": "1勝クラス",
+    "010": "2勝クラス",
+    "016": "3勝クラス",
+    "999": "オープン",
+}
+
+
+def race_condition_display(race_info: pd.DataFrame) -> str:
+    """競走条件の表示名を返す。
+
+    競走条件名称があればそれを使い、無ければ競走条件コードから表示名を引く。
+
+    Args:
+        race_info (pd.DataFrame): レース基本情報DataFrame（1行）。
+
+    Returns:
+        str: 競走条件の表示名。
+    """
+    cond_raw = race_info["競走条件名称"].iloc[0]
+    if pd.notna(cond_raw) and str(cond_raw).strip():
+        return str(cond_raw).strip()
+    joken_code_raw = race_info["競走条件コード"].iloc[0]
+    joken_code = str(joken_code_raw) if pd.notna(joken_code_raw) else ""
+    return _KYOSO_JOKEN_CODE_DISPLAY.get(joken_code, "")
+
+
+def grade_display(race_info: pd.DataFrame) -> str:
+    """レースのグレードの表示名を返す。
+
+    Args:
+        race_info (pd.DataFrame): レース基本情報DataFrame（1行）。
+
+    Returns:
+        str: グレードの表示名（G1・G2・G3・Lなど）。グレードが無いレースは空文字列。
+    """
+    grade_code = str(race_info["グレードコード"].iloc[0])
+    return GRADE_CODE_DISPLAY.get(grade_code, "")
+
+
+def race_display_name(race_info: pd.DataFrame, unified_names: Mapping[str, str]) -> str:
+    """記事に載せるレース名を返す。
+
+    競走名本題があるレース（特別レース）は、重賞を特別競走番号ごとの最新名に統一した名前、
+    競走名本題が無い条件戦は競走条件の表示名を返す。
+
+    Args:
+        race_info (pd.DataFrame): レース基本情報DataFrame（1行）。
+        unified_names (Mapping[str, str]): race_code → 統一した競走名本題。
+            競走名本題があるレースのrace_codeを含むこと。
+
+    Returns:
+        str: 記事に載せるレース名。
+
+    Raises:
+        KeyError: 競走名本題があるレースのrace_codeが unified_names に無い場合。
+    """
+    hondai = race_info["競走名本題"].iloc[0]
+    if pd.isna(hondai) or not str(hondai).strip():
+        return race_condition_display(race_info)
+    return unified_names[str(race_info["レースコード"].iloc[0])].strip()
 
 
 def kyakushitsu_display(row: pd.Series) -> str:

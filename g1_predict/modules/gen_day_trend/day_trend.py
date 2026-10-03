@@ -12,7 +12,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MaxNLocator, PercentFormatter
 from mykeibadb import RaceGetter
 
-from g1_predict.modules.constants import GRADE_CODE_DISPLAY, TRACK_CODE_TO_SHIBA_DA
+from g1_predict.modules.constants import TRACK_CODE_TO_SHIBA_DA
 from g1_predict.modules.utils.race_dynamics import (
     DYNAMICS_COLUMNS,
     DYNAMICS_DESCRIPTION,
@@ -23,18 +23,11 @@ from g1_predict.modules.utils.race_result import (
     KYAKUSHITSU_DISPLAY,
     format_corner4,
     format_halon,
+    grade_display,
     halon_rank,
     kyakushitsu_display,
+    race_condition_display,
 )
-
-_KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
-    "701": "新馬",
-    "703": "未勝利",
-    "005": "1勝クラス",
-    "010": "2勝クラス",
-    "016": "3勝クラス",
-    "999": "オープン",
-}
 
 # MATLABの標準色（線・棒の既定の色順）
 _MATLAB_COLORS: tuple[str, ...] = (
@@ -255,32 +248,12 @@ def _race_label(race_info: pd.DataFrame, venue_name: str, race_no: int) -> str:
     Returns:
         str: レースラベル文字列。
     """
-    condition = _race_condition(race_info)
-    grade_code = str(race_info["グレードコード"].iloc[0])
-    grade_display = GRADE_CODE_DISPLAY.get(grade_code, "")
+    condition = race_condition_display(race_info)
+    grade = grade_display(race_info)
 
-    if grade_display:
-        return f"{venue_name}{race_no}R {condition}({grade_display})"
+    if grade:
+        return f"{venue_name}{race_no}R {condition}({grade})"
     return f"{venue_name}{race_no}R {condition}"
-
-
-def _race_condition(race_info: pd.DataFrame) -> str:
-    """競走条件の表示名を返す。
-
-    競走条件名称があればそれを使い、無ければ競走条件コードから表示名を引く。
-
-    Args:
-        race_info (pd.DataFrame): レース基本情報DataFrame。
-
-    Returns:
-        str: 競走条件の表示名。
-    """
-    cond_raw = race_info["競走条件名称"].iloc[0]
-    if pd.notna(cond_raw) and str(cond_raw).strip():
-        return str(cond_raw).strip()
-    joken_code_raw = race_info["競走条件コード"].iloc[0]
-    joken_code = str(joken_code_raw) if pd.notna(joken_code_raw) else ""
-    return _KYOSO_JOKEN_CODE_DISPLAY.get(joken_code, "")
 
 
 def _dynamics_chart_path(kind: DayTrendKind) -> str:

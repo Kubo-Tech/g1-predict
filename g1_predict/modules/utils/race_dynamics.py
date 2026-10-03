@@ -1,5 +1,6 @@
 """記事に載せる展開評価（相関係数の表・標準化散布図・総合評価の表）を生成するユーティリティ。"""
 
+from collections.abc import Collection
 from datetime import date
 
 import pandas as pd
@@ -100,14 +101,20 @@ def build_dynamics_table_lines(cor_df: pd.DataFrame) -> list[str]:
 def build_total_evaluation_table_lines(
     eval_df: pd.DataFrame,
     result_df: pd.DataFrame,
+    bold_row_horse_nums: Collection[int] = (),
+    bold_name_horse_nums: Collection[int] = (),
 ) -> list[str]:
     """馬ごとの展開の総合評価を、評価値の高い順に並べた表を生成する。
 
     総合評価が無い馬（競走除外など）は載せない。
+    太字は、行全体と馬名のセルだけのどちらかを馬番で指定できる。
+    両方に含まれる馬番は行全体を太字にする。
 
     Args:
         eval_df (pd.DataFrame): 展開評価の馬ごとの評価DataFrame（馬番・総合評価カラムを使う）。
         result_df (pd.DataFrame): レース結果DataFrame（馬番・確定着順・馬名カラムを使う）。
+        bold_row_horse_nums (Collection[int]): 行のすべてのセルを太字にする馬の馬番。
+        bold_name_horse_nums (Collection[int]): 馬名のセルだけを太字にする馬の馬番。
 
     Returns:
         list[str]: Markdownの表の行リスト（ヘッダー・区切り・各馬の行）。
@@ -122,5 +129,10 @@ def build_total_evaluation_table_lines(
         chakujun_str = f"{int(chakujun)}着" if pd.notna(chakujun) else "-"
         # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
         value = round(float(row["総合評価"]), 2) + 0.0
-        lines.append(f"| {chakujun_str} | {umaban} | {horse['馬名']} | {value:+.2f} |")
+        cells = [chakujun_str, str(umaban), str(horse["馬名"]), f"{value:+.2f}"]
+        if umaban in bold_row_horse_nums:
+            cells = [f"**{cell}**" for cell in cells]
+        elif umaban in bold_name_horse_nums:
+            cells[2] = f"**{cells[2]}**"
+        lines.append("| " + " | ".join(cells) + " |")
     return lines
