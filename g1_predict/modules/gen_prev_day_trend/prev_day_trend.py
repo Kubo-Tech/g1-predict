@@ -8,6 +8,7 @@ from evaluation import evaluate_race_dynamics, make_time_plot
 from keiba_data_interface import DataInterface
 from keiba_domain import keibajo_from_code
 from matplotlib.figure import Figure
+from matplotlib.font_manager import FontProperties
 from mykeibadb import RaceGetter
 from race_data import RaceData
 
@@ -22,6 +23,12 @@ _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "999": "オープン",
 }
 
+# 展開評価の相関係数カラムと、展開グラフでの線の色（MATLABの標準色の先頭3色）
+_DYNAMICS_COLUMNS: tuple[str, ...] = ("差し有利度", "外枠有利度", "外有利度")
+_DYNAMICS_COLORS: tuple[str, ...] = ("#0072BD", "#D95319", "#EDB120")
+_DYNAMICS_CHART_PATH = "img/prev_day/dynamics.png"
+_JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
+
 
 @dataclass(frozen=True)
 class PrevDayTrendBody:
@@ -30,9 +37,9 @@ class PrevDayTrendBody:
     Attributes:
         text (str): 記事本文（Markdown）。対象レースが1件もない場合は空文字列。
         images (dict[str, Figure]): 記事ディレクトリからの相対パス
-            （例: "img/prev_day/xxx.png"）から、展開評価の標準化散布図への
-            マッピング。対象レースが1件もない、または全レースが展開評価の
-            対象外の場合は空辞書。
+            （例: "img/prev_day/xxx.png"）から画像へのマッピング。展開グラフ
+            （img/prev_day/dynamics.png）と、展開評価の対象レースごとの
+            標準化散布図を持つ。対象レースが1件もない場合は空辞書。
     """
 
     text: str
@@ -114,7 +121,7 @@ def build_prev_day_trend_body(
     blocks: list[str] = [
         _build_dememe_section(top3_entries),
         "",
-        _build_dynamics_section(matched_races, venue_name),
+        _build_dynamics_section(),
         "",
         "## 各レース",
         "",
@@ -124,11 +131,10 @@ def build_prev_day_trend_body(
         blocks.append(_format_race_block(race, venue_name))
         blocks.append("")
 
-    images = {
-        f"img/prev_day/{race.prev_race_code}.png": race.figure
-        for race in matched_races
-        if race.figure is not None
-    }
+    images: dict[str, Figure] = {_DYNAMICS_CHART_PATH: _make_dynamics_chart(matched_races)}
+    for race in matched_races:
+        if race.figure is not None:
+            images[f"img/prev_day/{race.prev_race_code}.png"] = race.figure
 
     return PrevDayTrendBody(text="\n".join(blocks), images=images)
 
@@ -272,12 +278,8 @@ def _format_correlation(cor_df: pd.DataFrame | None, column: str) -> str:
     return f"{round(float(value), 2) + 0.0:+.2f}"
 
 
-def _build_dynamics_section(matched_races: list[_MatchedRace], venue_name: str) -> str:
+def _build_dynamics_section() -> str:
     """展開セクションを生成する。
-
-    Args:
-        matched_races (list[_MatchedRace]): 前日にマッチしたレースのリスト。
-        venue_name (str): 競馬場表示名。
 
     Returns:
         str: 展開セクション文字列（## 展開から始まる）。
@@ -288,17 +290,40 @@ def _build_dynamics_section(matched_races: list[_MatchedRace], venue_name: str) 
         "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
         "内外の位置と走破タイムの相関係数。正なら差し・外枠・外を回した馬が有利。",
         "",
-        "| レース | 差し有利度 | 外枠有利度 | 外有利度 |",
-        "| --- | --- | --- | --- |",
+        f"![展開]({_DYNAMICS_CHART_PATH})",
     ]
-    for race in matched_races:
-        race_no = int(race.race_info["レース番号"].iloc[0])
-        label = _race_label(race.race_info, venue_name, race_no)
-        sashi = _format_correlation(race.cor_df, "差し有利度")
-        soto_waku = _format_correlation(race.cor_df, "外枠有利度")
-        soto = _format_correlation(race.cor_df, "外有利度")
-        lines.append(f"| {label} | {sashi} | {soto_waku} | {soto} |")
     return "\n".join(lines)
+
+
+def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
+    """各レースの差し有利度・外枠有利度・外有利度の折れ線グラフを生成する。
+
+    横軸はレースを等間隔に並べてレース番号を目盛りにし、縦軸は-1から1とする。
+    展開評価の対象外レースや値が無いレースは線を途切れさせる。
+
+    Args:
+        matched_races (list[_MatchedRace]): 前日にマッチしたレースのリスト。
+
+    Returns:
+        Figure: 展開グラフ。
+    """
+    figure = Figure(figsize=(8, 4))
+    ax = figure.subplots()
+    positions = list(range(len(matched_races)))
+    for column, color in zip(_DYNAMICS_COLUMNS, _DYNAMICS_COLORS, strict=True):
+        values = [
+            float(race.cor_df[column].iloc[0]) if race.cor_df is not None else float("nan")
+            for race in matched_races
+        ]
+        ax.plot(positions, values, color=color, marker="o", label=column)
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.set_ylim(-1, 1)
+    ax.set_xticks(positions)
+    ax.set_xticklabels([f"{int(race.race_info['レース番号'].iloc[0])}R" for race in matched_races])
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(prop=_JAPANESE_FONT)
+    figure.tight_layout()
+    return figure
 
 
 def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
@@ -348,6 +373,16 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
         ]
         lines.append("| " + " | ".join(cols) + " |")
 
+    if race.cor_df is not None:
+        values = [_format_correlation(race.cor_df, column) for column in _DYNAMICS_COLUMNS]
+        lines.extend(
+            [
+                "",
+                "| " + " | ".join(_DYNAMICS_COLUMNS) + " |",
+                "| --- | --- | --- |",
+                "| " + " | ".join(values) + " |",
+            ]
+        )
     if race.figure is not None:
         image_path = f"img/prev_day/{race.prev_race_code}.png"
         lines.append("")

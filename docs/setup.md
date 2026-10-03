@@ -33,7 +33,7 @@ pip install -e ".[dev]"
 | `race-data`（GitHub） | レースデータの取得・判定（`RaceData`）。`race-dynamics-evaluation` が要求する |
 | `feature-value-utils`（GitHub、private） | 統計量計算。`race-dynamics-evaluation` が要求する |
 | `race-dynamics-evaluation`（GitHub、private） | 展開評価（差し有利度・外枠有利度・外有利度）の計算とプロット |
-| `matplotlib` | 展開評価の標準化散布図の生成 |
+| `matplotlib` | 展開評価の標準化散布図と展開グラフの生成。展開グラフの凡例に Noto Sans CJK JP フォントを使う |
 | `openpyxl` | 分析表（xlsx）の書き出し |
 | `python-dotenv` | `.env` の読み込み |
 | `pyyaml` | `configs/` 配下の YAML の読み込み |

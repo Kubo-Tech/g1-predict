@@ -379,81 +379,94 @@ def test_build_prev_day_trend_body_dynamics_description() -> None:
     ) in result.text
 
 
-def test_build_prev_day_trend_body_dynamics_table_header() -> None:
-    """展開セクションの表ヘッダーが レース/差し有利度/外枠有利度/外有利度 になる。"""
+def test_build_prev_day_trend_body_dynamics_section_has_chart_link() -> None:
+    """展開セクションに展開グラフの画像を載せる。"""
     result = _call()
-    assert "| レース | 差し有利度 | 外枠有利度 | 外有利度 |" in result.text
+    section = result.text[result.text.index("## 展開") : result.text.index("## 各レース")]
+    assert "![展開](img/prev_day/dynamics.png)" in section
+    assert "|" not in section
 
 
-def test_build_prev_day_trend_body_dynamics_row_values_signed_two_decimals() -> None:
-    """展開セクションの行の値が符号付き小数2桁で表示される。"""
+def test_build_prev_day_trend_body_race_block_table_between_top3_and_image() -> None:
+    """レースブロックで、上位3頭の表と標準化散布図の間に有利度の表を空行で挟んで載せる。"""
+    mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(race_no=6))
+    raw = _make_raw_shosai(race_code="2026050405010106")
     cor_df = _make_cor_df(sashi=0.451, soto_waku=-0.123, soto=0.3)
-    result = _call(cor_df=cor_df)
-    assert "| +0.45 | -0.12 | +0.30 |" in result.text
+    result = _call(mock_di=mock_di, raw_shosai=raw, venue_name="東京", cor_df=cor_df)
+    assert (
+        " |\n\n| 差し有利度 | 外枠有利度 | 外有利度 |\n| --- | --- | --- |\n"
+        "| +0.45 | -0.12 | +0.30 |\n\n![東京6R 標準化散布図](img/prev_day/2026050405010106.png)"
+    ) in result.text
 
 
-def test_build_prev_day_trend_body_dynamics_row_negative_zero_is_plus_zero() -> None:
+def test_build_prev_day_trend_body_race_table_negative_zero_is_plus_zero() -> None:
     """0に丸まる負の値は -0.00 ではなく +0.00 と表示される。"""
     cor_df = _make_cor_df(sashi=-0.001, soto_waku=-0.004, soto=0.0)
     result = _call(cor_df=cor_df)
     assert "| +0.00 | +0.00 | +0.00 |" in result.text
 
 
-def test_build_prev_day_trend_body_dynamics_row_nan_is_dash() -> None:
-    """外有利度がNaN（全馬最内）の場合、展開セクションの値が - になる。"""
+def test_build_prev_day_trend_body_race_table_nan_is_dash() -> None:
+    """外有利度がNaN（全馬最内）の場合、有利度の表の値が - になる。"""
     cor_df = _make_cor_df(soto=float("nan"))
     result = _call(cor_df=cor_df)
-    assert "| -" in result.text
     assert "| +0.45 | -0.12 | - |" in result.text
 
 
-def test_build_prev_day_trend_body_dynamics_row_label_uses_race_heading_elements() -> None:
-    """展開セクションの行のレース列が見出しと同じ要素（競馬場・R・条件・グレード）で作られる。"""
-    mock_di = _make_mock_di(
-        prev_race_info=_make_prev_race_info(
-            race_no=6, grade_code="A", condition_name="天皇賞春"
-        )
-    )
-    result = _call(mock_di=mock_di, venue_name="阪神")
-    assert "| 阪神6R 天皇賞春(G1) | " in result.text
-
-
-def test_build_prev_day_trend_body_straight_race_dynamics_row_is_dash() -> None:
-    """直線コースの場合、展開セクションの値がすべて - になる。"""
+def test_build_prev_day_trend_body_straight_race_has_no_table_and_image_link() -> None:
+    """直線コースの場合、レースブロックに有利度の表と画像リンクを載せない。"""
     mock_race_data = _make_mock_race_data(is_straight_race=True)
     result = _call(mock_race_data=mock_race_data)
-    assert "| -" in result.text
-    assert "| +0.45" not in result.text
-
-
-def test_build_prev_day_trend_body_race_block_has_image_link() -> None:
-    """対象レースブロックの上位3頭の表の後に空行を挟んで標準化散布図の画像を載せる。"""
-    mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(race_no=6))
-    raw = _make_raw_shosai(race_code="2026050405010106")
-    result = _call(mock_di=mock_di, raw_shosai=raw, venue_name="東京")
-    assert "\n\n![東京6R 標準化散布図](img/prev_day/2026050405010106.png)" in result.text
-
-
-def test_build_prev_day_trend_body_straight_race_has_no_image_link() -> None:
-    """直線コースの場合、レースブロックに画像リンクを載せない。"""
-    mock_race_data = _make_mock_race_data(is_straight_race=True)
-    result = _call(mock_race_data=mock_race_data)
+    assert "| 差し有利度" not in result.text
     assert "標準化散布図" not in result.text
 
 
 def test_build_prev_day_trend_body_images_keyed_by_relative_path() -> None:
-    """images が記事ディレクトリからの相対パスをキーとしてFigureを保持する。"""
+    """images が記事ディレクトリからの相対パスをキーとして展開グラフと散布図を保持する。"""
     raw = _make_raw_shosai(race_code="2026050405010106")
     figure = MagicMock(name="Figure")
     result = _call(raw_shosai=raw, figure=figure)
-    assert result.images == {"img/prev_day/2026050405010106.png": figure}
+    assert set(result.images) == {
+        "img/prev_day/dynamics.png",
+        "img/prev_day/2026050405010106.png",
+    }
+    assert result.images["img/prev_day/2026050405010106.png"] is figure
 
 
-def test_build_prev_day_trend_body_straight_race_has_no_images() -> None:
-    """直線コースの場合、images が空辞書になる。"""
+def test_build_prev_day_trend_body_straight_race_has_only_dynamics_chart() -> None:
+    """直線コースの場合、images は展開グラフだけになる。"""
     mock_race_data = _make_mock_race_data(is_straight_race=True)
     result = _call(mock_race_data=mock_race_data)
-    assert result.images == {}
+    assert set(result.images) == {"img/prev_day/dynamics.png"}
+
+
+def test_build_prev_day_trend_body_dynamics_chart_lines() -> None:
+    """展開グラフは有利度ごとにMATLAB標準色の折れ線を持ち、縦軸は-1〜1、横軸はレース番号。"""
+    mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(race_no=6))
+    cor_df = _make_cor_df(sashi=0.451, soto_waku=-0.123, soto=0.3)
+    result = _call(mock_di=mock_di, cor_df=cor_df)
+    ax = result.images["img/prev_day/dynamics.png"].axes[0]
+    labels = ("差し有利度", "外枠有利度", "外有利度")
+    lines = [line for line in ax.get_lines() if line.get_label() in labels]
+    assert [line.get_label() for line in lines] == ["差し有利度", "外枠有利度", "外有利度"]
+    assert [line.get_color() for line in lines] == ["#0072BD", "#D95319", "#EDB120"]
+    assert [float(line.get_ydata()[0]) for line in lines] == pytest.approx([0.451, -0.123, 0.3])
+    assert ax.get_ylim() == (-1, 1)
+    assert [label.get_text() for label in ax.get_xticklabels()] == ["6R"]
+
+
+def test_build_prev_day_trend_body_dynamics_chart_places_races_evenly() -> None:
+    """展開グラフはレース番号に関係なくレースを等間隔に並べる。"""
+    raw = pd.concat(
+        [
+            _make_raw_shosai(race_code="2026050405010103", race_bango=3),
+            _make_raw_shosai(race_code="2026050405010111", race_bango=11),
+        ],
+        ignore_index=True,
+    )
+    result = _call(raw_shosai=raw)
+    ax = result.images["img/prev_day/dynamics.png"].axes[0]
+    assert list(ax.get_lines()[0].get_xdata()) == [0, 1]
 
 
 def test_build_prev_day_trend_body_race_data_uses_target_race_date_as_reference() -> None:
