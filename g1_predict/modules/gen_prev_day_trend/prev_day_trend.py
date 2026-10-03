@@ -5,10 +5,12 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 from evaluation import evaluate_race_dynamics, make_time_plot
+from evaluation.params import WAKU_TO_COLOR_DICT
 from keiba_data_interface import DataInterface
 from keiba_domain import keibajo_from_code
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
+from matplotlib.ticker import MaxNLocator
 from mykeibadb import RaceGetter
 from race_data import RaceData
 
@@ -23,9 +25,15 @@ _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "999": "オープン",
 }
 
-# 展開評価の相関係数カラムと、展開グラフでの線の色（MATLABの標準色の先頭3色）
+# MATLABの標準色（線・棒の既定の色順）
+_MATLAB_COLORS: tuple[str, ...] = (
+    "#0072BD", "#D95319", "#EDB120", "#7E2F8E", "#77AC30", "#4DBEEE", "#A2142F",
+)
+# 展開評価の相関係数カラム
 _DYNAMICS_COLUMNS: tuple[str, ...] = ("差し有利度", "外枠有利度", "外有利度")
-_DYNAMICS_COLORS: tuple[str, ...] = ("#0072BD", "#D95319", "#EDB120")
+# 脚質判定コード → 表示名
+_KYAKUSHITSU_DISPLAY: dict[str, str] = {"1": "逃げ", "2": "先行", "3": "差し", "4": "追込"}
+_KYAKUSHITSU_URL = "http://next5.jra-van.jp/appli/kyakushitsu3.html"
 _DYNAMICS_CHART_PATH = "img/prev_day/dynamics.png"
 _JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
 
@@ -118,8 +126,9 @@ def build_prev_day_trend_body(
         for _, horse_row in top3.iterrows():
             top3_entries.append((horse_row, result_df))
 
+    dememe_text, dememe_images = _build_dememe_section(top3_entries)
     blocks: list[str] = [
-        _build_dememe_section(top3_entries),
+        dememe_text,
         "",
         _build_dynamics_section(),
         "",
@@ -131,7 +140,10 @@ def build_prev_day_trend_body(
         blocks.append(_format_race_block(race, venue_name))
         blocks.append("")
 
-    images: dict[str, Figure] = {_DYNAMICS_CHART_PATH: _make_dynamics_chart(matched_races)}
+    images: dict[str, Figure] = {
+        **dememe_images,
+        _DYNAMICS_CHART_PATH: _make_dynamics_chart(matched_races),
+    }
     for race in matched_races:
         if race.figure is not None:
             images[f"img/prev_day/{race.prev_race_code}.png"] = race.figure
@@ -310,7 +322,7 @@ def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
     figure = Figure(figsize=(8, 4))
     ax = figure.subplots()
     positions = list(range(len(matched_races)))
-    for column, color in zip(_DYNAMICS_COLUMNS, _DYNAMICS_COLORS, strict=True):
+    for column, color in zip(_DYNAMICS_COLUMNS, _MATLAB_COLORS, strict=False):
         values = [
             float(race.cor_df[column].iloc[0]) if race.cor_df is not None else float("nan")
             for race in matched_races
@@ -347,8 +359,8 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
     lines: list[str] = [
         heading,
         "",
-        "| 着順 | 枠 | 馬番 | 人気 | 4角通過順位 | 後3ハロン | 後3ハロン順位 |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| 着順 | 枠 | 馬番 | 人気 | 4角通過順位 | 脚質 | 後3ハロン | 後3ハロン順位 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for _, horse_row in top3.iterrows():
         place = int(horse_row["確定着順"])
@@ -358,6 +370,7 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
 
         corner4 = horse_row["4コーナー順位"]
         corner4_str = f"{int(corner4)}番手" if pd.notna(corner4) else "-"
+        kyakushitsu_str = _kyakushitsu_display(horse_row) or "-"
 
         halon = horse_row["後3ハロン"]
         if pd.notna(halon):
@@ -369,7 +382,7 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
 
         cols = [
             f"{place}着", f"{gate}枠", f"{horse_no}番", f"{ninki}人気",
-            corner4_str, halon_str, rank_str,
+            corner4_str, kyakushitsu_str, halon_str, rank_str,
         ]
         lines.append("| " + " | ".join(cols) + " |")
 
@@ -391,53 +404,97 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
     return "\n".join(lines)
 
 
-def _build_dememe_section(top3_entries: list[tuple[pd.Series, pd.DataFrame]]) -> str:
+def _build_dememe_section(
+    top3_entries: list[tuple[pd.Series, pd.DataFrame]],
+) -> tuple[str, dict[str, Figure]]:
     """前日全レースの出目集計セクションを生成する。
+
+    人気・枠番・脚質・上がり順位ごとに、3着以内に入った頭数の棒グラフを載せる。
 
     Args:
         top3_entries (list[tuple[pd.Series, pd.DataFrame]]): (horse_row, result_df) のリスト。
 
     Returns:
         str: 出目セクション文字列（## 出目から始まる）。
+        dict[str, Figure]: 記事ディレクトリからの相対パスから棒グラフへのマッピング。
     """
     rows = [row for row, _ in top3_entries]
-
-    ninki_vals = [f"{c}頭" for c in _count_ninki(rows)]
-    waku_vals = [f"{_count_waku(rows).get(i, 0)}頭" for i in range(1, 9)]
+    waku_counts = _count_waku(rows)
     kyaku_counts = _count_kyakushitsu(rows)
-    kyaku_vals = [f"{kyaku_counts.get(k, 0)}頭" for k in ["逃", "先", "差", "追"]]
-    agari_vals = [f"{c}頭" for c in _count_agari_rank(top3_entries)]
+    ninki_labels = ["1人気", "2人気", "3人気", "4-6人気", "7-9人気", "10人気以下"]
+    agari_labels = ["1位", "2位", "3位", "4-6位", "7-9位", "10位以下"]
 
-    lines: list[str] = [
-        "## 出目",
-        "",
-        "3着以内に入った頭数",
-        "",
-        "**人気**",
-        "",
-        "| 1人気 | 2人気 | 3人気 | 4-6人気 | 7-9人気 | 10人気以下 |",
-        "| --- | --- | --- | --- | --- | --- |",
-        "| " + " | ".join(ninki_vals) + " |",
-        "",
-        "**枠番**",
-        "",
-        "| 1枠 | 2枠 | 3枠 | 4枠 | 5枠 | 6枠 | 7枠 | 8枠 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
-        "| " + " | ".join(waku_vals) + " |",
-        "",
-        "**脚質**",
-        "",
-        "| 逃げ | 先行 | 差し | 追込 |",
-        "| --- | --- | --- | --- |",
-        "| " + " | ".join(kyaku_vals) + " |",
-        "",
-        "**上がり順位**",
-        "",
-        "| 1位 | 2位 | 3位 | 4-6位 | 7-9位 | 10位以下 |",
-        "| --- | --- | --- | --- | --- | --- |",
-        "| " + " | ".join(agari_vals) + " |",
+    # (項目名, 見出しのリンク先, 画像ファイル名, 目盛りラベル, 頭数, 棒の色)
+    charts: list[tuple[str, str | None, str, list[str], list[int], list[str]]] = [
+        ("人気", None, "dememe_ninki", ninki_labels, _count_ninki(rows), list(_MATLAB_COLORS)),
+        (
+            "枠番",
+            None,
+            "dememe_waku",
+            [f"{waku}枠" for waku in range(1, 9)],
+            [waku_counts[waku] for waku in range(1, 9)],
+            [WAKU_TO_COLOR_DICT[waku] for waku in range(1, 9)],
+        ),
+        (
+            "脚質",
+            _KYAKUSHITSU_URL,
+            "dememe_kyakushitsu",
+            list(_KYAKUSHITSU_DISPLAY.values()),
+            [kyaku_counts[name] for name in _KYAKUSHITSU_DISPLAY.values()],
+            list(_MATLAB_COLORS),
+        ),
+        (
+            "上がり順位",
+            None,
+            "dememe_agari",
+            agari_labels,
+            _count_agari_rank(top3_entries),
+            list(_MATLAB_COLORS),
+        ),
     ]
-    return "\n".join(lines)
+
+    lines: list[str] = ["## 出目", "", "3着以内に入った頭数"]
+    images: dict[str, Figure] = {}
+    for name, url, file_name, labels, counts, colors in charts:
+        image_path = f"img/prev_day/{file_name}.png"
+        heading = f"[{name}]({url})" if url is not None else name
+        lines.extend(["", f"**{heading}**", "", f"![{name}]({image_path})"])
+        images[image_path] = _make_bar_chart(labels, counts, colors)
+    return "\n".join(lines), images
+
+
+def _make_bar_chart(labels: list[str], counts: list[int], colors: list[str]) -> Figure:
+    """頭数の棒グラフを生成する。
+
+    棒の上に頭数を表示し、縦軸の目盛りは整数にする。
+
+    Args:
+        labels (list[str]): 横軸の目盛りラベル。
+        counts (list[int]): 各ラベルの頭数。
+        colors (list[str]): 各棒の色（labels より多い分は使わない）。
+
+    Returns:
+        Figure: 棒グラフ。
+    """
+    figure = Figure(figsize=(6, 3))
+    ax = figure.subplots()
+    positions = list(range(len(labels)))
+    bars = ax.bar(
+        positions,
+        counts,
+        color=colors[: len(labels)],
+        edgecolor="black",
+        linewidth=0.8,
+    )
+    ax.bar_label(bars)
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels, fontproperties=_JAPANESE_FONT)
+    ax.set_ylim(0, max([*counts, 1]) + 1)
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.grid(True, axis="y", linestyle="--", alpha=0.5)
+    ax.set_axisbelow(True)
+    figure.tight_layout()
+    return figure
 
 
 def _count_ninki(rows: list[pd.Series]) -> list[int]:
@@ -491,24 +548,35 @@ def _count_waku(rows: list[pd.Series]) -> dict[int, int]:
 
 
 def _count_kyakushitsu(rows: list[pd.Series]) -> dict[str, int]:
-    """脚質（逃/先/差/追）ごとの頭数を返す。
+    """脚質（逃げ/先行/差し/追込）ごとの頭数を返す。
 
     Args:
         rows (list[pd.Series]): 馬毎レース結果の行リスト。
 
     Returns:
-        dict[str, int]: 脚質名をキーとした頭数辞書。
+        dict[str, int]: 脚質の表示名をキーとした頭数辞書。
     """
-    code_map = {"1": "逃", "2": "先", "3": "差", "4": "追"}
-    counts: dict[str, int] = {"逃": 0, "先": 0, "差": 0, "追": 0}
+    counts: dict[str, int] = {name: 0 for name in _KYAKUSHITSU_DISPLAY.values()}
     for row in rows:
-        code = row.get("脚質判定コード", "")
-        if pd.isna(code) or str(code).strip() == "":
-            continue
-        display = code_map.get(str(code).strip())
+        display = _kyakushitsu_display(row)
         if display:
             counts[display] += 1
     return counts
+
+
+def _kyakushitsu_display(row: pd.Series) -> str:
+    """馬毎レース結果の行から脚質の表示名を返す。
+
+    Args:
+        row (pd.Series): 馬毎レース結果の行。
+
+    Returns:
+        str: 脚質の表示名（逃げ/先行/差し/追込）。脚質判定コードが無い場合は空文字列。
+    """
+    code = row.get("脚質判定コード", "")
+    if pd.isna(code):
+        return ""
+    return _KYAKUSHITSU_DISPLAY.get(str(code).strip(), "")
 
 
 def _count_agari_rank(

@@ -96,11 +96,13 @@ python -m scripts.gen_prev_day_trend --race-code 2026061409030411
 構成:
 
 - `# {レース名}{年}前日の傾向`
-- `## 出目` … 3着以内に入った馬を、人気・枠番・脚質・上がり順位のグループごとに頭数集計した表。
-- `## 展開` … [race-dynamics-evaluation](https://github.com/KeibaAI-developer/race-dynamics-evaluation) で計算した差し有利度・外枠有利度・外有利度の折れ線グラフの画像。横軸はレースを等間隔に並べてレース番号を目盛りにし、縦軸は -1〜1。線の色は MATLAB の標準色（青・オレンジ・黄）。NaN と1000m直線コース（展開評価の対象外）のレースでは線が途切れる。凡例の日本語表示に Noto Sans CJK JP フォントを使う。
-- `## 各レース` … レースごとの `### {競馬場}{R}R {条件} {距離}m {頭数}頭` と、3着以内の枠・馬番・人気・4角通過順・上がり3F・上がり順位の表。1000m直線コース以外は、その後に差し有利度・外枠有利度・外有利度の表（符号付き小数2桁、NaN は `-`）と、展開評価の標準化散布図（`make_time_plot`）の画像リンクが続く。
+- `## 出目` … 3着以内に入った馬を、人気・枠番・脚質・上がり順位のグループごとに頭数集計した棒グラフ。項目ごとに太字の見出しと画像を1枚ずつ載せ、脚質の見出しは JRA-VAN の脚質判定の説明ページ（http://next5.jra-van.jp/appli/kyakushitsu3.html）へのリンクにする。棒の色は MATLAB の標準色で、枠番だけは各枠の色（race-dynamics-evaluation の `WAKU_TO_COLOR_DICT`）。
+- `## 展開` … [race-dynamics-evaluation](https://github.com/KeibaAI-developer/race-dynamics-evaluation) で計算した差し有利度・外枠有利度・外有利度の折れ線グラフの画像。横軸はレースを等間隔に並べてレース番号を目盛りにし、縦軸は -1〜1。線の色は MATLAB の標準色（青・オレンジ・黄）。NaN と1000m直線コース（展開評価の対象外）のレースでは線が途切れる。
+- `## 各レース` … レースごとの `### {競馬場}{R}R {条件} {距離}m {頭数}頭` と、3着以内の枠・馬番・人気・4角通過順・脚質・上がり3F・上がり順位の表。1000m直線コース以外は、その後に差し有利度・外枠有利度・外有利度の表（符号付き小数2桁、NaN は `-`）と、展開評価の標準化散布図（`make_time_plot`）の画像リンクが続く。
 
-画像は `public/{開催年}/{race_code}_{レース名}/img/prev_day/` に、展開グラフは `dynamics.png`、標準化散布図は `{前日のrace_code}.png` の名前で保存される。保存とクローズは `scripts/gen_prev_day_trend.py` が行い、`g1_predict/modules/gen_prev_day_trend/prev_day_trend.py` はMarkdown本文と画像（Figure）を `PrevDayTrendBody` として返すだけでファイルを書かない。
+グラフの日本語表示には Noto Sans CJK JP フォントを使う。
+
+画像は `public/{開催年}/{race_code}_{レース名}/img/prev_day/` に、出目の棒グラフは `dememe_ninki.png` / `dememe_waku.png` / `dememe_kyakushitsu.png` / `dememe_agari.png`、展開グラフは `dynamics.png`、標準化散布図は `{前日のrace_code}.png` の名前で保存される。保存とクローズは `scripts/gen_prev_day_trend.py` が行い、`g1_predict/modules/gen_prev_day_trend/prev_day_trend.py` はMarkdown本文と画像（Figure）を `PrevDayTrendBody` として返すだけでファイルを書かない。
 
 前日に対象となるレースが1つも無い場合は、タイトル行だけの記事が出力される。
 

@@ -4,11 +4,19 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from matplotlib.colors import to_hex
 
 from g1_predict.modules.gen_prev_day_trend.prev_day_trend import (
     PrevDayTrendBody,
     build_prev_day_trend_body,
 )
+
+_DEMEME_IMAGE_PATHS = {
+    "img/prev_day/dememe_ninki.png",
+    "img/prev_day/dememe_waku.png",
+    "img/prev_day/dememe_kyakushitsu.png",
+    "img/prev_day/dememe_agari.png",
+}
 
 
 def _make_race_info(keibajo_code: str = "05", track_code: str = "10") -> pd.DataFrame:
@@ -220,20 +228,23 @@ def test_build_prev_day_trend_body_has_dememe_header() -> None:
 
 
 @pytest.mark.parametrize(
-    "label, header_row",
+    "heading, image_link",
     [
-        pytest.param("人気", "| 1人気 |", id="ninki"),
-        pytest.param("枠番", "| 1枠 |", id="waku"),
-        pytest.param("脚質", "| 逃げ |", id="kyakushitsu"),
-        pytest.param("上がり順位", "| 1位 |", id="agari"),
+        pytest.param("**人気**", "![人気](img/prev_day/dememe_ninki.png)", id="ninki"),
+        pytest.param("**枠番**", "![枠番](img/prev_day/dememe_waku.png)", id="waku"),
+        pytest.param(
+            "**[脚質](http://next5.jra-van.jp/appli/kyakushitsu3.html)**",
+            "![脚質](img/prev_day/dememe_kyakushitsu.png)",
+            id="kyakushitsu",
+        ),
+        pytest.param("**上がり順位**", "![上がり順位](img/prev_day/dememe_agari.png)", id="agari"),
     ],
 )
-def test_build_prev_day_trend_body_blank_line_between_label_and_table(
-    label: str, header_row: str
-) -> None:
-    """出目の各見出しと表の間に空行を入れる（はてなブログで表として描画されるため）。"""
+def test_build_prev_day_trend_body_dememe_heading_then_chart(heading: str, image_link: str) -> None:
+    """出目の各見出しの下に、空行を挟んで棒グラフの画像を載せる。"""
     result = _call()
-    assert f"**{label}**\n\n{header_row}" in result.text
+    assert f"{heading}\n\n{image_link}" in result.text
+    assert "頭 |" not in result.text
 
 
 def test_build_prev_day_trend_body_has_each_race_header() -> None:
@@ -310,32 +321,57 @@ def test_build_prev_day_trend_body_prev_date_passed_to_race_getter() -> None:
     )
 
 
-def test_build_prev_day_trend_body_ninki_count(simple_result_df: pd.DataFrame) -> None:
-    """出目の人気カウントが正しい（1人気1頭, 4-6人気1頭, 10人気以下1頭）。"""
+def _bar_heights(figure: object) -> list[float]:
+    """棒グラフのFigureから棒の高さを取り出す。"""
+    ax = figure.axes[0]  # type: ignore[attr-defined]
+    return [patch.get_height() for patch in ax.patches]
+
+
+@pytest.mark.parametrize(
+    "image_path, expected",
+    [
+        pytest.param("img/prev_day/dememe_ninki.png", [1, 0, 0, 1, 0, 1], id="ninki"),
+        pytest.param("img/prev_day/dememe_waku.png", [1, 0, 1, 0, 0, 0, 0, 1], id="waku"),
+        pytest.param("img/prev_day/dememe_kyakushitsu.png", [1, 1, 0, 1], id="kyakushitsu"),
+        pytest.param("img/prev_day/dememe_agari.png", [1, 1, 1, 0, 0, 0], id="agari"),
+    ],
+)
+def test_build_prev_day_trend_body_dememe_counts(
+    simple_result_df: pd.DataFrame, image_path: str, expected: list[int]
+) -> None:
+    """出目の棒グラフの高さが3着以内の頭数と一致する。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
-    assert "| 1頭 | 0頭 | 0頭 | 1頭 | 0頭 | 1頭 |" in result.text
+    assert _bar_heights(result.images[image_path]) == expected
 
 
-def test_build_prev_day_trend_body_waku_count(simple_result_df: pd.DataFrame) -> None:
-    """出目の枠番カウントが正しい（1枠1頭, 3枠1頭, 8枠1頭）。"""
+def test_build_prev_day_trend_body_dememe_chart_labels_and_colors() -> None:
+    """出目の棒グラフは項目ごとの目盛りラベルを持ち、枠番は枠色、他はMATLAB標準色で塗る。"""
+    result = _call()
+    waku_ax = result.images["img/prev_day/dememe_waku.png"].axes[0]
+    assert [label.get_text() for label in waku_ax.get_xticklabels()] == [
+        f"{waku}枠" for waku in range(1, 9)
+    ]
+    assert [to_hex(patch.get_facecolor()) for patch in waku_ax.patches] == [
+        "#ffffff", "#444444", "#e95556", "#416bba", "#e7c52c", "#45af4c", "#ee9738", "#ef8fa0",
+    ]
+    kyaku_ax = result.images["img/prev_day/dememe_kyakushitsu.png"].axes[0]
+    assert [label.get_text() for label in kyaku_ax.get_xticklabels()] == [
+        "逃げ", "先行", "差し", "追込",
+    ]
+    assert [to_hex(patch.get_facecolor()) for patch in kyaku_ax.patches] == [
+        "#0072bd", "#d95319", "#edb120", "#7e2f8e",
+    ]
+
+
+def test_build_prev_day_trend_body_race_table_has_kyakushitsu_column(
+    simple_result_df: pd.DataFrame,
+) -> None:
+    """各レースの表で、4角通過順位の右に脚質を載せる。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
-    assert "| 1頭 | 0頭 | 1頭 | 0頭 | 0頭 | 0頭 | 0頭 | 1頭 |" in result.text
-
-
-def test_build_prev_day_trend_body_kyakushitsu_count(simple_result_df: pd.DataFrame) -> None:
-    """出目の脚質カウントが正しい（逃1頭, 先1頭, 差0頭, 追1頭）。"""
-    mock_di = _make_mock_di(result_df=simple_result_df)
-    result = _call(mock_di=mock_di)
-    assert "| 1頭 | 1頭 | 0頭 | 1頭 |" in result.text
-
-
-def test_build_prev_day_trend_body_agari_rank_count(simple_result_df: pd.DataFrame) -> None:
-    """出目の上がり順位カウントが正しい（1位1頭, 2位1頭, 3位1頭）。"""
-    mock_di = _make_mock_di(result_df=simple_result_df)
-    result = _call(mock_di=mock_di)
-    assert "| 1頭 | 1頭 | 1頭 | 0頭 | 0頭 | 0頭 |" in result.text
+    assert "| 4角通過順位 | 脚質 | 後3ハロン |" in result.text
+    assert "番手 | 逃げ |" in result.text
 
 
 def test_build_prev_day_trend_body_multiple_races_sorted_by_race_bango() -> None:
@@ -427,17 +463,18 @@ def test_build_prev_day_trend_body_images_keyed_by_relative_path() -> None:
     figure = MagicMock(name="Figure")
     result = _call(raw_shosai=raw, figure=figure)
     assert set(result.images) == {
+        *_DEMEME_IMAGE_PATHS,
         "img/prev_day/dynamics.png",
         "img/prev_day/2026050405010106.png",
     }
     assert result.images["img/prev_day/2026050405010106.png"] is figure
 
 
-def test_build_prev_day_trend_body_straight_race_has_only_dynamics_chart() -> None:
-    """直線コースの場合、images は展開グラフだけになる。"""
+def test_build_prev_day_trend_body_straight_race_has_only_summary_charts() -> None:
+    """直線コースの場合、images は出目と展開のグラフだけになる。"""
     mock_race_data = _make_mock_race_data(is_straight_race=True)
     result = _call(mock_race_data=mock_race_data)
-    assert set(result.images) == {"img/prev_day/dynamics.png"}
+    assert set(result.images) == {*_DEMEME_IMAGE_PATHS, "img/prev_day/dynamics.png"}
 
 
 def test_build_prev_day_trend_body_dynamics_chart_lines() -> None:
