@@ -99,7 +99,7 @@ def build_prev_day_trend_body(
         prev_race_code = str(raw_row["race_code"])
         prev_race_info = di.get_race_basic_info(prev_race_code)
         result_df = di.get_result(prev_race_code)
-        cor_df, figure = _evaluate_race_dynamics(prev_race_code, di)
+        cor_df, figure = _evaluate_race_dynamics(prev_race_code, di, race_date)
         matched_races.append(
             _MatchedRace(prev_race_code, prev_race_info, result_df, cor_df, figure)
         )
@@ -176,16 +176,20 @@ def _get_prev_day_matched_races(
 def _evaluate_race_dynamics(
     prev_race_code: str,
     data_interface: DataInterface,
+    target_race_date: date,
 ) -> tuple[pd.DataFrame | None, Figure | None]:
     """前日レースの展開評価を計算する。
 
     RaceDataを1回だけ取得し、相関係数の計算と標準化散布図の生成の両方に使い回す。
+    未来レースの判定基準日を対象レースの開催日にすることで、前日レースの当日中
+    （対象レースの前日）でも前日レースを確定済みのレースとして評価する。
     1000m直線コースは展開評価の対象外のため、両方Noneを返す。
     展開評価が使うのはレース結果とコーナー通過順のみのため、払戻情報は取得しない。
 
     Args:
         prev_race_code (str): 前日レースのrace_code。
         data_interface (DataInterface): 展開評価に使うDataInterface。
+        target_race_date (date): 対象レースの開催日。未来レース判定の基準日に使う。
 
     Returns:
         pd.DataFrame | None: 展開評価の相関係数DataFrame（1行）。対象外レースはNone。
@@ -194,7 +198,11 @@ def _evaluate_race_dynamics(
     Raises:
         CornerDataError: レース結果情報または4コーナーの通過順データが存在しない場合。
     """
-    race_data = RaceData(race_code=prev_race_code, data_interface=data_interface)
+    race_data = RaceData(
+        race_code=prev_race_code,
+        data_interface=data_interface,
+        reference_date=target_race_date,
+    )
     if race_data.is_straight_race():
         return None, None
 

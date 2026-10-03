@@ -456,6 +456,48 @@ def test_build_prev_day_trend_body_straight_race_has_no_images() -> None:
     assert result.images == {}
 
 
+def test_build_prev_day_trend_body_race_data_uses_target_race_date_as_reference() -> None:
+    """前日レースのRaceDataは、対象レースの開催日を未来レース判定の基準日にして作る。"""
+    mock_race_data = _make_mock_race_data()
+    mock_di = _make_mock_di()
+    mock_rg = MagicMock()
+    mock_rg.get_race_shosai.return_value = _make_raw_shosai(race_code="2026050405010106")
+
+    with (
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface",
+            return_value=mock_di,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            return_value=mock_rg,
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
+            return_value="東京",
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceData",
+            return_value=mock_race_data,
+        ) as mock_race_data_cls,
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.evaluate_race_dynamics",
+            return_value=MagicMock(cor_df=_make_cor_df()),
+        ),
+        patch(
+            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.make_time_plot",
+            return_value=MagicMock(name="Figure"),
+        ),
+    ):
+        build_prev_day_trend_body("2026050505010101", _make_race_info())
+
+    mock_race_data_cls.assert_called_once_with(
+        race_code="2026050405010106",
+        data_interface=mock_di,
+        reference_date=date(2026, 5, 5),
+    )
+
+
 def test_build_prev_day_trend_body_race_data_created_once_per_race() -> None:
     """RaceDataの取得が1レースにつき1回になる（evaluateとplotで使い回す）。"""
     mock_race_data = _make_mock_race_data()
