@@ -369,7 +369,7 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
         gate = horse_row["枠番"]
         horse_no = horse_row["馬番"]
         if pd.notna(gate) and pd.notna(horse_no):
-            gate_horse_str = f"{int(gate)}枠{int(horse_no)}番"
+            gate_horse_str = f"{int(gate)}枠 {int(horse_no)}番"
         else:
             gate_horse_str = "-"
         ninki = int(horse_row["単勝人気順"]) if pd.notna(horse_row["単勝人気順"]) else "-"
