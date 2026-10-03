@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 import pandas as pd
-from evaluation import evaluate_race_dynamics, make_time_plot
 from evaluation.params import WAKU_TO_COLOR_DICT
 from keiba_data_interface import DataInterface
 from keiba_domain import keibajo_from_code
@@ -12,9 +11,21 @@ from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MaxNLocator, PercentFormatter
 from mykeibadb import RaceGetter
-from race_data import RaceData
 
 from g1_predict.modules.constants import GRADE_CODE_DISPLAY, TRACK_CODE_TO_SHIBA_DA
+from g1_predict.modules.utils.race_dynamics import (
+    DYNAMICS_COLUMNS,
+    DYNAMICS_DESCRIPTION,
+    build_dynamics_table_lines,
+    evaluate_race_dynamics_with_plot,
+)
+from g1_predict.modules.utils.race_result import (
+    KYAKUSHITSU_DISPLAY,
+    format_corner4,
+    format_halon,
+    halon_rank,
+    kyakushitsu_display,
+)
 
 _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "701": "新馬",
@@ -29,12 +40,6 @@ _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
 _MATLAB_COLORS: tuple[str, ...] = (
     "#0072BD", "#D95319", "#EDB120", "#7E2F8E", "#77AC30", "#4DBEEE", "#A2142F",
 )
-# 展開評価の相関係数カラム
-_DYNAMICS_COLUMNS: tuple[str, ...] = ("差し有利度", "外枠有利度", "外有利度")
-# 脚質判定コード → 表示名
-_KYAKUSHITSU_DISPLAY: dict[str, str] = {"1": "逃げ", "2": "先行", "3": "差し", "4": "追込"}
-# 脚質の表示名 → 各レースの表で使う1文字の略称
-_KYAKUSHITSU_SHORT: dict[str, str] = {"逃げ": "逃", "先行": "先", "差し": "差", "追込": "追"}
 _KYAKUSHITSU_URL = "http://next5.jra-van.jp/appli/kyakushitsu3.html"
 _JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
 # 展開評価に必要なコーナー通過順が揃っている結果区分。
@@ -147,7 +152,10 @@ def build_day_trend_body(
         matched_race_code = str(raw_row["race_code"])
         matched_race_info = di.get_race_basic_info(matched_race_code)
         result_df = di.get_result(matched_race_code)
-        cor_df, figure = _evaluate_race_dynamics(matched_race_code, di, trend_date)
+        dynamics, figure = evaluate_race_dynamics_with_plot(
+            matched_race_code, di, trend_date + timedelta(days=1)
+        )
+        cor_df = dynamics.cor_df if dynamics is not None else None
         matched_races.append(
             _MatchedRace(matched_race_code, matched_race_info, result_df, cor_df, figure)
         )
@@ -236,46 +244,6 @@ def _get_matched_races(
     return raw.sort_values("race_bango").reset_index(drop=True)
 
 
-def _evaluate_race_dynamics(
-    race_code: str,
-    data_interface: DataInterface,
-    trend_date: date,
-) -> tuple[pd.DataFrame | None, Figure | None]:
-    """集計対象レースの展開評価を計算する。
-
-    RaceDataを1回だけ取得し、相関係数の計算と標準化散布図の生成の両方に使い回す。
-    未来レースの判定基準日を集計日の翌日にすることで、集計日当日中でも
-    集計対象レースを確定済みのレースとして評価する。
-    1000m直線コースは展開評価の対象外のため、両方Noneを返す。
-    展開評価が使うのはレース結果とコーナー通過順のみのため、払戻情報は取得しない。
-
-    Args:
-        race_code (str): 集計対象レースのrace_code。
-        data_interface (DataInterface): 展開評価に使うDataInterface。
-        trend_date (date): 集計日。この翌日を未来レース判定の基準日に使う。
-
-    Returns:
-        pd.DataFrame | None: 展開評価の相関係数DataFrame（1行）。対象外レースはNone。
-        Figure | None: 標準化散布図。対象外レースはNone。
-
-    Raises:
-        CornerDataError: レース結果情報または4コーナーの通過順データが存在しない場合。
-    """
-    race_data = RaceData(
-        race_code=race_code,
-        data_interface=data_interface,
-        reference_date=trend_date + timedelta(days=1),
-    )
-    if race_data.is_straight_race():
-        return None, None
-
-    race_data.fetch_race_result()
-    race_data.fetch_race_result_info()
-    result = evaluate_race_dynamics(race_data)
-    figure = make_time_plot(race_data)
-    return result.cor_df, figure
-
-
 def _race_label(race_info: pd.DataFrame, venue_name: str, race_no: int) -> str:
     """レースラベル（{競馬場}{R}R {条件}(グレード)）を生成する。
 
@@ -315,25 +283,6 @@ def _race_condition(race_info: pd.DataFrame) -> str:
     return _KYOSO_JOKEN_CODE_DISPLAY.get(joken_code, "")
 
 
-def _format_correlation(cor_df: pd.DataFrame | None, column: str) -> str:
-    """相関係数を100倍し、符号付きの整数パーセントの文字列に整形する。
-
-    Args:
-        cor_df (pd.DataFrame | None): 展開評価の相関係数DataFrame（1行）。
-            対象外レースはNone。
-        column (str): カラム名（差し有利度 / 外枠有利度 / 外有利度）。
-
-    Returns:
-        str: 符号付きの整数パーセントの文字列（例: "+45%"）。NaN、または対象外レースは "-"。
-    """
-    if cor_df is None:
-        return "-"
-    value = cor_df[column].iloc[0]
-    if pd.isna(value):
-        return "-"
-    return f"{round(float(value) * 100):+d}%"
-
-
 def _dynamics_chart_path(kind: DayTrendKind) -> str:
     """展開グラフの記事ディレクトリからの相対パスを返す。
 
@@ -358,8 +307,7 @@ def _build_dynamics_section(kind: DayTrendKind) -> str:
     lines: list[str] = [
         "## 展開有利度の傾向",
         "",
-        "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
-        "内外の位置と走破タイムの相関係数を100倍したもの。正なら差し・外枠・外を回した馬が有利。",
+        DYNAMICS_DESCRIPTION,
         "",
         f"![展開]({_dynamics_chart_path(kind)})",
     ]
@@ -382,7 +330,7 @@ def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
     figure = Figure(figsize=(8, 4))
     ax = figure.subplots()
     positions = list(range(len(matched_races)))
-    for column, color in zip(_DYNAMICS_COLUMNS, _MATLAB_COLORS, strict=False):
+    for column, color in zip(DYNAMICS_COLUMNS, _MATLAB_COLORS, strict=False):
         values = [
             float(race.cor_df[column].iloc[0]) * 100 if race.cor_df is not None else float("nan")
             for race in matched_races
@@ -434,35 +382,17 @@ def _format_race_block(race: _MatchedRace, venue_name: str, kind: DayTrendKind) 
             gate_horse_str = "-"
         ninki = int(horse_row["単勝人気順"]) if pd.notna(horse_row["単勝人気順"]) else "-"
 
-        corner4 = horse_row["4コーナー順位"]
-        corner4_str = f"{int(corner4)}番手" if pd.notna(corner4) else "-"
-        kyakushitsu = _kyakushitsu_display(horse_row)
-        if kyakushitsu:
-            corner4_str += f" ({_KYAKUSHITSU_SHORT[kyakushitsu]})"
-
-        halon = horse_row["後3ハロン"]
-        if pd.notna(halon):
-            halon_str = (
-                f"{float(halon):.1f}秒 ({_halon_rank(horse_row, race.result_df)}位)"
-            )
-        else:
-            halon_str = "-"
-
         cols = [
-            f"{place}着", gate_horse_str, f"{ninki}人気", corner4_str, halon_str,
+            f"{place}着",
+            gate_horse_str,
+            f"{ninki}人気",
+            format_corner4(horse_row, "番手"),
+            format_halon(horse_row, race.result_df),
         ]
         lines.append("| " + " | ".join(cols) + " |")
 
     if race.cor_df is not None:
-        values = [_format_correlation(race.cor_df, column) for column in _DYNAMICS_COLUMNS]
-        lines.extend(
-            [
-                "",
-                "| " + " | ".join(_DYNAMICS_COLUMNS) + " |",
-                "| --- | --- | --- |",
-                "| " + " | ".join(values) + " |",
-            ]
-        )
+        lines.extend(["", *build_dynamics_table_lines(race.cor_df)])
     if race.figure is not None:
         image_path = f"img/{kind.image_dir}/{race.race_code}.png"
         lines.append("")
@@ -494,7 +424,7 @@ def _build_dememe_section(
     kyaku_counts = _count_kyakushitsu(rows)
     ninki_labels = ["1人気", "2人気", "3人気", "4-6人気", "7-9人気", "10人気以下"]
     agari_labels = ["1位", "2位", "3位", "4-6位", "7-9位", "10位以下"]
-    kyaku_labels = list(_KYAKUSHITSU_DISPLAY.values())
+    kyaku_labels = list(KYAKUSHITSU_DISPLAY.values())
     # 枠番以外の棒はMATLABの標準色の1色目で揃える
     base_color = _MATLAB_COLORS[0]
 
@@ -642,27 +572,12 @@ def _count_kyakushitsu(rows: list[pd.Series]) -> dict[str, int]:
     Returns:
         dict[str, int]: 脚質の表示名をキーとした頭数辞書。
     """
-    counts: dict[str, int] = {name: 0 for name in _KYAKUSHITSU_DISPLAY.values()}
+    counts: dict[str, int] = {name: 0 for name in KYAKUSHITSU_DISPLAY.values()}
     for row in rows:
-        display = _kyakushitsu_display(row)
+        display = kyakushitsu_display(row)
         if display:
             counts[display] += 1
     return counts
-
-
-def _kyakushitsu_display(row: pd.Series) -> str:
-    """馬毎レース結果の行から脚質の表示名を返す。
-
-    Args:
-        row (pd.Series): 馬毎レース結果の行。
-
-    Returns:
-        str: 脚質の表示名（逃げ/先行/差し/追込）。脚質判定コードが無い場合は空文字列。
-    """
-    code = row.get("脚質判定コード", "")
-    if pd.isna(code):
-        return ""
-    return _KYAKUSHITSU_DISPLAY.get(str(code).strip(), "")
 
 
 def _count_agari_rank(
@@ -681,7 +596,7 @@ def _count_agari_rank(
         halon = horse_row["後3ハロン"]
         if pd.isna(halon):
             continue
-        rank = _halon_rank(horse_row, result_df)
+        rank = halon_rank(horse_row, result_df)
         if rank == 1:
             counts[0] += 1
         elif rank == 2:
@@ -695,18 +610,3 @@ def _count_agari_rank(
         else:
             counts[5] += 1
     return counts
-
-
-def _halon_rank(horse_row: pd.Series, result_df: pd.DataFrame) -> int:
-    """result_df内での後3ハロン順位（昇順、1位が最速）を返す。
-
-    Args:
-        horse_row (pd.Series): 順位を計算する馬の行。
-        result_df (pd.DataFrame): 全馬のresult DataFrame。
-
-    Returns:
-        int: 後3ハロン順位（1始まり）。
-    """
-    halon = float(horse_row["後3ハロン"])
-    series = pd.to_numeric(result_df["後3ハロン"], errors="coerce").dropna()
-    return int((series < halon).sum()) + 1

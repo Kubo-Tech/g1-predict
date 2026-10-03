@@ -1,11 +1,14 @@
 """generate_predict の単体テスト。"""
+import json
 import os
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+import requests
 
 from scripts.gen_predict import _DEFAULT_DATA_DIR, generate_predict
 
@@ -79,6 +82,42 @@ def _make_mock_race_getter(
 
     mock.get_umagoto_race_joho.side_effect = _umagoto
     return mock
+
+
+_FEED_PATCH_TARGET = "g1_predict.modules.utils.hatena_links.requests.get"
+_FEED_XML = (
+    '<feed xmlns="http://www.w3.org/2005/Atom">'
+    '<entry><title>過去タイトル</title><link href="https://example.com/1"/>'
+    "<id>hatenablog://entry/1</id></entry>"
+    '<entry><title>当日タイトル</title><link href="https://example.com/3"/>'
+    "<id>hatenablog://entry/3</id></entry>"
+    "</feed>"
+).encode()
+
+
+@pytest.fixture(autouse=True)
+def mock_feed() -> Generator[MagicMock, None, None]:
+    """ブログの公開フィード取得をモックする。
+
+    Yields:
+        MagicMock: requests.get のモック。
+    """
+    with patch(_FEED_PATCH_TARGET) as mock_get:
+        mock_get.return_value.content = _FEED_XML
+        yield mock_get
+
+
+def _write_state(public_dir: str, entries: dict[str, str]) -> None:
+    """2026年の状態ファイルを書き出す。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+        entries (dict[str, str]): 記事の相対パス -> エントリID。
+    """
+    year_dir = os.path.join(public_dir, "2026")
+    os.makedirs(year_dir, exist_ok=True)
+    with open(os.path.join(year_dir, ".hatena_entry_ids.json"), "w", encoding="utf-8") as f:
+        json.dump({"entries": entries, "images": {}}, f)
 
 
 @pytest.fixture
@@ -707,6 +746,91 @@ def test_generate_predict_contains_related_articles_section(
     _run(_make_mock_race_getter(), public_dir, templates_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert "## 関連記事" in content
+
+
+def test_generate_predict_related_articles_with_all_links(
+    dirs: tuple[str, str],
+) -> None:
+    """関連記事に過去・前日・当日の傾向のリンクを順に並べ、最後に自作AIの予想を付ける。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
+    public_dir, templates_dir = dirs
+    race_dir = "2026013105010110_天皇賞春"
+    _write_state(
+        public_dir,
+        {
+            f"2026/{race_dir}/当日の傾向.md": "3",
+            f"2026/{race_dir}/過去の傾向.md": "1",
+            f"2026/{race_dir}/前日の傾向.md": "2",
+        },
+    )
+    feed = _FEED_XML.replace(
+        b"</feed>",
+        '<entry><title>前日タイトル</title><link href="https://example.com/2"/>'
+        "<id>hatenablog://entry/2</id></entry></feed>".encode(),
+    )
+    with patch(_FEED_PATCH_TARGET) as mock_get:
+        mock_get.return_value.content = feed
+        _run(_make_mock_race_getter(), public_dir, templates_dir)
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
+    assert (
+        "## 関連記事\n\n"
+        "- [過去タイトル](https://example.com/1)\n"
+        "- [前日タイトル](https://example.com/2)\n"
+        "- [当日タイトル](https://example.com/3)\n"
+        "- [自作AIの予想]()\n\n"
+        "## 印"
+    ) in content
+
+
+def test_generate_predict_related_articles_skips_missing_links(
+    dirs: tuple[str, str],
+) -> None:
+    """投稿されていない記事のリンクは行ごと省き、自作AIの予想は常に出力する。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
+    public_dir, templates_dir = dirs
+    _write_state(public_dir, {"2026/2026013105010110_天皇賞春/過去の傾向.md": "1"})
+    _run(_make_mock_race_getter(), public_dir, templates_dir)
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
+    assert (
+        "## 関連記事\n\n- [過去タイトル](https://example.com/1)\n- [自作AIの予想]()\n\n## 印"
+    ) in content
+
+
+def test_generate_predict_related_articles_without_any_link(
+    dirs: tuple[str, str],
+) -> None:
+    """リンクが1つも無い場合は自作AIの予想だけを出力する。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+    """
+    public_dir, templates_dir = dirs
+    _run(_make_mock_race_getter(), public_dir, templates_dir)
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
+    assert "## 関連記事\n\n- [自作AIの予想]()\n\n## 印" in content
+
+
+# 準正常系
+def test_generate_predict_raises_when_feed_fetch_fails(
+    dirs: tuple[str, str], mock_feed: MagicMock
+) -> None:
+    """フィードの取得に失敗した場合は例外になり、ファイルを出力しない。
+
+    Args:
+        dirs (tuple[str, str]): public・templates ディレクトリ。
+        mock_feed (MagicMock): requests.get のモック。
+    """
+    public_dir, templates_dir = dirs
+    mock_feed.side_effect = requests.ConnectionError("down")
+    with pytest.raises(requests.ConnectionError):
+        _run(_make_mock_race_getter(), public_dir, templates_dir)
+    assert not os.path.exists(os.path.join(public_dir, "2026"))
 
 
 def test_generate_predict_has_insight_section(dirs: tuple[str, str]) -> None:

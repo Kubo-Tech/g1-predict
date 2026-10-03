@@ -1,3 +1,6 @@
+# 関連記事のリンクを取得する公開フィード（{blog_url}/feed）の元になるブログのURL
+blog_url: https://kubotech.hatenadiary.com
+
 categories:
   # レース記事以外（public/ 直下の記事など）に付ける
   default:

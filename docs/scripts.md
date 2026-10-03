@@ -14,9 +14,9 @@
 | `gen_table` | ○ | − | `table.yml` | − | `table/*.xlsx` |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
-| `gen_predict` | ○ | 読み | − | `TEMPLATE_PREDICT.md`, `points/` | `予想.md` |
+| `gen_predict` | ○ | 読み | `hatena.yml` | `TEMPLATE_PREDICT.md`, `points/` | `予想.md` |
 | `gen_result_comment` | ○ | 書き | − | − | TFJV の `KEK_COM` |
-| `gen_result` | ○ | 読み | − | `TEMPLATE_RESULT.md` | `回顧.md` |
+| `gen_result` | ○ | 読み | `hatena.yml` | `TEMPLATE_RESULT.md` | `回顧.md`, `img/race_result/{race_code}.png` |
 | `hatena_publish` | − | − | `hatena.yml` | − | はてなブログ記事 |
 
 ---
@@ -114,7 +114,7 @@ python -m scripts.gen_race_day_trend --race-code 2026061409030411
 
 グラフの日本語表示には Noto Sans CJK JP フォントを使う。
 
-画像は `public/{開催年}/{race_code}_{レース名}/img/{prev_day|race_day}/` に、出目の棒グラフは `dememe_ninki.png` / `dememe_waku.png` / `dememe_kyakushitsu.png` / `dememe_agari.png`、展開グラフは `dynamics.png`、標準化散布図は `{集計したレースのrace_code}.png` の名前で保存される。保存とクローズ、ファイルの書き出しは `scripts/gen_day_trend.py`（2つのスクリプトが種類を選んで呼ぶ共通処理）が行い、`g1_predict/modules/gen_day_trend/day_trend.py` はMarkdown本文と画像（Figure）を `DayTrendBody` として返すだけでファイルを書かない。前日・当日の違いは `DayTrendKind`（`PREV_DAY` / `RACE_DAY`）で表す。
+画像は `public/{開催年}/{race_code}_{レース名}/img/{prev_day|race_day}/` に、出目の棒グラフは `dememe_ninki.png` / `dememe_waku.png` / `dememe_kyakushitsu.png` / `dememe_agari.png`、展開グラフは `dynamics.png`、標準化散布図は `{集計したレースのrace_code}.png` の名前で保存される。画像の保存とクローズは `g1_predict/modules/utils/image_output.py` の `save_images()`、ファイルの書き出しは `scripts/gen_day_trend.py`（2つのスクリプトが種類を選んで呼ぶ共通処理）が行い、`g1_predict/modules/gen_day_trend/day_trend.py` はMarkdown本文と画像（Figure）を `DayTrendBody` として返すだけでファイルを書かない。前日・当日の違いは `DayTrendKind`（`PREV_DAY` / `RACE_DAY`）で表す。
 
 集計対象のレースが1つも無い場合（当日の傾向では結果が出ているレースが1つも無い場合を含む）は、タイトル行だけの記事が出力される。
 
@@ -135,7 +135,7 @@ python -m scripts.gen_predict --race-code 2026061409030411
 | セクション | 生成元 |
 | --- | --- |
 | `## ポイント` | 見出しの下に `templates/points/{レース名}.md` の本文を入れる。ファイルが無ければ空の箇条書きのみ |
-| `## 関連記事` | 空。手で書く（傾向分析・前日の傾向の記事へのリンク） |
+| `## 関連記事` | 過去の傾向・前日の傾向・当日の傾向の記事へのリンクと、手で URL を埋める `[自作AIの予想]()` |
 | `## 印` | TFJV の `UM*.DAT` から読んだ印 |
 | `## 見解` | 印を付けた馬の過去走コメント（TFJV の `KEK_COM`） |
 | `## 買い目` | 空。手で書く |
@@ -154,7 +154,20 @@ python -m scripts.gen_predict --race-code 2026061409030411
 
 ### 関連記事セクション
 
-テンプレートの空セクションがそのまま出力される。`gen_predict` は何も埋めない。傾向分析・前日の傾向の記事は先に公開し、確定したはてなの URL を手で貼る。
+過去の傾向・前日の傾向・当日の傾向の記事を、この順に次の形式で並べる。リンク文字列ははてなブログ上の記事タイトル（例: `【スプリンターズS2026】傾向分析`）。
+
+```markdown
+## 関連記事
+
+- [【スプリンターズS2026】傾向分析](https://kubotech.hatenadiary.com/entry/...)
+- [【スプリンターズS2026】前日の傾向](https://kubotech.hatenadiary.com/entry/...)
+- [自作AIの予想]()
+```
+
+- 記事ファイルが `.hatena_entry_ids.json` に記録されていない（未投稿）場合や、はてなブログの公開フィードにその記事が無い場合は、その行を出力しない。
+- 最後の `[自作AIの予想]()` は常に出力する。URL は手で埋める。
+- リンクは [hatena-publish.md](hatena-publish.md#関連記事のリンク) の仕組みで引く。公開フィードは1回の実行で1回だけ取得し、通信エラーや HTTP エラー、XML の解析失敗の場合は例外で停止する。
+- 傾向分析などの記事は先に `main` へ push して投稿しておくと、リンクが入る。
 
 ---
 
@@ -185,11 +198,13 @@ python -m scripts.gen_result_comment --race-code 2026061409030411
 python -m scripts.gen_result --race-code 2026061409030411
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/回顧.md`
+出力: `public/{開催年}/{race_code}_{レース名}/回顧.md`、`public/{開催年}/{race_code}_{レース名}/img/race_result/{race_code}.png`（標準化散布図）
 
-タイトルは `# 【{レース名}{年}】回顧`。`templates/TEMPLATE_RESULT.md` の `## 結果` と `## 回顧` を埋める（`## 総評` は空のまま。手で書く）。
+タイトルは `# 【{レース名}{年}】回顧`。セクションは `## 結果` → `## 関連記事` → `## 総評` → `## 展開評価` → `## 回顧` の順で、`templates/TEMPLATE_RESULT.md` の `## 総評` 以外を埋める（`## 総評` は空のまま。手で書く）。
 
-- `## 結果` … 3着までを `{着順}着 {印}{馬番}{馬名}` で列挙する。
+- `## 結果` … 3着までを、着順・印・馬番・馬名・人気・4角通過・後3Fの表にする。前日・当日の傾向の各レースの表と同じ計算で、馬番・人気・4角通過には単位を付けない。印が無い馬は印を空欄にし、値が無い項目は `-` にする。
+- `## 関連記事` … 予想記事へのリンクと、手で URL を埋める `[自作AIの結果]()`。予想記事が未投稿、またはフィードに無い場合は予想記事の行を出力せず、`[自作AIの結果]()` だけを出力する。リンクの引き方は `gen_predict` の関連記事セクションと同じ（[hatena-publish.md](hatena-publish.md#関連記事のリンク)）。
+- `## 展開評価` … 差し有利度・外枠有利度・外有利度の説明、有利度の表、標準化散布図（`![標準化散布図](img/race_result/{race_code}.png)`）、展開評価値の説明、展開評価値の表の順に載せる。展開評価値の表は、race-dynamics-evaluation の総合評価（展開の有利不利で走破タイムを補正した値）を着順・馬番・馬名とともに値の高い順に並べる（例: `+0.52`。値の大きさは秒として読めないため単位を付けない。総合評価が無い競走除外などの馬は載せない）。展開評価の対象外である1000m直線コースのレースは、セクションごと載せず、画像も保存しない。展開評価の未来レース判定の基準日には、開催日の翌日を使う。画像は手で貼る写真を置く `img/result/` と分けて `img/race_result/` に保存する。
 - `## 回顧` … TFJV の成績コメントがある馬について `### {着順}着 {印}{馬番}{馬名}` の見出しとコメント本文を出力する。
   - 正常に完走した馬を着順昇順で並べ、そのあとに異常（取消・除外・中止・失格）の馬を並べる。
   - コメント本文の `[レース名]` は除去し、`。` ごとに改行（行末2スペース）を入れて読みやすくする。

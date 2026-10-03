@@ -13,6 +13,7 @@ from dotenv import find_dotenv, load_dotenv
 from mykeibadb import RaceGetter
 
 from g1_predict.modules.constants import GRADE_CODE_DISPLAY
+from g1_predict.modules.utils.hatena_links import build_related_articles_section
 from g1_predict.modules.utils.md_utils import replace_section
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 from g1_predict.modules.utils.race_name import to_race_label
@@ -29,8 +30,11 @@ load_dotenv(find_dotenv())
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
 _TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
+_HATENA_CONFIG_PATH = os.path.join(_REPO_DIR, "configs", "hatena.yml")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
+# 関連記事に載せる記事ファイル名（拡張子を除く）。この順に並べる
+_RELATED_ARTICLE_NAMES = ["過去の傾向", "前日の傾向", "当日の傾向"]
 _MARK_ORDER = ["◎", "○", "▲", "△", "◆", "☆", "注"]
 
 
@@ -60,9 +64,14 @@ def generate_predict(race_code: str) -> None:
     insight_section = _build_insight_section(
         race_code, marks, entry_raw, race_getter, tfjv_data_dir
     )
-    content = _render_from_template(race_label, year, points, marks_section, insight_section)
-
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
+    related_section = build_related_articles_section(
+        _PUBLIC_DIR, race_dir, _RELATED_ARTICLE_NAMES, "自作AIの予想", _HATENA_CONFIG_PATH
+    )
+    content = _render_from_template(
+        race_label, year, points, related_section, marks_section, insight_section
+    )
+
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "予想.md")
     with open(output_path, "w", encoding="utf-8") as f:
@@ -252,6 +261,7 @@ def _render_from_template(
     race_label: str,
     year: str,
     points_section: str,
+    related_section: str,
     marks_section: str,
     insight_section: str,
 ) -> str:
@@ -261,6 +271,7 @@ def _render_from_template(
         race_label (str): 記事タイトルに使うレース名。
         year (str): 開催年。
         points_section (str): ポイントセクション。
+        related_section (str): 関連記事セクション。
         marks_section (str): 印セクション。
         insight_section (str): 見解セクション。
 
@@ -272,6 +283,7 @@ def _render_from_template(
         content = f.read()
     content = content.replace("{RaceName}", race_label).replace("{Year}", year)
     content = replace_section(content, "## ポイント", points_section)
+    content = replace_section(content, "## 関連記事", related_section)
     content = replace_section(content, "## 印", marks_section)
     content = replace_section(content, "## 見解", insight_section)
     return content
