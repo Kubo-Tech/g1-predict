@@ -423,10 +423,20 @@ def _build_dememe_section(
     kyaku_counts = _count_kyakushitsu(rows)
     ninki_labels = ["1人気", "2人気", "3人気", "4-6人気", "7-9人気", "10人気以下"]
     agari_labels = ["1位", "2位", "3位", "4-6位", "7-9位", "10位以下"]
+    kyaku_labels = list(_KYAKUSHITSU_DISPLAY.values())
+    # 枠番以外の棒はMATLABの標準色の1色目で揃える
+    base_color = _MATLAB_COLORS[0]
 
     # (項目名, 見出しのリンク先, 画像ファイル名, 目盛りラベル, 頭数, 棒の色)
     charts: list[tuple[str, str | None, str, list[str], list[int], list[str]]] = [
-        ("人気", None, "dememe_ninki", ninki_labels, _count_ninki(rows), list(_MATLAB_COLORS)),
+        (
+            "人気",
+            None,
+            "dememe_ninki",
+            ninki_labels,
+            _count_ninki(rows),
+            [base_color] * len(ninki_labels),
+        ),
         (
             "枠番",
             None,
@@ -439,9 +449,9 @@ def _build_dememe_section(
             "脚質",
             _KYAKUSHITSU_URL,
             "dememe_kyakushitsu",
-            list(_KYAKUSHITSU_DISPLAY.values()),
-            [kyaku_counts[name] for name in _KYAKUSHITSU_DISPLAY.values()],
-            list(_MATLAB_COLORS),
+            kyaku_labels,
+            [kyaku_counts[name] for name in kyaku_labels],
+            [base_color] * len(kyaku_labels),
         ),
         (
             "上がり順位",
@@ -449,7 +459,7 @@ def _build_dememe_section(
             "dememe_agari",
             agari_labels,
             _count_agari_rank(top3_entries),
-            list(_MATLAB_COLORS),
+            [base_color] * len(agari_labels),
         ),
     ]
 
@@ -471,7 +481,7 @@ def _make_bar_chart(labels: list[str], counts: list[int], colors: list[str]) -> 
     Args:
         labels (list[str]): 横軸の目盛りラベル。
         counts (list[int]): 各ラベルの頭数。
-        colors (list[str]): 各棒の色（labels より多い分は使わない）。
+        colors (list[str]): 各棒の色（labels と同じ長さ）。
 
     Returns:
         Figure: 棒グラフ。
@@ -482,7 +492,7 @@ def _make_bar_chart(labels: list[str], counts: list[int], colors: list[str]) -> 
     bars = ax.bar(
         positions,
         counts,
-        color=colors[: len(labels)],
+        color=colors,
         edgecolor="black",
         linewidth=0.8,
     )

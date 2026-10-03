@@ -346,7 +346,7 @@ def test_build_prev_day_trend_body_dememe_counts(
 
 
 def test_build_prev_day_trend_body_dememe_chart_labels_and_colors() -> None:
-    """出目の棒グラフは項目ごとの目盛りラベルを持ち、枠番は枠色、他はMATLAB標準色で塗る。"""
+    """出目の棒グラフは項目ごとの目盛りラベルを持ち、枠番は枠色、他はMATLAB標準色の1色目で塗る。"""
     result = _call()
     waku_ax = result.images["img/prev_day/dememe_waku.png"].axes[0]
     assert [label.get_text() for label in waku_ax.get_xticklabels()] == [
@@ -359,9 +359,10 @@ def test_build_prev_day_trend_body_dememe_chart_labels_and_colors() -> None:
     assert [label.get_text() for label in kyaku_ax.get_xticklabels()] == [
         "逃げ", "先行", "差し", "追込",
     ]
-    assert [to_hex(patch.get_facecolor()) for patch in kyaku_ax.patches] == [
-        "#0072bd", "#d95319", "#edb120", "#7e2f8e",
-    ]
+    assert [to_hex(patch.get_facecolor()) for patch in kyaku_ax.patches] == ["#0072bd"] * 4
+    for image_path in ("img/prev_day/dememe_ninki.png", "img/prev_day/dememe_agari.png"):
+        ax = result.images[image_path].axes[0]
+        assert [to_hex(patch.get_facecolor()) for patch in ax.patches] == ["#0072bd"] * 6
 
 
 def test_build_prev_day_trend_body_race_table_has_kyakushitsu_column(
