@@ -105,6 +105,7 @@ def dirs(tmp_path: pytest.TempPathFactory) -> tuple[str, str]:
             "## 結果\n\n"
             "## 関連記事\n\n"
             "## 総評\n\n"
+            "## 展開評価\n\n"
             "## 回顧\n"
         )
     return public_dir, templates_dir
@@ -247,7 +248,7 @@ def test_gen_result_result_section_without_values(dirs: tuple[str, str]) -> None
 
 
 def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str]) -> None:
-    """展開評価がある場合は有利度の表・標準化散布図・総合評価の表を載せ、画像を保存する。"""
+    """展開評価があれば、総評の後の展開評価セクションに説明・表・散布図を載せ、画像を保存する。"""
     public_dir, templates_dir = dirs
     cor_df = pd.DataFrame(
         {"差し有利度": [-0.79], "外枠有利度": [-0.15], "外有利度": [float("nan")]}
@@ -263,18 +264,24 @@ def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str
     )
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
     assert (
-        "\n\n| 差し有利度 | 外枠有利度 | 外有利度 |\n"
+        "## 総評\n\n"
+        "## 展開評価\n\n"
+        "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
+        "内外の位置と走破タイムの相関係数を100倍したもの。正なら差し・外枠・外を回した馬が有利。\n\n"
+        "| 差し有利度 | 外枠有利度 | 外有利度 |\n"
         "| --- | --- | --- |\n"
         "| -79% | -15% | - |\n\n"
         f"![標準化散布図](img/race_result/{_RACE_CODE}.png)\n\n"
+        "展開評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
+        "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。\n\n"
         "| 着順 | 馬番 | 馬名 | 展開評価値 |\n"
         "| --- | --- | --- | --- |\n"
         "| 2着 | 3 | ホースB | +0.31 |\n"
         "| 1着 | 5 | ホースA | -0.20 |\n\n"
-        "※ 展開評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
-        "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。\n\n"
-        "## 関連記事"
+        "## 回顧"
     ) in content
+    result_section = content[content.index("## 結果") : content.index("## 関連記事")]
+    assert "差し有利度" not in result_section
     expected_path = os.path.join(
         public_dir, _YEAR, f"{_RACE_CODE}_{_RACE_NAME}", "img", "race_result", f"{_RACE_CODE}.png"
     )
@@ -283,10 +290,12 @@ def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str
 
 
 def test_gen_result_result_section_without_dynamics(dirs: tuple[str, str]) -> None:
-    """展開評価の対象外レースは有利度の表と散布図を載せず、画像を作らない。"""
+    """展開評価の対象外レースは展開評価セクションごと載せず、画像を作らない。"""
     public_dir, templates_dir = dirs
     _run(_make_mock_di([_normal_row(1, 5, "ホースA")]), public_dir, templates_dir)
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
+    assert "## 展開評価" not in content
+    assert "## 総評\n\n## 回顧" in content
     assert "差し有利度" not in content
     assert "標準化散布図" not in content
     assert not os.path.exists(

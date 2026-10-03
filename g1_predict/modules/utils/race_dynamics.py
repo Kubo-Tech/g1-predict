@@ -10,6 +10,16 @@ from race_data import RaceData
 
 # 展開評価の相関係数カラム
 DYNAMICS_COLUMNS: tuple[str, ...] = ("差し有利度", "外枠有利度", "外有利度")
+# 記事に載せる差し有利度・外枠有利度・外有利度の説明
+DYNAMICS_DESCRIPTION = (
+    "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
+    "内外の位置と走破タイムの相関係数を100倍したもの。正なら差し・外枠・外を回した馬が有利。"
+)
+# 記事に載せる展開評価値の説明
+TOTAL_EVALUATION_DESCRIPTION = (
+    "展開評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
+    "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。"
+)
 
 
 def evaluate_race_dynamics_with_plot(

@@ -15,6 +15,7 @@ from mykeibadb import RaceGetter
 from g1_predict.modules.constants import GRADE_CODE_DISPLAY, TRACK_CODE_TO_SHIBA_DA
 from g1_predict.modules.utils.race_dynamics import (
     DYNAMICS_COLUMNS,
+    DYNAMICS_DESCRIPTION,
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
 )
@@ -306,8 +307,7 @@ def _build_dynamics_section(kind: DayTrendKind) -> str:
     lines: list[str] = [
         "## 展開有利度の傾向",
         "",
-        "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
-        "内外の位置と走破タイムの相関係数を100倍したもの。正なら差し・外枠・外を回した馬が有利。",
+        DYNAMICS_DESCRIPTION,
         "",
         f"![展開]({_dynamics_chart_path(kind)})",
     ]

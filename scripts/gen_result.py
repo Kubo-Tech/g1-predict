@@ -22,9 +22,11 @@ from mykeibadb.code_converter import convert_ijo_kubun_code  # noqa: E402
 
 from g1_predict.modules.utils.hatena_links import build_related_articles_section  # noqa: E402
 from g1_predict.modules.utils.image_output import save_images  # noqa: E402
-from g1_predict.modules.utils.md_utils import replace_section  # noqa: E402
+from g1_predict.modules.utils.md_utils import remove_section, replace_section  # noqa: E402
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code  # noqa: E402
 from g1_predict.modules.utils.race_dynamics import (  # noqa: E402
+    DYNAMICS_DESCRIPTION,
+    TOTAL_EVALUATION_DESCRIPTION,
     build_dynamics_table_lines,
     build_total_evaluation_table_lines,
     evaluate_race_dynamics_with_plot,
@@ -84,14 +86,15 @@ def generate_result(race_code: str) -> None:
         race_code, di, race_date + timedelta(days=1)
     )
     image_path = f"{_RESULT_IMAGE_DIR}/{race_code}.png"
-    result_section = _build_result_section(result_df, marks, dynamics, figure, image_path)
+    result_section = _build_result_section(result_df, marks)
+    dynamics_section = _build_dynamics_section(dynamics, figure, image_path, result_df)
     review_section = _build_review_section(result_df, marks, comments)
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     related_section = build_related_articles_section(
         _PUBLIC_DIR, race_dir, _RELATED_ARTICLE_NAMES, "自作AIの結果", _HATENA_CONFIG_PATH
     )
-    sections = (result_section, related_section, review_section)
+    sections = (result_section, related_section, dynamics_section, review_section)
     content = _render_from_template(race_label, year, *sections)
 
     os.makedirs(race_dir, exist_ok=True)
@@ -111,13 +114,7 @@ def main() -> None:
     generate_result(args.race_code)
 
 
-def _build_result_section(
-    result_df: pd.DataFrame,
-    marks: dict[int, str],
-    dynamics: RaceDynamicsResult | None,
-    figure: Figure | None,
-    image_path: str,
-) -> str:
+def _build_result_section(result_df: pd.DataFrame, marks: dict[int, str]) -> str:
     lines = [
         "## 結果",
         "",
@@ -141,20 +138,41 @@ def _build_result_section(
             format_halon(row, result_df),
         ]
         lines.append("| " + " | ".join(cols) + " |")
-    if dynamics is not None:
-        lines.extend(["", *build_dynamics_table_lines(dynamics.cor_df)])
-    if figure is not None:
-        lines.extend(["", f"![標準化散布図]({image_path})"])
-    if dynamics is not None:
-        lines.extend(
-            [
-                "",
-                *build_total_evaluation_table_lines(dynamics.eval_df, result_df),
-                "",
-                "※ 展開評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
-                "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。",
-            ]
-        )
+    return "\n".join(lines)
+
+
+def _build_dynamics_section(
+    dynamics: RaceDynamicsResult | None,
+    figure: Figure | None,
+    image_path: str,
+    result_df: pd.DataFrame,
+) -> str | None:
+    """展開評価セクションを生成する。
+
+    Args:
+        dynamics (RaceDynamicsResult | None): 展開評価の結果。対象外レースはNone。
+        figure (Figure | None): 標準化散布図。対象外レースはNone。
+        image_path (str): 記事ディレクトリからの標準化散布図の相対パス。
+        result_df (pd.DataFrame): レース結果DataFrame。
+
+    Returns:
+        str | None: `## 展開評価` から始まるセクション文字列。展開評価の対象外レースはNone。
+    """
+    if dynamics is None or figure is None:
+        return None
+    lines = [
+        "## 展開評価",
+        "",
+        DYNAMICS_DESCRIPTION,
+        "",
+        *build_dynamics_table_lines(dynamics.cor_df),
+        "",
+        f"![標準化散布図]({image_path})",
+        "",
+        TOTAL_EVALUATION_DESCRIPTION,
+        "",
+        *build_total_evaluation_table_lines(dynamics.eval_df, result_df),
+    ]
     return "\n".join(lines)
 
 
@@ -200,6 +218,7 @@ def _render_from_template(
     year: str,
     result_section: str,
     related_section: str,
+    dynamics_section: str | None,
     review_section: str,
 ) -> str:
     template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_RESULT.md")
@@ -208,6 +227,10 @@ def _render_from_template(
     content = content.replace("{RaceName}", race_label).replace("{Year}", year)
     content = replace_section(content, "## 結果", result_section)
     content = replace_section(content, "## 関連記事", related_section)
+    if dynamics_section is None:
+        content = remove_section(content, "## 展開評価")
+    else:
+        content = replace_section(content, "## 展開評価", dynamics_section)
     content = replace_section(content, "## 回顧", review_section)
     return content
 
