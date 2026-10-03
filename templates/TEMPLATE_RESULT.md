@@ -1,4 +1,4 @@
-# {RaceName}{Year}回顧
+# 【{RaceName}{Year}】回顧
 
 ## 結果
 

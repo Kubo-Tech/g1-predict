@@ -22,7 +22,7 @@ pytest test/unit
 
 ruff は isort・flake8・darglint を置き換えたもので、KeibaAI の他ライブラリと同じルールセット（`E,W,F,N,D,I,DOC` / Google スタイル docstring / 100文字）を使う。CI では共通の `library-workflow` と同じバージョン（`RUFF_VERSION`）に固定して実行するため、ローカルの ruff の版が違うと結果がずれることがある。
 
-CI（`.github/workflows/ci.yml`）は `g1_predict/**` / `scripts/**` / `test/**` / `configs/**` / `pyproject.toml` / `ci.yml` の変更で起動し、ruff は `g1_predict/` + `scripts/` + `test/`、mypy は `g1_predict/` + `scripts/` を検査する。
+CI（`.github/workflows/ci.yml`）は `g1_predict/**` / `scripts/**` / `test/**` / `configs/**` / `pyproject.toml` / `ci.yml` の変更で起動し、ruff は `g1_predict/` + `scripts/` + `test/`、mypy は `g1_predict/` + `scripts/` を検査する。依存インストール前に、Secrets の `KEIBAAI_DEVELOPER_TOKEN` で `KeibaAI-developer` の private リポジトリ（`race-dynamics-evaluation` / `feature-value-utils`）への git アクセスを認証するステップが入る（詳細は [setup.md](setup.md)）。
 
 `pytest` は外部依存をモックしているので DB・TFJV データが無くても通る。ただし `openpyxl` などの依存は必要なので、事前に `pip install -e ".[dev]"` を済ませておく。
 

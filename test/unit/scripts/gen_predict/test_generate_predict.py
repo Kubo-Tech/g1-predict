@@ -97,7 +97,7 @@ def dirs(tmp_path: Path) -> tuple[str, str]:
     os.makedirs(os.path.join(templates_dir, "points"))
     with open(os.path.join(templates_dir, "TEMPLATE_PREDICT.md"), "w", encoding="utf-8") as f:
         f.write(
-            "# {RaceName}{Year}予想\n\n"
+            "# 【{RaceName}{Year}】予想\n\n"
             "## ポイント\n\n"
             "- \n\n"
             "## 関連記事\n\n"
@@ -179,7 +179,7 @@ def _read_output(public_dir: str, year: str, race_code: str, race_name: str) -> 
 
 # 正常系
 def test_generate_predict_title_format(dirs: tuple[str, str]) -> None:
-    """生成ファイルのタイトルが # {race_name}{year}予想 になる。
+    """生成ファイルのタイトルが # 【{race_name}{year}】予想 になる。
 
     Args:
         dirs (tuple[str, str]): public・templates ディレクトリ。
@@ -187,7 +187,7 @@ def test_generate_predict_title_format(dirs: tuple[str, str]) -> None:
     public_dir, templates_dir = dirs
     _run(_make_mock_race_getter(race_name="天皇賞春", year="2026"), public_dir, templates_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert content.startswith("# 天皇賞春2026")
+    assert content.startswith("# 【天皇賞春2026】予想")
 
 
 def test_generate_predict_marks_section_shows_only_marked_horses(

@@ -97,7 +97,7 @@ def _render_trend_content(
     Returns:
         str: 生成済み傾向分析記事Markdown文字列。
     """
-    title = f"# {race_label}{year}傾向分析"
+    title = f"# 【{race_label}{year}】傾向分析"
     if not trend_sections_map:
         return title + "\n"
     return title + "\n\n" + "\n\n".join(trend_sections_map.values()) + "\n"

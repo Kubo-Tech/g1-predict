@@ -30,12 +30,18 @@ pip install -e ".[dev]"
 | `keiba-domain`（GitHub） | 競馬ドメインの定義・判定。`keiba-data-interface` が要求する |
 | `keiba-data-interface`（GitHub） | 日本語カラム名でのレース・出走表・過去成績取得 |
 | `mykeibadb-python`（GitHub / `develop` ブランチ） | DB 直接アクセスと着度数集計（`analytics`） |
+| `race-data`（GitHub） | レースデータの取得・判定（`RaceData`）。`race-dynamics-evaluation` が要求する |
+| `feature-value-utils`（GitHub、private） | 統計量計算。`race-dynamics-evaluation` が要求する |
+| `race-dynamics-evaluation`（GitHub、private） | 展開評価（差し有利度・外枠有利度・外有利度）の計算とプロット |
+| `matplotlib` | 前日・当日の傾向のグラフ（出目の棒グラフ・展開グラフ・標準化散布図）の生成。日本語表示に Noto Sans CJK JP フォントを使う |
 | `openpyxl` | 分析表（xlsx）の書き出し |
 | `python-dotenv` | `.env` の読み込み |
 | `pyyaml` | `configs/` 配下の YAML の読み込み |
 | `requests` | はてなブログ AtomPub / Fotolife API |
 
-`keiba-domain` は `keiba-data-interface` の依存だが、PyPI に存在せず GitHub からしか取得できないため、**このリポジトリの直接依存としても明示している**。書かないと依存解決が `No matching distribution found for keiba-domain` で失敗する。
+`keiba-domain` は `keiba-data-interface` の依存だが、PyPI に存在せず GitHub からしか取得できないため、**このリポジトリの直接依存としても明示している**。書かないと依存解決が `No matching distribution found for keiba-domain` で失敗する。`feature-value-utils` も同様に `race-dynamics-evaluation` の依存として明示している。
+
+`race-dynamics-evaluation` と `feature-value-utils` は `KeibaAI-developer` の private リポジトリのため、ローカルでの `pip install` には GitHub への認証が必要になる（SSH 鍵、または `https://<token>@github.com/...` 形式の URL など）。CI では Secrets の `KEIBAAI_DEVELOPER_TOKEN`（`KeibaAI-developer` の private リポジトリを読める fine-grained PAT。Contents: Read-only）を使って認証する。
 
 `[project.optional-dependencies] dev` には `pytest` / `pytest-cov` / `pytest-mock` と、静的解析用の `mypy` / 型スタブが入る。ruff は CI 側でバージョンを固定して実行するため、ここには含めない。
 
@@ -76,6 +82,14 @@ KeibaAI の開発コンテナからクラウド DB を参照する場合は、�
 | `HATENA_API_KEY` | AtomPub の API キー |
 
 ローカルから手動投稿する場合のみ、`.env` にも同じ値が必要になる。
+
+### CI の依存インストール（GitHub Actions でのみ使用）
+
+| 変数 | 内容 |
+| --- | --- |
+| `KEIBAAI_DEVELOPER_TOKEN` | `KeibaAI-developer` の private リポジトリ（`race-dynamics-evaluation`、`feature-value-utils`）を読める fine-grained PAT（Contents: Read-only） |
+
+`.github/workflows/ci.yml` が依存インストール前にこのトークンで `https://github.com/KeibaAI-developer/` への git アクセスを認証する。GitHub の Secrets に登録しておく。
 
 ## 動作確認
 

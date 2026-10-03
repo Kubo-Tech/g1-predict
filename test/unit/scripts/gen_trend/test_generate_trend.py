@@ -99,14 +99,14 @@ def test_generate_trend_creates_file_in_race_subdir(public_dir: str) -> None:
 
 
 def test_generate_trend_title_format(public_dir: str) -> None:
-    """傾向ファイルのタイトルが # {race_name}{year}傾向分析 になる。
+    """傾向ファイルのタイトルが # 【{race_name}{year}】傾向分析 になる。
 
     Args:
         public_dir (str): public ディレクトリパス。
     """
     _run(_make_mock_race_getter(race_name="天皇賞春", year="2026"), public_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert content.startswith("# 天皇賞春2026傾向分析")
+    assert content.startswith("# 【天皇賞春2026】傾向分析")
 
 
 def test_generate_trend_contains_dynamic_sections(public_dir: str) -> None:
