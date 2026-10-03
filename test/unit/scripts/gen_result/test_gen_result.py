@@ -2,11 +2,13 @@
 import json
 import os
 from collections.abc import Generator
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 import requests
+from matplotlib.figure import Figure
 
 from scripts.gen_result import _format_comment_body, generate_result
 
@@ -28,12 +30,24 @@ def _make_mock_di(result_rows: list[dict]) -> MagicMock:
     return mock
 
 
-def _normal_row(chakusa: int, umaban: int, horse_name: str) -> dict:
+def _normal_row(
+    chakusa: int,
+    umaban: int,
+    horse_name: str,
+    ninki: float = 1,
+    corner4: float = 1,
+    halon: float = 35.0,
+    kyakushitsu: str | None = "1",
+) -> dict:
     return {
         "確定着順": chakusa,
         "馬番": umaban,
         "馬名": horse_name,
         "異常区分コード": "0",
+        "単勝人気順": ninki,
+        "4コーナー順位": corner4,
+        "後3ハロン": halon,
+        "脚質判定コード": kyakushitsu,
     }
 
 
@@ -43,6 +57,10 @@ def _abnormal_row(umaban: int, horse_name: str, ijo_code: str) -> dict:
         "馬番": umaban,
         "馬名": horse_name,
         "異常区分コード": ijo_code,
+        "単勝人気順": float("nan"),
+        "4コーナー順位": float("nan"),
+        "後3ハロン": float("nan"),
+        "脚質判定コード": None,
     }
 
 
@@ -99,7 +117,9 @@ def _run(
     marks: dict[int, str] | None = None,
     comments: dict[int, str] | None = None,
     race_code: str = _RACE_CODE,
-) -> None:
+    dynamics: tuple[pd.DataFrame | None, Figure | None] = (None, None),
+) -> MagicMock:
+    """generate_result を実行し、展開評価のモックを返す。"""
     if marks is None:
         marks = {}
     if comments is None:
@@ -109,11 +129,15 @@ def _run(
         patch("scripts.gen_result.DataInterface", return_value=mock_di),
         patch("scripts.gen_result._PUBLIC_DIR", public_dir),
         patch("scripts.gen_result._TEMPLATES_DIR", templates_dir),
+        patch(
+            "scripts.gen_result.evaluate_race_dynamics_with_plot", return_value=dynamics
+        ) as mock_evaluate,
         patch("scripts.gen_result.read_marks", return_value=marks),
         patch("scripts.gen_result.read_kek_comments", return_value=comments),
         patch.dict("os.environ", {"TFJV_DATA_DIR": "/tmp/fake_tfjv"}),
     ):
         generate_result(race_code)
+    return mock_evaluate
 
 
 def _read_md(public_dir: str, race_code: str, race_name: str, year: str) -> str:
@@ -130,7 +154,7 @@ def test_gen_result_related_articles_with_predict_link(dirs: tuple[str, str]) ->
     _run(_make_mock_di([_normal_row(1, 5, "ホースA")]), public_dir, templates_dir)
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
     assert (
-        "1着 5ホースA  \n\n"
+        "| 1着 |  | 5 | ホースA | 1 | 1 (逃) | 35.0秒 (1位) |\n\n"
         "## 関連記事\n\n"
         "- [予想タイトル](https://example.com/1)\n"
         "- [自作AIの結果]()\n\n"
@@ -186,53 +210,80 @@ def test_gen_result_has_sohyo_section(dirs: tuple[str, str]) -> None:
     assert "## 総評" in content
 
 
-def test_gen_result_result_section_shows_top3(dirs: tuple[str, str]) -> None:
-    """結果セクションに1〜3着が出力される。"""
+def test_gen_result_result_section_table_values(dirs: tuple[str, str]) -> None:
+    """結果セクションに1〜3着の表が出力され、4着以降は出力されない。"""
     public_dir, templates_dir = dirs
     mock_di = _make_mock_di([
-        _normal_row(1, 5, "ホースA"),
-        _normal_row(2, 3, "ホースB"),
-        _normal_row(3, 8, "ホースC"),
-        _normal_row(4, 1, "ホースD"),
+        _normal_row(1, 11, "ホースA", ninki=9, corner4=1, halon=35.8, kyakushitsu="1"),
+        _normal_row(2, 3, "ホースB", ninki=2, corner4=5, halon=34.5, kyakushitsu="3"),
+        _normal_row(3, 8, "ホースC", ninki=1, corner4=7, halon=36.0, kyakushitsu="4"),
+        _normal_row(4, 1, "ホースD", ninki=3, corner4=2, halon=35.0, kyakushitsu="2"),
+    ])
+    _run(mock_di, public_dir, templates_dir, marks={11: "◎", 8: "▲"})
+    content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
+    result_section = content[content.index("## 結果") : content.index("## 関連記事")]
+    assert result_section == (
+        "## 結果\n\n"
+        "| 着順 | 印 | 馬番 | 馬名 | 人気 | 4角通過 | 後3F |\n"
+        "| --- | --- | --- | --- | --- | --- | --- |\n"
+        "| 1着 | ◎ | 11 | ホースA | 9 | 1 (逃) | 35.8秒 (3位) |\n"
+        "| 2着 |  | 3 | ホースB | 2 | 5 (差) | 34.5秒 (1位) |\n"
+        "| 3着 | ▲ | 8 | ホースC | 1 | 7 (追) | 36.0秒 (4位) |\n\n"
+    )
+
+
+def test_gen_result_result_section_without_values(dirs: tuple[str, str]) -> None:
+    """人気・4角通過・後3Fが無い馬は「-」、脚質判定が無い馬は4角通過に括弧を付けない。"""
+    public_dir, templates_dir = dirs
+    nan = float("nan")
+    mock_di = _make_mock_di([
+        _normal_row(1, 5, "ホースA", ninki=nan, corner4=nan, halon=nan, kyakushitsu=None),
+        _normal_row(2, 3, "ホースB", corner4=4, kyakushitsu=None),
     ])
     _run(mock_di, public_dir, templates_dir)
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
-    result_section = content[content.index("## 結果") : content.index("## 総評")]
-    assert "1着 5ホースA" in result_section
-    assert "2着 3ホースB" in result_section
-    assert "3着 8ホースC" in result_section
-    assert "4着" not in result_section
+    assert "| 1着 |  | 5 | ホースA | - | - | - |\n" in content
+    assert "| 2着 |  | 3 | ホースB | 1 | 4 | 35.0秒 (1位) |\n" in content
 
 
-def test_gen_result_result_section_trailing_spaces(dirs: tuple[str, str]) -> None:
-    """1着・2着行末尾に半角スペース2つ、3着は末尾スペースなし。"""
+def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str]) -> None:
+    """展開評価がある場合は有利度の表と標準化散布図を載せ、画像を保存する。"""
     public_dir, templates_dir = dirs
-    mock_di = _make_mock_di([
-        _normal_row(1, 5, "ホースA"),
-        _normal_row(2, 3, "ホースB"),
-        _normal_row(3, 8, "ホースC"),
-    ])
-    _run(mock_di, public_dir, templates_dir)
+    cor_df = pd.DataFrame(
+        {"差し有利度": [-0.79], "外枠有利度": [-0.15], "外有利度": [float("nan")]}
+    )
+    figure = MagicMock(spec=Figure)
+    mock_evaluate = _run(
+        _make_mock_di([_normal_row(1, 5, "ホースA")]),
+        public_dir,
+        templates_dir,
+        dynamics=(cor_df, figure),
+    )
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
-    assert "1着 5ホースA  " in content
-    assert "2着 3ホースB  " in content
-    assert "3着 8ホースC  " not in content
+    assert (
+        "\n\n| 差し有利度 | 外枠有利度 | 外有利度 |\n"
+        "| --- | --- | --- |\n"
+        "| -79% | -15% | - |\n\n"
+        f"![標準化散布図](img/race_result/{_RACE_CODE}.png)\n\n"
+        "## 関連記事"
+    ) in content
+    expected_path = os.path.join(
+        public_dir, _YEAR, f"{_RACE_CODE}_{_RACE_NAME}", "img", "race_result", f"{_RACE_CODE}.png"
+    )
+    figure.savefig.assert_called_once_with(expected_path, bbox_inches="tight")
+    assert mock_evaluate.call_args.args[2] == date(2026, 5, 25)
 
 
-def test_gen_result_result_section_with_mark(dirs: tuple[str, str]) -> None:
-    """印がある馬は印付きで出力される。"""
+def test_gen_result_result_section_without_dynamics(dirs: tuple[str, str]) -> None:
+    """展開評価の対象外レースは有利度の表と散布図を載せず、画像を作らない。"""
     public_dir, templates_dir = dirs
-    mock_di = _make_mock_di([
-        _normal_row(1, 5, "ホースA"),
-        _normal_row(2, 3, "ホースB"),
-        _normal_row(3, 8, "ホースC"),
-    ])
-    _run(mock_di, public_dir, templates_dir, marks={5: "◎", 8: "▲"})
+    _run(_make_mock_di([_normal_row(1, 5, "ホースA")]), public_dir, templates_dir)
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
-    result_section = content[content.index("## 結果") : content.index("## 総評")]
-    assert "1着 ◎5ホースA" in result_section
-    assert "2着 3ホースB" in result_section
-    assert "3着 ▲8ホースC" in result_section
+    assert "差し有利度" not in content
+    assert "標準化散布図" not in content
+    assert not os.path.exists(
+        os.path.join(public_dir, _YEAR, f"{_RACE_CODE}_{_RACE_NAME}", "img")
+    )
 
 
 def test_gen_result_review_section_all_horses_ordered(dirs: tuple[str, str]) -> None:

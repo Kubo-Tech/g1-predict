@@ -19,7 +19,7 @@ JRA の G1 レースについて、
 | --- | --- | --- |
 | mykeibadb（PostgreSQL） | [`mykeibadb-python`](https://github.com/KeibaAI-developer/mykeibadb-python) の `RaceGetter` / `MasterGetter` / `ShussobetsuGetter` / `analytics` | JRA-VAN 由来のレース・出走馬・血統・成績データ |
 | 同上（正規化済みビュー） | [`keiba-data-interface`](https://github.com/KeibaAI-developer/keiba-data-interface) の `DataInterface("mykeibadb")` | 日本語カラム名に整形された出走表・結果・過去成績 |
-| 同上（`RaceData` 経由） | [`race-data`](https://github.com/KeibaAI-developer/race-data) の `RaceData` | [`race-dynamics-evaluation`](https://github.com/KeibaAI-developer/race-dynamics-evaluation) の入力。`gen_prev_day_trend` / `gen_race_day_trend` の展開評価（差し有利度・外枠有利度・外有利度）で使用 |
+| 同上（`RaceData` 経由） | [`race-data`](https://github.com/KeibaAI-developer/race-data) の `RaceData` | [`race-dynamics-evaluation`](https://github.com/KeibaAI-developer/race-dynamics-evaluation) の入力。`gen_prev_day_trend` / `gen_race_day_trend` / `gen_result` の展開評価（差し有利度・外枠有利度・外有利度）で使用 |
 | TARGET frontier JV のデータファイル | `g1_predict/modules/utils/tfjv.py` で直接バイナリ読み書き | 自分でつけた**印**と、レースごとに書き溜めた**成績コメント** |
 | （データソースではない） | [`keiba-domain`](https://github.com/KeibaAI-developer/keiba-domain) | 競馬場・馬場状態などコード表由来の定義と判定。DB にも外部 API にも依存しない最下層ライブラリ |
 | （データソースではない） | [`race-dynamics-evaluation`](https://github.com/KeibaAI-developer/race-dynamics-evaluation)（private） | `RaceData` から展開評価の相関係数・標準化散布図を計算するアルゴリズムライブラリ。[`feature-value-utils`](https://github.com/KeibaAI-developer/feature-value-utils)（private）に依存する |
@@ -98,8 +98,11 @@ g1-predict/
 │   │   └── table_utils.py          # フィルタ、色ルール、セル変換
 │   └── utils/
 │       ├── hatena_links.py         # 関連記事のはてなブログ記事リンク取得
+│       ├── image_output.py         # 記事に貼る画像の保存
 │       ├── md_utils.py             # Markdown セクション置換
 │       ├── output_path.py          # 出力パスの検証
+│       ├── race_dynamics.py        # 展開評価の実行、有利度の書式と表
+│       ├── race_result.py          # 結果の行の整形（脚質・4角通過・後3F）
 │       └── tfjv.py                 # TARGET frontier JV ファイルの読み書き
 ├── scripts/                        # エントリポイント（python -m scripts.xxx）
 │   └── gen_day_trend.py            # 前日・当日の傾向に共通する出力処理（gen_prev_day_trend / gen_race_day_trend から呼ぶ）
@@ -110,12 +113,12 @@ g1-predict/
 ├── public/{年}/{race_code}_{レース名}/
 │   ├── 過去の傾向.md / 前日の傾向.md / 当日の傾向.md / 予想.md / 回顧.md
 │   ├── table/{race_code}_{レース名}.xlsx
-│   ├── img/                        # 記事に貼る画像（table/ patrol/ result/ など任意）
+│   ├── img/                        # 記事に貼る画像（table/ patrol/ result/ race_result/ など任意）
 │   └── ../.hatena_entry_ids.json   # 投稿済みエントリ ID と画像 URL の記録
 └── test/unit/                      # scripts / modules の単体テスト
 ```
 
-`scripts/` は「引数のパース・入出力パス決定・テンプレート埋め込み」に徹し、集計や判定のロジックは `g1_predict/modules/` 側に置く方針になっている。`modules/` 配下のパッケージ名は、それを使うスクリプト名と対応させる（`scripts/gen_trend.py` → `modules/gen_trend/`）。前日の傾向と当日の傾向は同じロジックを共有するため、`scripts/gen_prev_day_trend.py` と `scripts/gen_race_day_trend.py` は `modules/gen_day_trend/` を使う。複数の機能から参照する定数だけが `modules/constants.py` に置かれる。
+`scripts/` は「引数のパース・入出力パス決定・テンプレート埋め込み」に徹し、集計や判定のロジックは `g1_predict/modules/` 側に置く方針になっている。`modules/` 配下のパッケージ名は、それを使うスクリプト名と対応させる（`scripts/gen_trend.py` → `modules/gen_trend/`）。前日の傾向と当日の傾向は同じロジックを共有するため、`scripts/gen_prev_day_trend.py` と `scripts/gen_race_day_trend.py` は `modules/gen_day_trend/` を使う。前日・当日の傾向と回顧で共通する展開評価・結果の整形・画像保存は `modules/utils/` に置く。複数の機能から参照する定数だけが `modules/constants.py` に置かれる。
 
 ## race_code（16桁）の構造
 

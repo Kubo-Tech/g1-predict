@@ -16,7 +16,7 @@
 | `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
 | `gen_predict` | ○ | 読み | `hatena.yml` | `TEMPLATE_PREDICT.md`, `points/` | `予想.md` |
 | `gen_result_comment` | ○ | 書き | − | − | TFJV の `KEK_COM` |
-| `gen_result` | ○ | 読み | `hatena.yml` | `TEMPLATE_RESULT.md` | `回顧.md` |
+| `gen_result` | ○ | 読み | `hatena.yml` | `TEMPLATE_RESULT.md` | `回顧.md`, `img/race_result/{race_code}.png` |
 | `hatena_publish` | − | − | `hatena.yml` | − | はてなブログ記事 |
 
 ---
@@ -114,7 +114,7 @@ python -m scripts.gen_race_day_trend --race-code 2026061409030411
 
 グラフの日本語表示には Noto Sans CJK JP フォントを使う。
 
-画像は `public/{開催年}/{race_code}_{レース名}/img/{prev_day|race_day}/` に、出目の棒グラフは `dememe_ninki.png` / `dememe_waku.png` / `dememe_kyakushitsu.png` / `dememe_agari.png`、展開グラフは `dynamics.png`、標準化散布図は `{集計したレースのrace_code}.png` の名前で保存される。保存とクローズ、ファイルの書き出しは `scripts/gen_day_trend.py`（2つのスクリプトが種類を選んで呼ぶ共通処理）が行い、`g1_predict/modules/gen_day_trend/day_trend.py` はMarkdown本文と画像（Figure）を `DayTrendBody` として返すだけでファイルを書かない。前日・当日の違いは `DayTrendKind`（`PREV_DAY` / `RACE_DAY`）で表す。
+画像は `public/{開催年}/{race_code}_{レース名}/img/{prev_day|race_day}/` に、出目の棒グラフは `dememe_ninki.png` / `dememe_waku.png` / `dememe_kyakushitsu.png` / `dememe_agari.png`、展開グラフは `dynamics.png`、標準化散布図は `{集計したレースのrace_code}.png` の名前で保存される。画像の保存とクローズは `g1_predict/modules/utils/image_output.py` の `save_images()`、ファイルの書き出しは `scripts/gen_day_trend.py`（2つのスクリプトが種類を選んで呼ぶ共通処理）が行い、`g1_predict/modules/gen_day_trend/day_trend.py` はMarkdown本文と画像（Figure）を `DayTrendBody` として返すだけでファイルを書かない。前日・当日の違いは `DayTrendKind`（`PREV_DAY` / `RACE_DAY`）で表す。
 
 集計対象のレースが1つも無い場合（当日の傾向では結果が出ているレースが1つも無い場合を含む）は、タイトル行だけの記事が出力される。
 
@@ -198,11 +198,11 @@ python -m scripts.gen_result_comment --race-code 2026061409030411
 python -m scripts.gen_result --race-code 2026061409030411
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/回顧.md`
+出力: `public/{開催年}/{race_code}_{レース名}/回顧.md`、`public/{開催年}/{race_code}_{レース名}/img/race_result/{race_code}.png`（標準化散布図）
 
 タイトルは `# 【{レース名}{年}】回顧`。`templates/TEMPLATE_RESULT.md` の `## 結果`・`## 関連記事`・`## 回顧` を埋める（`## 総評` は空のまま。手で書く）。
 
-- `## 結果` … 3着までを `{着順}着 {印}{馬番}{馬名}` で列挙する。
+- `## 結果` … 3着までを、着順・印・馬番・馬名・人気・4角通過・後3Fの表にする。前日・当日の傾向の各レースの表と同じ計算で、馬番・人気・4角通過には単位を付けない。印が無い馬は印を空欄にし、値が無い項目は `-` にする。表の下に、差し有利度・外枠有利度・外有利度の表と標準化散布図（`![標準化散布図](img/race_result/{race_code}.png)`）を載せる。展開評価の対象外である1000m直線コースのレースは、有利度の表と散布図を載せず、画像も保存しない。展開評価の未来レース判定の基準日には、開催日の翌日を使う。画像は手で貼る写真を置く `img/result/` と分けて `img/race_result/` に保存する。
 - `## 関連記事` … 予想記事へのリンクと、手で URL を埋める `[自作AIの結果]()`。予想記事が未投稿、またはフィードに無い場合は予想記事の行を出力せず、`[自作AIの結果]()` だけを出力する。リンクの引き方は `gen_predict` の関連記事セクションと同じ（[hatena-publish.md](hatena-publish.md#関連記事のリンク)）。
 - `## 回顧` … TFJV の成績コメントがある馬について `### {着順}着 {印}{馬番}{馬名}` の見出しとコメント本文を出力する。
   - 正常に完走した馬を着順昇順で並べ、そのあとに異常（取消・除外・中止・失格）の馬を並べる。

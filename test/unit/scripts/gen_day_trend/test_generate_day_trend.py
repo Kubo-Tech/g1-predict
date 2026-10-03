@@ -162,7 +162,7 @@ def test_generate_day_trend_prev_day_saves_and_closes_image(public_dir: str) -> 
         ),
         patch("scripts.gen_day_trend._PUBLIC_DIR", public_dir),
         patch("scripts.gen_day_trend.build_day_trend_body", return_value=body),
-        patch("scripts.gen_day_trend.plt") as mock_plt,
+        patch("g1_predict.modules.utils.image_output.plt") as mock_plt,
     ):
         generate_day_trend(race_code, PREV_DAY)
 
@@ -190,7 +190,7 @@ def test_generate_day_trend_race_day_writes_race_day_article_and_images(public_d
         patch("scripts.gen_day_trend.RaceGetter", return_value=_make_mock_race_getter()),
         patch("scripts.gen_day_trend._PUBLIC_DIR", public_dir),
         patch("scripts.gen_day_trend.build_day_trend_body", return_value=body) as mock_build,
-        patch("scripts.gen_day_trend.plt") as mock_plt,
+        patch("g1_predict.modules.utils.image_output.plt") as mock_plt,
     ):
         generate_day_trend(race_code, RACE_DAY)
 

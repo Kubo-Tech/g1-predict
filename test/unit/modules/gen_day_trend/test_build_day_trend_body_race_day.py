@@ -13,6 +13,7 @@ from g1_predict.modules.gen_day_trend.day_trend import (
     build_day_trend_body,
 )
 
+_DYNAMICS_MODULE = "g1_predict.modules.utils.race_dynamics"
 _MODULE = "g1_predict.modules.gen_day_trend.day_trend"
 
 
@@ -93,9 +94,12 @@ def _call(
         patch(f"{_MODULE}.DataInterface", return_value=mock_di),
         patch(f"{_MODULE}.RaceGetter", return_value=mock_rg),
         patch(f"{_MODULE}.keibajo_from_code", return_value="東京"),
-        patch(f"{_MODULE}.RaceData", return_value=mock_race_data) as mock_race_data_cls,
-        patch(f"{_MODULE}.evaluate_race_dynamics", return_value=MagicMock(cor_df=cor_df)),
-        patch(f"{_MODULE}.make_time_plot", return_value=MagicMock(name="Figure")),
+        patch(f"{_DYNAMICS_MODULE}.RaceData", return_value=mock_race_data) as mock_race_data_cls,
+        patch(
+            f"{_DYNAMICS_MODULE}.evaluate_race_dynamics",
+            return_value=MagicMock(cor_df=cor_df),
+        ),
+        patch(f"{_DYNAMICS_MODULE}.make_time_plot", return_value=MagicMock(name="Figure")),
     ):
         body = build_day_trend_body("2026050505010111", _make_race_info(), "天皇賞春", kind)
     return body, mock_rg, mock_race_data_cls

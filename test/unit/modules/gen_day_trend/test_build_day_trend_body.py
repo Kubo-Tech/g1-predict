@@ -151,15 +151,15 @@ def _call(
             return_value=venue_name,
         ),
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.RaceData",
+            "g1_predict.modules.utils.race_dynamics.RaceData",
             return_value=mock_race_data,
         ),
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.evaluate_race_dynamics",
+            "g1_predict.modules.utils.race_dynamics.evaluate_race_dynamics",
             return_value=MagicMock(cor_df=cor_df),
         ),
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.make_time_plot",
+            "g1_predict.modules.utils.race_dynamics.make_time_plot",
             return_value=figure,
         ),
     ):
@@ -554,15 +554,15 @@ def test_build_day_trend_body_prev_day_race_data_uses_target_race_date_as_refere
             return_value="東京",
         ),
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.RaceData",
+            "g1_predict.modules.utils.race_dynamics.RaceData",
             return_value=mock_race_data,
         ) as mock_race_data_cls,
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.evaluate_race_dynamics",
+            "g1_predict.modules.utils.race_dynamics.evaluate_race_dynamics",
             return_value=MagicMock(cor_df=_make_cor_df()),
         ),
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.make_time_plot",
+            "g1_predict.modules.utils.race_dynamics.make_time_plot",
             return_value=MagicMock(name="Figure"),
         ),
     ):
@@ -596,15 +596,15 @@ def test_build_day_trend_body_prev_day_race_data_created_once_per_race() -> None
             return_value="東京",
         ),
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.RaceData",
+            "g1_predict.modules.utils.race_dynamics.RaceData",
             return_value=mock_race_data,
         ) as mock_race_data_cls,
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.evaluate_race_dynamics",
+            "g1_predict.modules.utils.race_dynamics.evaluate_race_dynamics",
             return_value=MagicMock(cor_df=_make_cor_df()),
         ),
         patch(
-            "g1_predict.modules.gen_day_trend.day_trend.make_time_plot",
+            "g1_predict.modules.utils.race_dynamics.make_time_plot",
             return_value=MagicMock(name="Figure"),
         ),
     ):

@@ -11,8 +11,6 @@ import matplotlib
 matplotlib.use("Agg")
 
 from dotenv import find_dotenv, load_dotenv  # noqa: E402
-from matplotlib import pyplot as plt  # noqa: E402
-from matplotlib.figure import Figure  # noqa: E402
 from mykeibadb import RaceGetter  # noqa: E402
 
 from g1_predict.modules.gen_day_trend.day_trend import (  # noqa: E402
@@ -20,6 +18,7 @@ from g1_predict.modules.gen_day_trend.day_trend import (  # noqa: E402
     DayTrendKind,
     build_day_trend_body,
 )
+from g1_predict.modules.utils.image_output import save_images  # noqa: E402
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code  # noqa: E402
 from g1_predict.modules.utils.race_name import to_race_label  # noqa: E402
 
@@ -51,7 +50,7 @@ def generate_day_trend(race_code: str, kind: DayTrendKind) -> None:
     output_path = os.path.join(race_dir, f"{kind.label}の傾向.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
-    _save_images(race_dir, body.images)
+    save_images(race_dir, body.images)
     print(f"Generated: {output_path}")
 
 
@@ -85,20 +84,3 @@ def _render_day_trend_content(
     if not body.text:
         return title + "\n"
     return title + "\n\n" + body.text
-
-
-def _save_images(race_dir: str, images: dict[str, Figure]) -> None:
-    """展開評価の画像を記事ディレクトリへ保存する。
-
-    保存後にFigureをcloseし、メモリを解放する。
-
-    Args:
-        race_dir (str): レース単位の出力ディレクトリのパス。
-        images (dict[str, Figure]): 記事ディレクトリからの相対パス → Figure。
-    """
-    for relative_path, figure in images.items():
-        image_path = os.path.join(race_dir, relative_path)
-        os.makedirs(os.path.dirname(image_path), exist_ok=True)
-        # タイトル・軸ラベルが画像の外に切れないよう余白を内容に合わせる
-        figure.savefig(image_path, bbox_inches="tight")
-        plt.close(figure)
