@@ -268,11 +268,11 @@ def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str
         "| -79% | -15% | - |\n\n"
         f"![標準化散布図](img/race_result/{_RACE_CODE}.png)\n\n"
         "評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
-        "走破タイムを補正した値（秒）。大きいほど展開の不利をはね返して好走した馬。\n\n"
+        "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。\n\n"
         "| 着順 | 馬番 | 馬名 | 評価値 |\n"
         "| --- | --- | --- | --- |\n"
-        "| 2着 | 3 | ホースB | +0.31秒 |\n"
-        "| 1着 | 5 | ホースA | -0.20秒 |\n\n"
+        "| 2着 | 3 | ホースB | +0.31 |\n"
+        "| 1着 | 5 | ホースA | -0.20 |\n\n"
         "## 関連記事"
     ) in content
     expected_path = os.path.join(

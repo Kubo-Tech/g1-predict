@@ -112,5 +112,5 @@ def build_total_evaluation_table_lines(
         chakujun_str = f"{int(chakujun)}着" if pd.notna(chakujun) else "-"
         # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
         value = round(float(row["総合評価"]), 2) + 0.0
-        lines.append(f"| {chakujun_str} | {umaban} | {horse['馬名']} | {value:+.2f}秒 |")
+        lines.append(f"| {chakujun_str} | {umaban} | {horse['馬名']} | {value:+.2f} |")
     return lines

@@ -150,7 +150,7 @@ def _build_result_section(
             [
                 "",
                 "評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
-                "走破タイムを補正した値（秒）。大きいほど展開の不利をはね返して好走した馬。",
+                "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。",
                 "",
                 *build_total_evaluation_table_lines(dynamics.eval_df, result_df),
             ]
