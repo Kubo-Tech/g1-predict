@@ -222,9 +222,11 @@ def test_build_prev_day_trend_body_returns_empty_when_no_target_races(
 
 
 def test_build_prev_day_trend_body_has_dememe_header() -> None:
-    """マッチするレースがある場合、## 出目 ヘッダーを含む。"""
+    """マッチするレースがある場合、## 前日の出目 ヘッダーと説明文を含む。"""
     result = _call()
-    assert "## 出目" in result.text
+    assert (
+        "## 前日の出目\n\n各要素において、前日のレースで3着以内に入った頭数を集計。\n"
+    ) in result.text
 
 
 @pytest.mark.parametrize(
@@ -248,9 +250,9 @@ def test_build_prev_day_trend_body_dememe_heading_then_chart(heading: str, image
 
 
 def test_build_prev_day_trend_body_has_each_race_header() -> None:
-    """マッチするレースがある場合、## 各レース ヘッダーを含む。"""
+    """マッチするレースがある場合、## 各レースの結果 ヘッダーを含む。"""
     result = _call()
-    assert "## 各レース" in result.text
+    assert "## 各レースの結果" in result.text
 
 
 def test_build_prev_day_trend_body_race_block_starts_with_h3() -> None:
@@ -399,11 +401,11 @@ def test_build_prev_day_trend_body_multiple_races_sorted_by_race_bango() -> None
 
 
 def test_build_prev_day_trend_body_has_dynamics_header() -> None:
-    """マッチするレースがある場合、## 展開 ヘッダーを## 出目と## 各レースの間に含む。"""
+    """マッチするレースがある場合、展開有利度の傾向のヘッダーを前日の出目と各レースの結果の間に含む。"""
     result = _call()
-    dememe_index = result.text.index("## 出目")
-    dynamics_index = result.text.index("## 展開")
-    each_race_index = result.text.index("## 各レース")
+    dememe_index = result.text.index("## 前日の出目")
+    dynamics_index = result.text.index("## 展開有利度の傾向")
+    each_race_index = result.text.index("## 各レースの結果")
     assert dememe_index < dynamics_index < each_race_index
 
 
@@ -419,7 +421,8 @@ def test_build_prev_day_trend_body_dynamics_description() -> None:
 def test_build_prev_day_trend_body_dynamics_section_has_chart_link() -> None:
     """展開セクションに展開グラフの画像を載せる。"""
     result = _call()
-    section = result.text[result.text.index("## 展開") : result.text.index("## 各レース")]
+    start = result.text.index("## 展開有利度の傾向")
+    section = result.text[start : result.text.index("## 各レースの結果")]
     assert "![展開](img/prev_day/dynamics.png)" in section
     assert "|" not in section
 

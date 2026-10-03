@@ -81,7 +81,7 @@ def build_prev_day_trend_body(
     """前日の傾向記事の本文を生成する。
 
     対象レースの前日に同競馬場・同芝ダで行われたレースの上位3頭を列挙する。
-    本文は `## 出目` `## 展開` `## 各レース` の3セクションから構成され、
+    本文は `## 前日の出目` `## 展開有利度の傾向` `## 各レースの結果` の3セクションから構成され、
     H1見出しは含まない。画像は展開評価の標準化散布図で、対象外レース
     （1000m直線コース）には生成しない。
 
@@ -132,7 +132,7 @@ def build_prev_day_trend_body(
         "",
         _build_dynamics_section(),
         "",
-        "## 各レース",
+        "## 各レースの結果",
         "",
     ]
 
@@ -294,10 +294,10 @@ def _build_dynamics_section() -> str:
     """展開セクションを生成する。
 
     Returns:
-        str: 展開セクション文字列（## 展開から始まる）。
+        str: 展開セクション文字列（## 展開有利度の傾向から始まる）。
     """
     lines: list[str] = [
-        "## 展開",
+        "## 展開有利度の傾向",
         "",
         "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
         "内外の位置と走破タイムの相関係数。正なら差し・外枠・外を回した馬が有利。",
@@ -415,7 +415,7 @@ def _build_dememe_section(
         top3_entries (list[tuple[pd.Series, pd.DataFrame]]): (horse_row, result_df) のリスト。
 
     Returns:
-        str: 出目セクション文字列（## 出目から始まる）。
+        str: 出目セクション文字列（## 前日の出目から始まる）。
         dict[str, Figure]: 記事ディレクトリからの相対パスから棒グラフへのマッピング。
     """
     rows = [row for row, _ in top3_entries]
@@ -463,7 +463,11 @@ def _build_dememe_section(
         ),
     ]
 
-    lines: list[str] = ["## 出目", "", "3着以内に入った頭数"]
+    lines: list[str] = [
+        "## 前日の出目",
+        "",
+        "各要素において、前日のレースで3着以内に入った頭数を集計。",
+    ]
     images: dict[str, Figure] = {}
     for name, url, file_name, labels, counts, colors in charts:
         image_path = f"img/prev_day/{file_name}.png"
