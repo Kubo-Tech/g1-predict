@@ -115,6 +115,15 @@ def main() -> None:
 
 
 def _build_result_section(result_df: pd.DataFrame, marks: dict[int, str]) -> str:
+    """結果セクション（3着までの表）を生成する。
+
+    Args:
+        result_df (pd.DataFrame): レース結果DataFrame。
+        marks (dict[int, str]): 馬番 -> 印記号のdict。
+
+    Returns:
+        str: `## 結果` から始まるセクション文字列。
+    """
     lines = [
         "## 結果",
         "",
