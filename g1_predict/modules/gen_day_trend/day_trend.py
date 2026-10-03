@@ -1,4 +1,4 @@
-"""前日の傾向記事の本文を生成するモジュール。"""
+"""前日・当日の傾向記事の本文を生成するモジュール。"""
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -36,19 +36,42 @@ _KYAKUSHITSU_DISPLAY: dict[str, str] = {"1": "逃げ", "2": "先行", "3": "差�
 # 脚質の表示名 → 各レースの表で使う1文字の略称
 _KYAKUSHITSU_SHORT: dict[str, str] = {"逃げ": "逃", "先行": "先", "差し": "差", "追込": "追"}
 _KYAKUSHITSU_URL = "http://next5.jra-van.jp/appli/kyakushitsu3.html"
-_DYNAMICS_CHART_PATH = "img/prev_day/dynamics.png"
 _JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
+# 展開評価に必要なコーナー通過順が揃っている結果区分。
+# RACE_SHOSAIのDATA_KUBUNのうち、"6"は速報成績（全馬着順＋コーナー通過順）、"7"は成績。
+_RESULT_CONFIRMED_DATA_KUBUN: frozenset[str] = frozenset({"6", "7"})
 
 
 @dataclass(frozen=True)
-class PrevDayTrendBody:
-    """前日の傾向記事の本文と画像。
+class DayTrendKind:
+    """傾向記事の種類（前日・当日）ごとの違い。
+
+    Attributes:
+        label (str): 記事の見出しや説明文に使う表示語（"前日" / "当日"）。
+        day_offset (int): 集計日の対象レースの開催日からの日数（前日は-1、当日は0）。
+        image_dir (str): 記事ディレクトリ直下の画像ディレクトリ名。
+        confirmed_only (bool): 結果が出ているレースだけを集計する場合はTrue。
+    """
+
+    label: str
+    day_offset: int
+    image_dir: str
+    confirmed_only: bool
+
+
+PREV_DAY = DayTrendKind(label="前日", day_offset=-1, image_dir="prev_day", confirmed_only=False)
+RACE_DAY = DayTrendKind(label="当日", day_offset=0, image_dir="race_day", confirmed_only=True)
+
+
+@dataclass(frozen=True)
+class DayTrendBody:
+    """傾向記事の本文と画像。
 
     Attributes:
         text (str): 記事本文（Markdown）。対象レースが1件もない場合は空文字列。
         images (dict[str, Figure]): 記事ディレクトリからの相対パス
-            （例: "img/prev_day/xxx.png"）から画像へのマッピング。展開グラフ
-            （img/prev_day/dynamics.png）と、展開評価の対象レースごとの
+            （例: "img/prev_day/xxx.png"）から画像へのマッピング。出目の棒グラフ、
+            展開グラフ（dynamics.png）と、展開評価の対象レースごとの
             標準化散布図を持つ。対象レースが1件もない場合は空辞書。
     """
 
@@ -58,41 +81,43 @@ class PrevDayTrendBody:
 
 @dataclass(frozen=True)
 class _MatchedRace:
-    """前日にマッチした1レース分のデータ。
+    """集計対象の1レース分のデータ。
 
     Attributes:
-        prev_race_code (str): 前日レースのrace_code。
-        race_info (pd.DataFrame): 前日レースの基本情報DataFrame（日本語カラム名）。
-        result_df (pd.DataFrame): 前日レースの結果DataFrame（日本語カラム名）。
+        race_code (str): 集計対象レースのrace_code。
+        race_info (pd.DataFrame): 集計対象レースの基本情報DataFrame（日本語カラム名）。
+        result_df (pd.DataFrame): 集計対象レースの結果DataFrame（日本語カラム名）。
         cor_df (pd.DataFrame | None): 展開評価の相関係数DataFrame（1行）。
             展開評価の対象外レースはNone。
         figure (Figure | None): 展開評価の標準化散布図。展開評価の対象外レースはNone。
     """
 
-    prev_race_code: str
+    race_code: str
     race_info: pd.DataFrame
     result_df: pd.DataFrame
     cor_df: pd.DataFrame | None
     figure: Figure | None
 
 
-def build_prev_day_trend_body(
+def build_day_trend_body(
     race_code: str,
     race_info: pd.DataFrame,
-) -> PrevDayTrendBody:
-    """前日の傾向記事の本文を生成する。
+    kind: DayTrendKind,
+) -> DayTrendBody:
+    """傾向記事の本文を生成する。
 
-    対象レースの前日に同競馬場・同芝ダで行われたレースの上位3頭を列挙する。
-    本文は `## 前日の出目` `## 展開有利度の傾向` `## 各レースの結果` の3セクションから構成され、
-    H1見出しは含まない。画像は展開評価の標準化散布図で、対象外レース
-    （1000m直線コース）には生成しない。
+    対象レースの前日または当日に、同競馬場・同芝ダで行われたレースの上位3頭を列挙する。
+    本文は `## {前日|当日}の出目` `## 展開有利度の傾向` `## 各レースの結果` の3セクションから
+    構成され、H1見出しは含まない。画像は出目の棒グラフ、展開グラフ、展開評価の標準化散布図で、
+    標準化散布図は対象外レース（1000m直線コース）には生成しない。
 
     Args:
         race_code (str): 16桁レースコード。
         race_info (pd.DataFrame): 対象レースの基本情報DataFrame（raw英語カラム名）。
+        kind (DayTrendKind): 傾向記事の種類（PREV_DAY / RACE_DAY）。
 
     Returns:
-        PrevDayTrendBody: 前日の傾向記事の本文と画像。対象レースが1件もない場合は
+        DayTrendBody: 傾向記事の本文と画像。集計対象のレースが1件もない場合は
             本文が空文字列、画像は空辞書。
     """
     di = DataInterface("mykeibadb")
@@ -103,22 +128,22 @@ def build_prev_day_trend_body(
     year = int(race_code[0:4])
     mmdd = race_code[4:8]
     race_date = datetime.strptime(f"{year}{mmdd}", "%Y%m%d").date()
-    prev_date = race_date - timedelta(days=1)
+    trend_date = race_date + timedelta(days=kind.day_offset)
 
-    matched = _get_prev_day_matched_races(prev_date, keibajo_code, target_shiba_da)
+    matched = _get_matched_races(trend_date, keibajo_code, target_shiba_da, kind)
     if matched.empty:
-        return PrevDayTrendBody(text="", images={})
+        return DayTrendBody(text="", images={})
 
     venue_name = keibajo_from_code(keibajo_code)
 
     matched_races: list[_MatchedRace] = []
     for _, raw_row in matched.iterrows():
-        prev_race_code = str(raw_row["race_code"])
-        prev_race_info = di.get_race_basic_info(prev_race_code)
-        result_df = di.get_result(prev_race_code)
-        cor_df, figure = _evaluate_race_dynamics(prev_race_code, di, race_date)
+        matched_race_code = str(raw_row["race_code"])
+        matched_race_info = di.get_race_basic_info(matched_race_code)
+        result_df = di.get_result(matched_race_code)
+        cor_df, figure = _evaluate_race_dynamics(matched_race_code, di, trend_date)
         matched_races.append(
-            _MatchedRace(prev_race_code, prev_race_info, result_df, cor_df, figure)
+            _MatchedRace(matched_race_code, matched_race_info, result_df, cor_df, figure)
         )
 
     top3_entries: list[tuple[pd.Series, pd.DataFrame]] = []
@@ -128,51 +153,58 @@ def build_prev_day_trend_body(
         for _, horse_row in top3.iterrows():
             top3_entries.append((horse_row, result_df))
 
-    dememe_text, dememe_images = _build_dememe_section(top3_entries)
+    dememe_text, dememe_images = _build_dememe_section(top3_entries, kind)
     blocks: list[str] = [
         dememe_text,
         "",
-        _build_dynamics_section(),
+        _build_dynamics_section(kind),
         "",
         "## 各レースの結果",
         "",
     ]
 
     for race in matched_races:
-        blocks.append(_format_race_block(race, venue_name))
+        blocks.append(_format_race_block(race, venue_name, kind))
         blocks.append("")
 
     images: dict[str, Figure] = {
         **dememe_images,
-        _DYNAMICS_CHART_PATH: _make_dynamics_chart(matched_races),
+        _dynamics_chart_path(kind): _make_dynamics_chart(matched_races),
     }
     for race in matched_races:
         if race.figure is not None:
-            images[f"img/prev_day/{race.prev_race_code}.png"] = race.figure
+            images[f"img/{kind.image_dir}/{race.race_code}.png"] = race.figure
 
-    return PrevDayTrendBody(text="\n".join(blocks), images=images)
+    return DayTrendBody(text="\n".join(blocks), images=images)
 
 
-def _get_prev_day_matched_races(
-    prev_date: date,
+def _get_matched_races(
+    trend_date: date,
     keibajo_code: str,
     shiba_da: str,
+    kind: DayTrendKind,
 ) -> pd.DataFrame:
-    """前日の同競馬場・同芝ダのレース一覧を返す。
+    """集計日の同競馬場・同芝ダのレース一覧を返す。
 
     Args:
-        prev_date (date): 前日の日付。
+        trend_date (date): 集計日。
         keibajo_code (str): 競馬場コード（例: "05"）。
         shiba_da (str): 芝ダ区分（"芝" または "ダ"）。
+        kind (DayTrendKind): 傾向記事の種類。confirmed_onlyの場合は結果が出ているレースに絞る。
 
     Returns:
         pd.DataFrame: 条件一致したレースのraw RACE_SHOSAI DataFrame（race_bango昇順）。
     """
     rg = RaceGetter()
-    raw = rg.get_race_shosai(start_date=prev_date, end_date=prev_date, convert_codes=False)
+    raw = rg.get_race_shosai(start_date=trend_date, end_date=trend_date, convert_codes=False)
 
     if raw.empty:
         return raw
+
+    if kind.confirmed_only:
+        raw = raw[raw["data_kubun"].astype(str).str.strip().isin(_RESULT_CONFIRMED_DATA_KUBUN)]
+        if raw.empty:
+            return raw
 
     keibajo_mask = raw["keibajo_code"].astype(str).str.strip() == keibajo_code
     raw = raw[keibajo_mask]
@@ -194,22 +226,22 @@ def _get_prev_day_matched_races(
 
 
 def _evaluate_race_dynamics(
-    prev_race_code: str,
+    race_code: str,
     data_interface: DataInterface,
-    target_race_date: date,
+    trend_date: date,
 ) -> tuple[pd.DataFrame | None, Figure | None]:
-    """前日レースの展開評価を計算する。
+    """集計対象レースの展開評価を計算する。
 
     RaceDataを1回だけ取得し、相関係数の計算と標準化散布図の生成の両方に使い回す。
-    未来レースの判定基準日を対象レースの開催日にすることで、前日レースの当日中
-    （対象レースの前日）でも前日レースを確定済みのレースとして評価する。
+    未来レースの判定基準日を集計日の翌日にすることで、集計日当日中でも
+    集計対象レースを確定済みのレースとして評価する。
     1000m直線コースは展開評価の対象外のため、両方Noneを返す。
     展開評価が使うのはレース結果とコーナー通過順のみのため、払戻情報は取得しない。
 
     Args:
-        prev_race_code (str): 前日レースのrace_code。
+        race_code (str): 集計対象レースのrace_code。
         data_interface (DataInterface): 展開評価に使うDataInterface。
-        target_race_date (date): 対象レースの開催日。未来レース判定の基準日に使う。
+        trend_date (date): 集計日。この翌日を未来レース判定の基準日に使う。
 
     Returns:
         pd.DataFrame | None: 展開評価の相関係数DataFrame（1行）。対象外レースはNone。
@@ -219,9 +251,9 @@ def _evaluate_race_dynamics(
         CornerDataError: レース結果情報または4コーナーの通過順データが存在しない場合。
     """
     race_data = RaceData(
-        race_code=prev_race_code,
+        race_code=race_code,
         data_interface=data_interface,
-        reference_date=target_race_date,
+        reference_date=trend_date + timedelta(days=1),
     )
     if race_data.is_straight_race():
         return None, None
@@ -292,8 +324,23 @@ def _format_correlation(cor_df: pd.DataFrame | None, column: str) -> str:
     return f"{round(float(value), 2) + 0.0:+.2f}"
 
 
-def _build_dynamics_section() -> str:
+def _dynamics_chart_path(kind: DayTrendKind) -> str:
+    """展開グラフの記事ディレクトリからの相対パスを返す。
+
+    Args:
+        kind (DayTrendKind): 傾向記事の種類。
+
+    Returns:
+        str: 展開グラフの相対パス。
+    """
+    return f"img/{kind.image_dir}/dynamics.png"
+
+
+def _build_dynamics_section(kind: DayTrendKind) -> str:
     """展開セクションを生成する。
+
+    Args:
+        kind (DayTrendKind): 傾向記事の種類。
 
     Returns:
         str: 展開セクション文字列（## 展開有利度の傾向から始まる）。
@@ -304,7 +351,7 @@ def _build_dynamics_section() -> str:
         "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
         "内外の位置と走破タイムの相関係数。正なら差し・外枠・外を回した馬が有利。",
         "",
-        f"![展開]({_DYNAMICS_CHART_PATH})",
+        f"![展開]({_dynamics_chart_path(kind)})",
     ]
     return "\n".join(lines)
 
@@ -316,7 +363,7 @@ def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
     展開評価の対象外レースや値が無いレースは線を途切れさせる。
 
     Args:
-        matched_races (list[_MatchedRace]): 前日にマッチしたレースのリスト。
+        matched_races (list[_MatchedRace]): 集計対象レースのリスト。
 
     Returns:
         Figure: 展開グラフ。
@@ -340,12 +387,13 @@ def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
     return figure
 
 
-def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
+def _format_race_block(race: _MatchedRace, venue_name: str, kind: DayTrendKind) -> str:
     """1レース分のトレンドブロックを生成する。
 
     Args:
-        race (_MatchedRace): 前日にマッチした1レース分のデータ。
+        race (_MatchedRace): 集計対象の1レース分のデータ。
         venue_name (str): 競馬場表示名（例: "東京"）。
+        kind (DayTrendKind): 傾向記事の種類。
 
     Returns:
         str: フォーマットされたレースブロック文字列。
@@ -404,7 +452,7 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
             ]
         )
     if race.figure is not None:
-        image_path = f"img/prev_day/{race.prev_race_code}.png"
+        image_path = f"img/{kind.image_dir}/{race.race_code}.png"
         lines.append("")
         lines.append(f"![{venue_name}{race_no}R 標準化散布図]({image_path})")
 
@@ -413,16 +461,18 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
 
 def _build_dememe_section(
     top3_entries: list[tuple[pd.Series, pd.DataFrame]],
+    kind: DayTrendKind,
 ) -> tuple[str, dict[str, Figure]]:
-    """前日全レースの出目集計セクションを生成する。
+    """集計対象全レースの出目集計セクションを生成する。
 
     人気・枠番・脚質・上がり順位ごとに、3着以内に入った頭数の棒グラフを載せる。
 
     Args:
         top3_entries (list[tuple[pd.Series, pd.DataFrame]]): (horse_row, result_df) のリスト。
+        kind (DayTrendKind): 傾向記事の種類。
 
     Returns:
-        str: 出目セクション文字列（## 前日の出目から始まる）。
+        str: 出目セクション文字列（## {前日|当日}の出目から始まる）。
         dict[str, Figure]: 記事ディレクトリからの相対パスから棒グラフへのマッピング。
     """
     rows = [row for row, _ in top3_entries]
@@ -471,13 +521,13 @@ def _build_dememe_section(
     ]
 
     lines: list[str] = [
-        "## 前日の出目",
+        f"## {kind.label}の出目",
         "",
-        "各要素において、前日のレースで3着以内に入った頭数を集計。",
+        f"各要素において、{kind.label}のレースで3着以内に入った頭数を集計。",
     ]
     images: dict[str, Figure] = {}
     for name, url, file_name, labels, counts, colors in charts:
-        image_path = f"img/prev_day/{file_name}.png"
+        image_path = f"img/{kind.image_dir}/{file_name}.png"
         heading = f"[{name}]({url})" if url is not None else name
         lines.extend(["", f"**{heading}**", "", f"![{name}]({image_path})"])
         images[image_path] = _make_bar_chart(labels, counts, colors)

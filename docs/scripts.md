@@ -13,6 +13,7 @@
 | `gen_trend` | ○ | − | `trends.yml` | − | `過去の傾向.md` |
 | `gen_table` | ○ | − | `table.yml` | − | `table/*.xlsx` |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
+| `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
 | `gen_predict` | ○ | 読み | − | `TEMPLATE_PREDICT.md`, `points/` | `予想.md` |
 | `gen_result_comment` | ○ | 書き | − | − | TFJV の `KEK_COM` |
 | `gen_result` | ○ | 読み | − | `TEMPLATE_RESULT.md` | `回顧.md` |
@@ -83,17 +84,28 @@ python -m scripts.gen_table --race-code 2026061409030411
 
 ---
 
-## gen_prev_day_trend — 前日の傾向記事
+## gen_prev_day_trend / gen_race_day_trend — 前日・当日の傾向記事
 
 ```bash
 python -m scripts.gen_prev_day_trend --race-code 2026061409030411
+python -m scripts.gen_race_day_trend --race-code 2026061409030411
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/前日の傾向.md`
+出力: `public/{開催年}/{race_code}_{レース名}/前日の傾向.md`（`gen_prev_day_trend`）、`public/{開催年}/{race_code}_{レース名}/当日の傾向.md`（`gen_race_day_trend`）
 
-対象レースの**前日**に、同じ競馬場・同じ芝ダ区分で行われた平地レース（障害を除く）を集計する。土曜の馬場傾向から日曜のメインを読むための記事。
+どちらも同じ競馬場・同じ芝ダ区分で行われた平地レース（障害を除く）を集計し、同じ構成の記事を出力する。違いは次の表のとおり。
 
-構成:
+| | `gen_prev_day_trend` | `gen_race_day_trend` |
+| --- | --- | --- |
+| 集計日 | 対象レースの前日 | 対象レースと同じ日 |
+| 集計するレース | 集計日の該当レースすべて | 結果が出ているレースだけ |
+| 見出し・説明文の表示語 | 前日 | 当日 |
+| 画像の保存先 | `img/prev_day/` | `img/race_day/` |
+| 展開評価の未来レース判定の基準日 | 対象レースの開催日 | 対象レースの開催日の翌日 |
+
+前日の傾向は、土曜の馬場傾向から日曜のメインを読むための記事。前日のレースはすべて確定済みの前提で、結果が未確定のレースがあれば展開評価で例外になる。当日の傾向は、当日のレースのうち結果が出ているレースだけを集計する。結果が出ているかは `RACE_SHOSAI` の `data_kubun` で判定し、コーナー通過順まで揃う `6`（速報成績・全馬着順＋コーナー通過順）と `7`（成績）を結果が出ているとみなす。基準日を集計日の翌日にするのは、集計日のレースが未来レースとして扱われないようにするため。
+
+構成（以下は前日の傾向。当日の傾向は「前日」を「当日」に置き換える）:
 
 - `# 【{レース名}{年}】前日の傾向`
 - `## 前日の出目` … 3着以内に入った馬を、人気・枠番・脚質・上がり順位のグループごとに頭数集計した棒グラフ。項目ごとに太字の見出しと画像を1枚ずつ載せ、脚質の見出しは JRA-VAN の脚質判定の説明ページ（http://next5.jra-van.jp/appli/kyakushitsu3.html）へのリンクにする。棒の色は MATLAB の標準色の1色目（青）で、枠番だけは各枠の色（race-dynamics-evaluation の `WAKU_TO_COLOR_DICT`）。
@@ -102,9 +114,9 @@ python -m scripts.gen_prev_day_trend --race-code 2026061409030411
 
 グラフの日本語表示には Noto Sans CJK JP フォントを使う。
 
-画像は `public/{開催年}/{race_code}_{レース名}/img/prev_day/` に、出目の棒グラフは `dememe_ninki.png` / `dememe_waku.png` / `dememe_kyakushitsu.png` / `dememe_agari.png`、展開グラフは `dynamics.png`、標準化散布図は `{前日のrace_code}.png` の名前で保存される。保存とクローズは `scripts/gen_prev_day_trend.py` が行い、`g1_predict/modules/gen_prev_day_trend/prev_day_trend.py` はMarkdown本文と画像（Figure）を `PrevDayTrendBody` として返すだけでファイルを書かない。
+画像は `public/{開催年}/{race_code}_{レース名}/img/{prev_day|race_day}/` に、出目の棒グラフは `dememe_ninki.png` / `dememe_waku.png` / `dememe_kyakushitsu.png` / `dememe_agari.png`、展開グラフは `dynamics.png`、標準化散布図は `{集計したレースのrace_code}.png` の名前で保存される。保存とクローズ、ファイルの書き出しは `scripts/gen_day_trend.py`（2つのスクリプトが種類を選んで呼ぶ共通処理）が行い、`g1_predict/modules/gen_day_trend/day_trend.py` はMarkdown本文と画像（Figure）を `DayTrendBody` として返すだけでファイルを書かない。前日・当日の違いは `DayTrendKind`（`PREV_DAY` / `RACE_DAY`）で表す。
 
-前日に対象となるレースが1つも無い場合は、タイトル行だけの記事が出力される。
+集計対象のレースが1つも無い場合（当日の傾向では結果が出ているレースが1つも無い場合を含む）は、タイトル行だけの記事が出力される。
 
 生成後は、馬場傾向の所感を書き足して仕上げる（実例: `public/2026/2026061409030411_宝塚記念/前日の傾向.md`）。
 

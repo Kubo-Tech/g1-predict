@@ -33,7 +33,7 @@ pip install -e ".[dev]"
 | `race-data`（GitHub） | レースデータの取得・判定（`RaceData`）。`race-dynamics-evaluation` が要求する |
 | `feature-value-utils`（GitHub、private） | 統計量計算。`race-dynamics-evaluation` が要求する |
 | `race-dynamics-evaluation`（GitHub、private） | 展開評価（差し有利度・外枠有利度・外有利度）の計算とプロット |
-| `matplotlib` | 前日の傾向のグラフ（出目の棒グラフ・展開グラフ・標準化散布図）の生成。日本語表示に Noto Sans CJK JP フォントを使う |
+| `matplotlib` | 前日・当日の傾向のグラフ（出目の棒グラフ・展開グラフ・標準化散布図）の生成。日本語表示に Noto Sans CJK JP フォントを使う |
 | `openpyxl` | 分析表（xlsx）の書き出し |
 | `python-dotenv` | `.env` の読み込み |
 | `pyyaml` | `configs/` 配下の YAML の読み込み |

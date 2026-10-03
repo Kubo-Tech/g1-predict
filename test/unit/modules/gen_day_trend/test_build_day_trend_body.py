@@ -1,4 +1,4 @@
-"""build_prev_day_trend_body の単体テスト。"""
+"""build_day_trend_body の前日の傾向についての単体テスト。"""
 from datetime import date
 from unittest.mock import MagicMock, patch
 
@@ -6,9 +6,11 @@ import pandas as pd
 import pytest
 from matplotlib.colors import to_hex
 
-from g1_predict.modules.gen_prev_day_trend.prev_day_trend import (
-    PrevDayTrendBody,
-    build_prev_day_trend_body,
+from g1_predict.modules.gen_day_trend.day_trend import (
+    PREV_DAY,
+    DayTrendBody,
+    DayTrendKind,
+    build_day_trend_body,
 )
 
 _DEMEME_IMAGE_PATHS = {
@@ -116,8 +118,9 @@ def _call(
     mock_race_data: MagicMock | None = None,
     cor_df: pd.DataFrame | None = None,
     figure: MagicMock | None = None,
-) -> PrevDayTrendBody:
-    """build_prev_day_trend_body をモック環境で実行する。"""
+    kind: DayTrendKind = PREV_DAY,
+) -> DayTrendBody:
+    """build_day_trend_body をモック環境で実行する。"""
     if race_info is None:
         race_info = _make_race_info()
     if mock_di is None:
@@ -136,31 +139,31 @@ def _call(
 
     with (
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface",
+            "g1_predict.modules.gen_day_trend.day_trend.DataInterface",
             return_value=mock_di,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            "g1_predict.modules.gen_day_trend.day_trend.RaceGetter",
             return_value=mock_rg,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
+            "g1_predict.modules.gen_day_trend.day_trend.keibajo_from_code",
             return_value=venue_name,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceData",
+            "g1_predict.modules.gen_day_trend.day_trend.RaceData",
             return_value=mock_race_data,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.evaluate_race_dynamics",
+            "g1_predict.modules.gen_day_trend.day_trend.evaluate_race_dynamics",
             return_value=MagicMock(cor_df=cor_df),
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.make_time_plot",
+            "g1_predict.modules.gen_day_trend.day_trend.make_time_plot",
             return_value=figure,
         ),
     ):
-        return build_prev_day_trend_body(race_code, race_info)
+        return build_day_trend_body(race_code, race_info, kind)
 
 
 @pytest.fixture
@@ -212,7 +215,7 @@ def simple_result_df() -> pd.DataFrame:
         pytest.param(_make_raw_shosai(track_code="51"), id="barrier_race_excluded"),
     ],
 )
-def test_build_prev_day_trend_body_returns_empty_when_no_target_races(
+def test_build_day_trend_body_prev_day_returns_empty_when_no_target_races(
     raw_shosai: pd.DataFrame,
 ) -> None:
     """対象レースが0件の場合、本文が空文字列で画像も空になる。"""
@@ -221,7 +224,7 @@ def test_build_prev_day_trend_body_returns_empty_when_no_target_races(
     assert result.images == {}
 
 
-def test_build_prev_day_trend_body_has_dememe_header() -> None:
+def test_build_day_trend_body_prev_day_has_dememe_header() -> None:
     """マッチするレースがある場合、## 前日の出目 ヘッダーと説明文を含む。"""
     result = _call()
     assert (
@@ -242,27 +245,29 @@ def test_build_prev_day_trend_body_has_dememe_header() -> None:
         pytest.param("**上がり順位**", "![上がり順位](img/prev_day/dememe_agari.png)", id="agari"),
     ],
 )
-def test_build_prev_day_trend_body_dememe_heading_then_chart(heading: str, image_link: str) -> None:
+def test_build_day_trend_body_prev_day_dememe_heading_then_chart(
+    heading: str, image_link: str
+) -> None:
     """出目の各見出しの下に、空行を挟んで棒グラフの画像を載せる。"""
     result = _call()
     assert f"{heading}\n\n{image_link}" in result.text
     assert "頭 |" not in result.text
 
 
-def test_build_prev_day_trend_body_has_each_race_header() -> None:
+def test_build_day_trend_body_prev_day_has_each_race_header() -> None:
     """マッチするレースがある場合、## 各レースの結果 ヘッダーを含む。"""
     result = _call()
     assert "## 各レースの結果" in result.text
 
 
-def test_build_prev_day_trend_body_race_block_starts_with_h3() -> None:
+def test_build_day_trend_body_prev_day_race_block_starts_with_h3() -> None:
     """レースブロックの見出しが ### {venue}{race_no}R で始まる。"""
     mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(race_no=6))
     result = _call(mock_di=mock_di, venue_name="東京")
     assert "### 東京6R" in result.text
 
 
-def test_build_prev_day_trend_body_grade_displayed_in_race_header() -> None:
+def test_build_day_trend_body_prev_day_grade_displayed_in_race_header() -> None:
     """グレードコード A は G1 としてレースヘッダーに表示される。"""
     mock_di = _make_mock_di(
         prev_race_info=_make_prev_race_info(grade_code="A", condition_name="天皇賞春")
@@ -271,7 +276,7 @@ def test_build_prev_day_trend_body_grade_displayed_in_race_header() -> None:
     assert "(G1)" in result.text
 
 
-def test_build_prev_day_trend_body_no_grade_for_unknown_code() -> None:
+def test_build_day_trend_body_prev_day_no_grade_for_unknown_code() -> None:
     """グレードコードが未定義（_）の場合、グレード表示なし。"""
     mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(grade_code="_"))
     result = _call(mock_di=mock_di)
@@ -280,7 +285,7 @@ def test_build_prev_day_trend_body_no_grade_for_unknown_code() -> None:
     assert "(G3)" not in result.text
 
 
-def test_build_prev_day_trend_body_uses_condition_name_when_present() -> None:
+def test_build_day_trend_body_prev_day_uses_condition_name_when_present() -> None:
     """競走条件名称がある場合、条件名称をレースヘッダーに使用する。"""
     mock_di = _make_mock_di(
         prev_race_info=_make_prev_race_info(condition_name="カトレア賞")
@@ -289,7 +294,7 @@ def test_build_prev_day_trend_body_uses_condition_name_when_present() -> None:
     assert "カトレア賞" in result.text
 
 
-def test_build_prev_day_trend_body_uses_condition_code_when_name_absent() -> None:
+def test_build_day_trend_body_prev_day_uses_condition_code_when_name_absent() -> None:
     """競走条件名称が空の場合、条件コードから表示名を使用する。"""
     mock_di = _make_mock_di(
         prev_race_info=_make_prev_race_info(condition_name="", condition_code="703")
@@ -298,23 +303,23 @@ def test_build_prev_day_trend_body_uses_condition_code_when_name_absent() -> Non
     assert "未勝利" in result.text
 
 
-def test_build_prev_day_trend_body_prev_date_passed_to_race_getter() -> None:
+def test_build_day_trend_body_prev_day_prev_date_passed_to_race_getter() -> None:
     """RaceGetter.get_race_shosai が前日の日付で呼ばれる。"""
     mock_rg = MagicMock()
     mock_rg.get_race_shosai.return_value = pd.DataFrame()
 
     with (
-        patch("g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface"),
+        patch("g1_predict.modules.gen_day_trend.day_trend.DataInterface"),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            "g1_predict.modules.gen_day_trend.day_trend.RaceGetter",
             return_value=mock_rg,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
+            "g1_predict.modules.gen_day_trend.day_trend.keibajo_from_code",
             return_value="東京",
         ),
     ):
-        build_prev_day_trend_body("2026050505010101", _make_race_info())
+        build_day_trend_body("2026050505010101", _make_race_info(), PREV_DAY)
 
     mock_rg.get_race_shosai.assert_called_once_with(
         start_date=date(2026, 5, 4),
@@ -338,7 +343,7 @@ def _bar_heights(figure: object) -> list[float]:
         pytest.param("img/prev_day/dememe_agari.png", [1, 1, 1, 0, 0, 0], id="agari"),
     ],
 )
-def test_build_prev_day_trend_body_dememe_counts(
+def test_build_day_trend_body_prev_day_dememe_counts(
     simple_result_df: pd.DataFrame, image_path: str, expected: list[int]
 ) -> None:
     """出目の棒グラフの高さが3着以内の頭数と一致する。"""
@@ -347,7 +352,7 @@ def test_build_prev_day_trend_body_dememe_counts(
     assert _bar_heights(result.images[image_path]) == expected
 
 
-def test_build_prev_day_trend_body_dememe_chart_labels_and_colors() -> None:
+def test_build_day_trend_body_prev_day_dememe_chart_labels_and_colors() -> None:
     """出目の棒グラフは項目ごとの目盛りラベルを持ち、枠番は枠色、他はMATLAB標準色の1色目で塗る。"""
     result = _call()
     waku_ax = result.images["img/prev_day/dememe_waku.png"].axes[0]
@@ -367,7 +372,7 @@ def test_build_prev_day_trend_body_dememe_chart_labels_and_colors() -> None:
         assert [to_hex(patch.get_facecolor()) for patch in ax.patches] == ["#0072bd"] * 6
 
 
-def test_build_prev_day_trend_body_race_table_columns(simple_result_df: pd.DataFrame) -> None:
+def test_build_day_trend_body_prev_day_race_table_columns(simple_result_df: pd.DataFrame) -> None:
     """各レースの表は枠番を「8枠 11番」、4角通過・後3Fに脚質の略称・上がり順位を添えて書く。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
@@ -376,7 +381,7 @@ def test_build_prev_day_trend_body_race_table_columns(simple_result_df: pd.DataF
     assert "| 3着 | 8枠 15番 | 11人気 | 8番手 (追) | 35.5秒 (3位) |" in result.text
 
 
-def test_build_prev_day_trend_body_race_table_without_kyakushitsu_and_halon() -> None:
+def test_build_day_trend_body_prev_day_race_table_without_kyakushitsu_and_halon() -> None:
     """脚質判定コードが無ければ4角通過にカッコを付けず、後3ハロンが無ければ後3Fは - になる。"""
     result_df = _make_result_df([
         {
@@ -393,7 +398,7 @@ def test_build_prev_day_trend_body_race_table_without_kyakushitsu_and_halon() ->
     assert "| 1着 | 1枠 1番 | 1人気 | 2番手 | - |" in result.text
 
 
-def test_build_prev_day_trend_body_multiple_races_sorted_by_race_bango() -> None:
+def test_build_day_trend_body_prev_day_multiple_races_sorted_by_race_bango() -> None:
     """複数レースが race_bango 昇順でレースブロックに出力される。"""
     raw = pd.DataFrame({
         "race_code": ["2026050405010108", "2026050405010103"],
@@ -416,7 +421,7 @@ def test_build_prev_day_trend_body_multiple_races_sorted_by_race_bango() -> None
     assert result.text.index("### 東京3R") < result.text.index("### 東京8R")
 
 
-def test_build_prev_day_trend_body_has_dynamics_header() -> None:
+def test_build_day_trend_body_prev_day_has_dynamics_header() -> None:
     """マッチするレースがある場合、展開有利度の傾向のヘッダーを前日の出目と各レースの結果の間に含む。"""
     result = _call()
     dememe_index = result.text.index("## 前日の出目")
@@ -425,7 +430,7 @@ def test_build_prev_day_trend_body_has_dynamics_header() -> None:
     assert dememe_index < dynamics_index < each_race_index
 
 
-def test_build_prev_day_trend_body_dynamics_description() -> None:
+def test_build_day_trend_body_prev_day_dynamics_description() -> None:
     """展開セクションに説明文を含む。"""
     result = _call()
     assert (
@@ -434,7 +439,7 @@ def test_build_prev_day_trend_body_dynamics_description() -> None:
     ) in result.text
 
 
-def test_build_prev_day_trend_body_dynamics_section_has_chart_link() -> None:
+def test_build_day_trend_body_prev_day_dynamics_section_has_chart_link() -> None:
     """展開セクションに展開グラフの画像を載せる。"""
     result = _call()
     start = result.text.index("## 展開有利度の傾向")
@@ -443,7 +448,7 @@ def test_build_prev_day_trend_body_dynamics_section_has_chart_link() -> None:
     assert "|" not in section
 
 
-def test_build_prev_day_trend_body_race_block_table_between_top3_and_image() -> None:
+def test_build_day_trend_body_prev_day_race_block_table_between_top3_and_image() -> None:
     """レースブロックで、上位3頭の表と標準化散布図の間に有利度の表を空行で挟んで載せる。"""
     mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(race_no=6))
     raw = _make_raw_shosai(race_code="2026050405010106")
@@ -455,21 +460,21 @@ def test_build_prev_day_trend_body_race_block_table_between_top3_and_image() -> 
     ) in result.text
 
 
-def test_build_prev_day_trend_body_race_table_negative_zero_is_plus_zero() -> None:
+def test_build_day_trend_body_prev_day_race_table_negative_zero_is_plus_zero() -> None:
     """0に丸まる負の値は -0.00 ではなく +0.00 と表示される。"""
     cor_df = _make_cor_df(sashi=-0.001, soto_waku=-0.004, soto=0.0)
     result = _call(cor_df=cor_df)
     assert "| +0.00 | +0.00 | +0.00 |" in result.text
 
 
-def test_build_prev_day_trend_body_race_table_nan_is_dash() -> None:
+def test_build_day_trend_body_prev_day_race_table_nan_is_dash() -> None:
     """外有利度がNaN（全馬最内）の場合、有利度の表の値が - になる。"""
     cor_df = _make_cor_df(soto=float("nan"))
     result = _call(cor_df=cor_df)
     assert "| +0.45 | -0.12 | - |" in result.text
 
 
-def test_build_prev_day_trend_body_straight_race_has_no_table_and_image_link() -> None:
+def test_build_day_trend_body_prev_day_straight_race_has_no_table_and_image_link() -> None:
     """直線コースの場合、レースブロックに有利度の表と画像リンクを載せない。"""
     mock_race_data = _make_mock_race_data(is_straight_race=True)
     result = _call(mock_race_data=mock_race_data)
@@ -477,7 +482,7 @@ def test_build_prev_day_trend_body_straight_race_has_no_table_and_image_link() -
     assert "標準化散布図" not in result.text
 
 
-def test_build_prev_day_trend_body_images_keyed_by_relative_path() -> None:
+def test_build_day_trend_body_prev_day_images_keyed_by_relative_path() -> None:
     """images が記事ディレクトリからの相対パスをキーとして展開グラフと散布図を保持する。"""
     raw = _make_raw_shosai(race_code="2026050405010106")
     figure = MagicMock(name="Figure")
@@ -490,14 +495,14 @@ def test_build_prev_day_trend_body_images_keyed_by_relative_path() -> None:
     assert result.images["img/prev_day/2026050405010106.png"] is figure
 
 
-def test_build_prev_day_trend_body_straight_race_has_only_summary_charts() -> None:
+def test_build_day_trend_body_prev_day_straight_race_has_only_summary_charts() -> None:
     """直線コースの場合、images は出目と展開のグラフだけになる。"""
     mock_race_data = _make_mock_race_data(is_straight_race=True)
     result = _call(mock_race_data=mock_race_data)
     assert set(result.images) == {*_DEMEME_IMAGE_PATHS, "img/prev_day/dynamics.png"}
 
 
-def test_build_prev_day_trend_body_dynamics_chart_lines() -> None:
+def test_build_day_trend_body_prev_day_dynamics_chart_lines() -> None:
     """展開グラフは有利度ごとにMATLAB標準色の折れ線を持ち、縦軸は-1〜1、横軸はレース番号。"""
     mock_di = _make_mock_di(prev_race_info=_make_prev_race_info(race_no=6))
     cor_df = _make_cor_df(sashi=0.451, soto_waku=-0.123, soto=0.3)
@@ -512,7 +517,7 @@ def test_build_prev_day_trend_body_dynamics_chart_lines() -> None:
     assert [label.get_text() for label in ax.get_xticklabels()] == ["6R"]
 
 
-def test_build_prev_day_trend_body_dynamics_chart_places_races_evenly() -> None:
+def test_build_day_trend_body_prev_day_dynamics_chart_places_races_evenly() -> None:
     """展開グラフはレース番号に関係なくレースを等間隔に並べる。"""
     raw = pd.concat(
         [
@@ -526,7 +531,7 @@ def test_build_prev_day_trend_body_dynamics_chart_places_races_evenly() -> None:
     assert list(ax.get_lines()[0].get_xdata()) == [0, 1]
 
 
-def test_build_prev_day_trend_body_race_data_uses_target_race_date_as_reference() -> None:
+def test_build_day_trend_body_prev_day_race_data_uses_target_race_date_as_reference() -> None:
     """前日レースのRaceDataは、対象レースの開催日を未来レース判定の基準日にして作る。"""
     mock_race_data = _make_mock_race_data()
     mock_di = _make_mock_di()
@@ -535,31 +540,31 @@ def test_build_prev_day_trend_body_race_data_uses_target_race_date_as_reference(
 
     with (
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface",
+            "g1_predict.modules.gen_day_trend.day_trend.DataInterface",
             return_value=mock_di,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            "g1_predict.modules.gen_day_trend.day_trend.RaceGetter",
             return_value=mock_rg,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
+            "g1_predict.modules.gen_day_trend.day_trend.keibajo_from_code",
             return_value="東京",
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceData",
+            "g1_predict.modules.gen_day_trend.day_trend.RaceData",
             return_value=mock_race_data,
         ) as mock_race_data_cls,
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.evaluate_race_dynamics",
+            "g1_predict.modules.gen_day_trend.day_trend.evaluate_race_dynamics",
             return_value=MagicMock(cor_df=_make_cor_df()),
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.make_time_plot",
+            "g1_predict.modules.gen_day_trend.day_trend.make_time_plot",
             return_value=MagicMock(name="Figure"),
         ),
     ):
-        build_prev_day_trend_body("2026050505010101", _make_race_info())
+        build_day_trend_body("2026050505010101", _make_race_info(), PREV_DAY)
 
     mock_race_data_cls.assert_called_once_with(
         race_code="2026050405010106",
@@ -568,7 +573,7 @@ def test_build_prev_day_trend_body_race_data_uses_target_race_date_as_reference(
     )
 
 
-def test_build_prev_day_trend_body_race_data_created_once_per_race() -> None:
+def test_build_day_trend_body_prev_day_race_data_created_once_per_race() -> None:
     """RaceDataの取得が1レースにつき1回になる（evaluateとplotで使い回す）。"""
     mock_race_data = _make_mock_race_data()
     mock_di = _make_mock_di()
@@ -577,31 +582,31 @@ def test_build_prev_day_trend_body_race_data_created_once_per_race() -> None:
 
     with (
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.DataInterface",
+            "g1_predict.modules.gen_day_trend.day_trend.DataInterface",
             return_value=mock_di,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceGetter",
+            "g1_predict.modules.gen_day_trend.day_trend.RaceGetter",
             return_value=mock_rg,
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.keibajo_from_code",
+            "g1_predict.modules.gen_day_trend.day_trend.keibajo_from_code",
             return_value="東京",
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.RaceData",
+            "g1_predict.modules.gen_day_trend.day_trend.RaceData",
             return_value=mock_race_data,
         ) as mock_race_data_cls,
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.evaluate_race_dynamics",
+            "g1_predict.modules.gen_day_trend.day_trend.evaluate_race_dynamics",
             return_value=MagicMock(cor_df=_make_cor_df()),
         ),
         patch(
-            "g1_predict.modules.gen_prev_day_trend.prev_day_trend.make_time_plot",
+            "g1_predict.modules.gen_day_trend.day_trend.make_time_plot",
             return_value=MagicMock(name="Figure"),
         ),
     ):
-        build_prev_day_trend_body("2026050505010101", _make_race_info())
+        build_day_trend_body("2026050505010101", _make_race_info(), PREV_DAY)
 
     assert mock_race_data_cls.call_count == 1
     mock_race_data.fetch_race_result.assert_called_once_with()
