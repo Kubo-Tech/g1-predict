@@ -436,7 +436,7 @@ def test_build_day_trend_body_prev_day_dynamics_description() -> None:
     result = _call()
     assert (
         "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
-        "内外の位置と走破タイムの相関係数。正なら差し・外枠・外を回した馬が有利。"
+        "内外の位置と走破タイムの相関係数を100倍したもの。正なら差し・外枠・外を回した馬が有利。"
     ) in result.text
 
 
@@ -457,22 +457,22 @@ def test_build_day_trend_body_prev_day_race_block_table_between_top3_and_image()
     result = _call(mock_di=mock_di, raw_shosai=raw, venue_name="東京", cor_df=cor_df)
     assert (
         " |\n\n| 差し有利度 | 外枠有利度 | 外有利度 |\n| --- | --- | --- |\n"
-        "| +0.45 | -0.12 | +0.30 |\n\n![東京6R 標準化散布図](img/prev_day/2026050405010106.png)"
+        "| +45% | -12% | +30% |\n\n![東京6R 標準化散布図](img/prev_day/2026050405010106.png)"
     ) in result.text
 
 
 def test_build_day_trend_body_prev_day_race_table_negative_zero_is_plus_zero() -> None:
-    """0に丸まる負の値は -0.00 ではなく +0.00 と表示される。"""
+    """0%に丸まる値は符号を正にして +0% と表示される。"""
     cor_df = _make_cor_df(sashi=-0.001, soto_waku=-0.004, soto=0.0)
     result = _call(cor_df=cor_df)
-    assert "| +0.00 | +0.00 | +0.00 |" in result.text
+    assert "| +0% | +0% | +0% |" in result.text
 
 
 def test_build_day_trend_body_prev_day_race_table_nan_is_dash() -> None:
     """外有利度がNaN（全馬最内）の場合、有利度の表の値が - になる。"""
     cor_df = _make_cor_df(soto=float("nan"))
     result = _call(cor_df=cor_df)
-    assert "| +0.45 | -0.12 | - |" in result.text
+    assert "| +45% | -12% | - |" in result.text
 
 
 def test_build_day_trend_body_prev_day_straight_race_has_no_table_and_image_link() -> None:
@@ -513,8 +513,9 @@ def test_build_day_trend_body_prev_day_dynamics_chart_lines() -> None:
     lines = [line for line in ax.get_lines() if line.get_label() in labels]
     assert [line.get_label() for line in lines] == ["差し有利度", "外枠有利度", "外有利度"]
     assert [line.get_color() for line in lines] == ["#0072BD", "#D95319", "#EDB120"]
-    assert [float(line.get_ydata()[0]) for line in lines] == pytest.approx([0.451, -0.123, 0.3])
-    assert ax.get_ylim() == (-1, 1)
+    assert [float(line.get_ydata()[0]) for line in lines] == pytest.approx([45.1, -12.3, 30.0])
+    assert ax.get_ylim() == (-100, 100)
+    assert ax.yaxis.get_major_formatter()(50, 0) == "50%"
     assert [label.get_text() for label in ax.get_xticklabels()] == ["6R"]
 
 

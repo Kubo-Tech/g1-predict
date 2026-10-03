@@ -10,7 +10,7 @@ from keiba_data_interface import DataInterface
 from keiba_domain import keibajo_from_code
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, PercentFormatter
 from mykeibadb import RaceGetter
 from race_data import RaceData
 
@@ -316,7 +316,7 @@ def _race_condition(race_info: pd.DataFrame) -> str:
 
 
 def _format_correlation(cor_df: pd.DataFrame | None, column: str) -> str:
-    """相関係数を符号付き小数2桁の文字列に整形する。
+    """相関係数を100倍し、符号付きの整数パーセントの文字列に整形する。
 
     Args:
         cor_df (pd.DataFrame | None): 展開評価の相関係数DataFrame（1行）。
@@ -324,15 +324,14 @@ def _format_correlation(cor_df: pd.DataFrame | None, column: str) -> str:
         column (str): カラム名（差し有利度 / 外枠有利度 / 外有利度）。
 
     Returns:
-        str: 符号付き小数2桁の文字列。NaN、または対象外レースは "-"。
+        str: 符号付きの整数パーセントの文字列（例: "+45%"）。NaN、または対象外レースは "-"。
     """
     if cor_df is None:
         return "-"
     value = cor_df[column].iloc[0]
     if pd.isna(value):
         return "-"
-    # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
-    return f"{round(float(value), 2) + 0.0:+.2f}"
+    return f"{round(float(value) * 100):+d}%"
 
 
 def _dynamics_chart_path(kind: DayTrendKind) -> str:
@@ -360,7 +359,7 @@ def _build_dynamics_section(kind: DayTrendKind) -> str:
         "## 展開有利度の傾向",
         "",
         "差し有利度・外枠有利度・外有利度は、それぞれ4角通過位置・馬番・コーナーでの"
-        "内外の位置と走破タイムの相関係数。正なら差し・外枠・外を回した馬が有利。",
+        "内外の位置と走破タイムの相関係数を100倍したもの。正なら差し・外枠・外を回した馬が有利。",
         "",
         f"![展開]({_dynamics_chart_path(kind)})",
     ]
@@ -370,7 +369,8 @@ def _build_dynamics_section(kind: DayTrendKind) -> str:
 def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
     """各レースの差し有利度・外枠有利度・外有利度の折れ線グラフを生成する。
 
-    横軸はレースを等間隔に並べてレース番号を目盛りにし、縦軸は-1から1とする。
+    横軸はレースを等間隔に並べてレース番号を目盛りにし、縦軸は相関係数を100倍した
+    -100%から100%とする。
     展開評価の対象外レースや値が無いレースは線を途切れさせる。
 
     Args:
@@ -384,12 +384,13 @@ def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
     positions = list(range(len(matched_races)))
     for column, color in zip(_DYNAMICS_COLUMNS, _MATLAB_COLORS, strict=False):
         values = [
-            float(race.cor_df[column].iloc[0]) if race.cor_df is not None else float("nan")
+            float(race.cor_df[column].iloc[0]) * 100 if race.cor_df is not None else float("nan")
             for race in matched_races
         ]
         ax.plot(positions, values, color=color, marker="o", label=column)
     ax.axhline(0, color="black", linewidth=0.8)
-    ax.set_ylim(-1, 1)
+    ax.set_ylim(-100, 100)
+    ax.yaxis.set_major_formatter(PercentFormatter(decimals=0))
     ax.set_xticks(positions)
     ax.set_xticklabels([f"{int(race.race_info['レース番号'].iloc[0])}R" for race in matched_races])
     ax.grid(True, linestyle="--", alpha=0.5)
