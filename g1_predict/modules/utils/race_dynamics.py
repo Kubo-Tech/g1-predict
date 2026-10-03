@@ -104,7 +104,7 @@ def build_total_evaluation_table_lines(
     """
     horses = result_df.set_index(result_df["馬番"].astype(int))
     evaluated = eval_df[eval_df["総合評価"].notna()].sort_values("総合評価", ascending=False)
-    lines = ["| 着順 | 馬番 | 馬名 | 評価値 |", "| --- | --- | --- | --- |"]
+    lines = ["| 着順 | 馬番 | 馬名 | 展開評価値 |", "| --- | --- | --- | --- |"]
     for _, row in evaluated.iterrows():
         umaban = int(row["馬番"])
         horse = horses.loc[umaban]

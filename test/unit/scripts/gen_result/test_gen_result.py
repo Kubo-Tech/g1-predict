@@ -267,7 +267,7 @@ def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str
         "| --- | --- | --- |\n"
         "| -79% | -15% | - |\n\n"
         f"![標準化散布図](img/race_result/{_RACE_CODE}.png)\n\n"
-        "| 着順 | 馬番 | 馬名 | 評価値 |\n"
+        "| 着順 | 馬番 | 馬名 | 展開評価値 |\n"
         "| --- | --- | --- | --- |\n"
         "| 2着 | 3 | ホースB | +0.31 |\n"
         "| 1着 | 5 | ホースA | -0.20 |\n\n"

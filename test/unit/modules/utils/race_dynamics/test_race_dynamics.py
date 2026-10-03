@@ -58,7 +58,7 @@ def test_build_total_evaluation_table_lines_sorted_by_value() -> None:
         }
     )
     assert build_total_evaluation_table_lines(eval_df, result_df) == [
-        "| 着順 | 馬番 | 馬名 | 評価値 |",
+        "| 着順 | 馬番 | 馬名 | 展開評価値 |",
         "| --- | --- | --- | --- |",
         "| 3着 | 2 | ホースB | +0.52 |",
         "| 2着 | 4 | ホースD | +0.00 |",
