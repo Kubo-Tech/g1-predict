@@ -130,7 +130,11 @@ def build_day_trend_body(
     race_date = datetime.strptime(f"{year}{mmdd}", "%Y%m%d").date()
     trend_date = race_date + timedelta(days=kind.day_offset)
 
-    matched = _get_matched_races(trend_date, keibajo_code, target_shiba_da, kind)
+    # 対象レースと同じ日を集計するときは、対象レース以降のレースを含めない
+    before_race_bango = int(race_code[14:16]) if trend_date == race_date else None
+    matched = _get_matched_races(
+        trend_date, keibajo_code, target_shiba_da, kind, before_race_bango
+    )
     if matched.empty:
         return DayTrendBody(text="", images={})
 
@@ -183,6 +187,7 @@ def _get_matched_races(
     keibajo_code: str,
     shiba_da: str,
     kind: DayTrendKind,
+    before_race_bango: int | None,
 ) -> pd.DataFrame:
     """集計日の同競馬場・同芝ダのレース一覧を返す。
 
@@ -191,6 +196,7 @@ def _get_matched_races(
         keibajo_code (str): 競馬場コード（例: "05"）。
         shiba_da (str): 芝ダ区分（"芝" または "ダ"）。
         kind (DayTrendKind): 傾向記事の種類。confirmed_onlyの場合は結果が出ているレースに絞る。
+        before_race_bango (int | None): 指定した場合、このレース番号より前のレースに絞る。
 
     Returns:
         pd.DataFrame: 条件一致したレースのraw RACE_SHOSAI DataFrame（race_bango昇順）。
@@ -221,6 +227,9 @@ def _get_matched_races(
         lambda tc: TRACK_CODE_TO_SHIBA_DA.get(str(tc).strip(), "")
     )
     raw = raw[shiba_da_series == shiba_da]
+
+    if before_race_bango is not None:
+        raw = raw[pd.to_numeric(raw["race_bango"]) < before_race_bango]
 
     return raw.sort_values("race_bango").reset_index(drop=True)
 

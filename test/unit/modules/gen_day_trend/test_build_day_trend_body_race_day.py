@@ -133,6 +133,29 @@ def test_build_day_trend_body_race_day_aggregates_only_confirmed_races() -> None
     assert codes == ["2026050505010104", "2026050505010105"]
 
 
+def test_build_day_trend_body_race_day_excludes_target_race_and_later() -> None:
+    """当日の傾向では、対象レース（11R）とそれ以降のレースを集計しない。"""
+    raw = _make_raw_shosai(
+        [
+            ("2026050505010110", "7", 10),
+            ("2026050505010111", "7", 11),
+            ("2026050505010112", "7", 12),
+        ]
+    )
+    body, _, mock_race_data_cls = _call(raw, RACE_DAY)
+    assert body.text.count("### ") == 1
+    assert "### 東京10R" in body.text
+    codes = [call.kwargs["race_code"] for call in mock_race_data_cls.call_args_list]
+    assert codes == ["2026050505010110"]
+
+
+def test_build_day_trend_body_prev_day_does_not_filter_by_race_bango() -> None:
+    """前日の傾向では、対象レースの番号以降のレースも集計する。"""
+    raw = _make_raw_shosai([("2026050405010111", "7", 11), ("2026050405010112", "7", 12)])
+    body, _, _ = _call(raw, PREV_DAY)
+    assert body.text.count("### ") == 2
+
+
 def test_build_day_trend_body_race_day_returns_empty_when_no_confirmed_races() -> None:
     """当日の傾向では、結果が出ているレースが1件も無ければ本文が空で画像も無い。"""
     raw = _make_raw_shosai([("2026050505010101", "2", 1), ("2026050505010102", "5", 2)])
