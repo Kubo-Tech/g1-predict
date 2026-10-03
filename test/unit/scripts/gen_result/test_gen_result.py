@@ -1,9 +1,12 @@
 """gen_result の単体テスト。"""
+import json
 import os
+from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+import requests
 
 from scripts.gen_result import _format_comment_body, generate_result
 
@@ -43,6 +46,35 @@ def _abnormal_row(umaban: int, horse_name: str, ijo_code: str) -> dict:
     }
 
 
+_FEED_PATCH_TARGET = "g1_predict.modules.utils.hatena_links.requests.get"
+_FEED_XML = (
+    '<feed xmlns="http://www.w3.org/2005/Atom">'
+    '<entry><title>予想タイトル</title><link href="https://example.com/1"/>'
+    "<id>hatenablog://entry/1</id></entry>"
+    "</feed>"
+).encode()
+
+
+@pytest.fixture(autouse=True)
+def mock_feed() -> Generator[MagicMock, None, None]:
+    """ブログの公開フィード取得をモックする。
+
+    Yields:
+        MagicMock: requests.get のモック。
+    """
+    with patch(_FEED_PATCH_TARGET) as mock_get:
+        mock_get.return_value.content = _FEED_XML
+        yield mock_get
+
+
+def _write_state(public_dir: str, entries: dict[str, str]) -> None:
+    """2026年の状態ファイルを書き出す。"""
+    year_dir = os.path.join(public_dir, _YEAR)
+    os.makedirs(year_dir, exist_ok=True)
+    with open(os.path.join(year_dir, ".hatena_entry_ids.json"), "w", encoding="utf-8") as f:
+        json.dump({"entries": entries, "images": {}}, f)
+
+
 @pytest.fixture
 def dirs(tmp_path: pytest.TempPathFactory) -> tuple[str, str]:
     """public・templates ディレクトリを用意する。"""
@@ -53,6 +85,7 @@ def dirs(tmp_path: pytest.TempPathFactory) -> tuple[str, str]:
         f.write(
             "# 【{RaceName}{Year}】回顧\n\n"
             "## 結果\n\n"
+            "## 関連記事\n\n"
             "## 総評\n\n"
             "## 回顧\n"
         )
@@ -87,6 +120,41 @@ def _read_md(public_dir: str, race_code: str, race_name: str, year: str) -> str:
     path = os.path.join(public_dir, year, f"{race_code}_{race_name}", "回顧.md")
     with open(path, encoding="utf-8") as f:
         return f.read()
+
+
+# 正常系
+def test_gen_result_related_articles_with_predict_link(dirs: tuple[str, str]) -> None:
+    """関連記事に予想記事のリンクと自作AIの結果を出力し、結果と総評の間に置く。"""
+    public_dir, templates_dir = dirs
+    _write_state(public_dir, {f"{_YEAR}/{_RACE_CODE}_{_RACE_NAME}/予想.md": "1"})
+    _run(_make_mock_di([_normal_row(1, 5, "ホースA")]), public_dir, templates_dir)
+    content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
+    assert (
+        "1着 5ホースA  \n\n"
+        "## 関連記事\n\n"
+        "- [予想タイトル](https://example.com/1)\n"
+        "- [自作AIの結果]()\n\n"
+        "## 総評"
+    ) in content
+
+
+def test_gen_result_related_articles_without_predict_link(dirs: tuple[str, str]) -> None:
+    """予想記事のリンクが無い場合は自作AIの結果だけを出力する。"""
+    public_dir, templates_dir = dirs
+    _run(_make_mock_di([_normal_row(1, 5, "ホースA")]), public_dir, templates_dir)
+    content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
+    assert "## 関連記事\n\n- [自作AIの結果]()\n\n## 総評" in content
+
+
+# 準正常系
+def test_gen_result_raises_when_feed_fetch_fails(
+    dirs: tuple[str, str], mock_feed: MagicMock
+) -> None:
+    """フィードの取得に失敗した場合は例外になる。"""
+    public_dir, templates_dir = dirs
+    mock_feed.side_effect = requests.ConnectionError("down")
+    with pytest.raises(requests.ConnectionError):
+        _run(_make_mock_di([_normal_row(1, 5, "ホースA")]), public_dir, templates_dir)
 
 
 # 正常系

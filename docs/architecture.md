@@ -77,7 +77,7 @@ flowchart TD
 ```
 g1-predict/
 ├── configs/
-│   ├── hatena.yml                  # 記事の置き場所・種別 → はてなカテゴリの対応
+│   ├── hatena.yml                  # ブログURL、記事の置き場所・種別 → はてなカテゴリの対応
 │   └── {レース名}/
 │       ├── trends.yml              # 傾向表の定義
 │       └── table.yml               # 分析表の定義
@@ -97,6 +97,7 @@ g1-predict/
 │   │   ├── table_stat.py           # 枠・騎手・生産者・種牡馬などの統計計算
 │   │   └── table_utils.py          # フィルタ、色ルール、セル変換
 │   └── utils/
+│       ├── hatena_links.py         # 関連記事のはてなブログ記事リンク取得
 │       ├── md_utils.py             # Markdown セクション置換
 │       ├── output_path.py          # 出力パスの検証
 │       └── tfjv.py                 # TARGET frontier JV ファイルの読み書き

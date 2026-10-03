@@ -13,6 +13,7 @@ from dotenv import find_dotenv, load_dotenv
 from keiba_data_interface import DataInterface
 from mykeibadb.code_converter import convert_ijo_kubun_code
 
+from g1_predict.modules.utils.hatena_links import build_related_articles_section
 from g1_predict.modules.utils.md_utils import replace_section
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 from g1_predict.modules.utils.race_name import to_race_label
@@ -29,8 +30,11 @@ load_dotenv(find_dotenv())
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
 _TEMPLATES_DIR = os.path.join(_REPO_DIR, "templates")
+_HATENA_CONFIG_PATH = os.path.join(_REPO_DIR, "configs", "hatena.yml")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
+# 関連記事に載せる記事ファイル名（拡張子を除く）
+_RELATED_ARTICLE_NAMES = ["予想"]
 _ABNORMAL_CODES = {"1", "2", "3", "4"}
 
 
@@ -61,9 +65,13 @@ def generate_result(race_code: str) -> None:
     result_section = _build_result_section(result_df, marks)
     review_section = _build_review_section(result_df, marks, comments)
 
-    content = _render_from_template(race_label, year, result_section, review_section)
-
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
+    related_section = build_related_articles_section(
+        _PUBLIC_DIR, race_dir, _RELATED_ARTICLE_NAMES, "自作AIの結果", _HATENA_CONFIG_PATH
+    )
+    sections = (result_section, related_section, review_section)
+    content = _render_from_template(race_label, year, *sections)
+
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "回顧.md")
     with open(output_path, "w", encoding="utf-8") as f:
@@ -134,6 +142,7 @@ def _render_from_template(
     race_label: str,
     year: str,
     result_section: str,
+    related_section: str,
     review_section: str,
 ) -> str:
     template_path = os.path.join(_TEMPLATES_DIR, "TEMPLATE_RESULT.md")
@@ -141,6 +150,7 @@ def _render_from_template(
         content = f.read()
     content = content.replace("{RaceName}", race_label).replace("{Year}", year)
     content = replace_section(content, "## 結果", result_section)
+    content = replace_section(content, "## 関連記事", related_section)
     content = replace_section(content, "## 回顧", review_section)
     return content
 
