@@ -1,12 +1,16 @@
 """race_result の単体テスト。"""
 
 import pandas as pd
+import pytest
 
 from g1_predict.modules.utils.race_result import (
     format_corner4,
     format_halon,
+    grade_display,
     halon_rank,
     kyakushitsu_display,
+    race_condition_display,
+    race_display_name,
 )
 
 
@@ -84,3 +88,70 @@ def test_format_halon_with_rank() -> None:
 def test_format_halon_without_value() -> None:
     """後3ハロンが無い場合は「-」になる。"""
     assert format_halon(_row(後3ハロン=float("nan")), _result_df()) == "-"
+
+
+def _race_info(
+    hondai: object = None,
+    condition_name: object = None,
+    condition_code: object = "703",
+    grade_code: object = "_",
+    race_code: str = "2026010105010101",
+) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "レースコード": [race_code],
+            "競走名本題": [hondai],
+            "競走条件名称": [condition_name],
+            "競走条件コード": [condition_code],
+            "グレードコード": [grade_code],
+        }
+    )
+
+
+# race_condition_display
+def test_race_condition_display_prefers_condition_name() -> None:
+    """競走条件名称があればそれを返す。"""
+    assert race_condition_display(_race_info(condition_name=" 3歳以上1勝クラス ")) == (
+        "3歳以上1勝クラス"
+    )
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [("701", "新馬"), ("703", "未勝利"), ("005", "1勝クラス"), ("999", "オープン"), (None, "")],
+)
+def test_race_condition_display_falls_back_to_code_name(code: object, expected: str) -> None:
+    """競走条件名称が空なら、競走条件コードの表示名を返す。"""
+    assert race_condition_display(_race_info(condition_name="", condition_code=code)) == expected
+
+
+# grade_display
+@pytest.mark.parametrize(
+    "grade_code, expected", [("A", "G1"), ("B", "G2"), ("C", "G3"), ("L", "L"), ("_", "")]
+)
+def test_grade_display(grade_code: str, expected: str) -> None:
+    """グレードコードの表示名を返す。グレードが無ければ空文字列。"""
+    assert grade_display(_race_info(grade_code=grade_code)) == expected
+
+
+# race_display_name
+def test_race_display_name_uses_unified_name_for_special_race() -> None:
+    """競走名本題があるレースは、統一した競走名本題を返す。"""
+    info = _race_info(hondai="旧名ステークス", race_code="2026010105010111")
+    assert race_display_name(info, {"2026010105010111": "新名ステークス"}) == "新名ステークス"
+
+
+def test_race_display_name_uses_condition_for_condition_race() -> None:
+    """競走名本題が無い条件戦は、条件名を返す。"""
+    assert race_display_name(_race_info(hondai=None, condition_code="010"), {}) == "2勝クラス"
+
+
+def test_race_display_name_blank_hondai_uses_condition() -> None:
+    """競走名本題が空白だけなら、条件名を返す。"""
+    assert race_display_name(_race_info(hondai="  ", condition_code="703"), {}) == "未勝利"
+
+
+def test_race_display_name_raises_when_unified_name_missing() -> None:
+    """競走名本題があるのに統一名が無い場合はKeyErrorを送出する。"""
+    with pytest.raises(KeyError):
+        race_display_name(_race_info(hondai="X"), {})

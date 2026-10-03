@@ -66,6 +66,37 @@ def test_build_total_evaluation_table_lines_sorted_by_value() -> None:
     ]
 
 
+def _bold_eval_and_result() -> tuple[pd.DataFrame, pd.DataFrame]:
+    eval_df = pd.DataFrame({"馬番": [1, 2, 3], "総合評価": [0.3, 0.2, 0.1]})
+    result_df = pd.DataFrame(
+        {"馬番": [1, 2, 3], "確定着順": [1, 2, 3], "馬名": ["ホースA", "ホースB", "ホースC"]}
+    )
+    return eval_df, result_df
+
+
+def test_build_total_evaluation_table_lines_bold_row_and_name() -> None:
+    """行全体の太字は全セル、馬名のみの太字は馬名のセルだけを太字にする。"""
+    eval_df, result_df = _bold_eval_and_result()
+    assert build_total_evaluation_table_lines(
+        eval_df, result_df, bold_row_horse_nums=[1], bold_name_horse_nums=[3]
+    ) == [
+        "| 着順 | 馬番 | 馬名 | 展開評価値 |",
+        "| --- | --- | --- | --- |",
+        "| **1着** | **1** | **ホースA** | **+0.30** |",
+        "| 2着 | 2 | ホースB | +0.20 |",
+        "| 3着 | 3 | **ホースC** | +0.10 |",
+    ]
+
+
+def test_build_total_evaluation_table_lines_bold_row_takes_precedence() -> None:
+    """行全体と馬名のみの両方に指定された馬は、行全体を太字にする。"""
+    eval_df, result_df = _bold_eval_and_result()
+    lines = build_total_evaluation_table_lines(
+        eval_df, result_df, bold_row_horse_nums=[2], bold_name_horse_nums=[2]
+    )
+    assert lines[3] == "| **2着** | **2** | **ホースB** | **+0.20** |"
+
+
 # evaluate_race_dynamics_with_plot
 def test_evaluate_race_dynamics_with_plot_returns_cor_df_and_figure() -> None:
     """RaceDataを基準日付きで1回作り、展開評価の結果と散布図を返す。"""
