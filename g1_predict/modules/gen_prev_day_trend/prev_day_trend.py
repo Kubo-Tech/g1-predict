@@ -33,6 +33,8 @@ _MATLAB_COLORS: tuple[str, ...] = (
 _DYNAMICS_COLUMNS: tuple[str, ...] = ("差し有利度", "外枠有利度", "外有利度")
 # 脚質判定コード → 表示名
 _KYAKUSHITSU_DISPLAY: dict[str, str] = {"1": "逃げ", "2": "先行", "3": "差し", "4": "追込"}
+# 脚質の表示名 → 各レースの表で使う1文字の略称
+_KYAKUSHITSU_SHORT: dict[str, str] = {"逃げ": "逃", "先行": "先", "差し": "差", "追込": "追"}
 _KYAKUSHITSU_URL = "http://next5.jra-van.jp/appli/kyakushitsu3.html"
 _DYNAMICS_CHART_PATH = "img/prev_day/dynamics.png"
 _JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
@@ -359,8 +361,8 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
     lines: list[str] = [
         heading,
         "",
-        "| 着順 | 枠 | 馬番 | 人気 | 4角通過順位 | 脚質 | 後3ハロン | 後3ハロン順位 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| 着順 | 枠 | 馬番 | 人気 | 4角通過 | 後3F |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for _, horse_row in top3.iterrows():
         place = int(horse_row["確定着順"])
@@ -370,19 +372,21 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
 
         corner4 = horse_row["4コーナー順位"]
         corner4_str = f"{int(corner4)}番手" if pd.notna(corner4) else "-"
-        kyakushitsu_str = _kyakushitsu_display(horse_row) or "-"
+        kyakushitsu = _kyakushitsu_display(horse_row)
+        if kyakushitsu:
+            corner4_str += f" ({_KYAKUSHITSU_SHORT[kyakushitsu]})"
 
         halon = horse_row["後3ハロン"]
         if pd.notna(halon):
-            halon_str = f"{float(halon):.1f}秒"
-            rank_str = f"{_halon_rank(horse_row, race.result_df)}位"
+            halon_str = (
+                f"{float(halon):.1f}秒 ({_halon_rank(horse_row, race.result_df)}位)"
+            )
         else:
             halon_str = "-"
-            rank_str = "-"
 
         cols = [
             f"{place}着", f"{gate}枠", f"{horse_no}番", f"{ninki}人気",
-            corner4_str, kyakushitsu_str, halon_str, rank_str,
+            corner4_str, halon_str,
         ]
         lines.append("| " + " | ".join(cols) + " |")
 

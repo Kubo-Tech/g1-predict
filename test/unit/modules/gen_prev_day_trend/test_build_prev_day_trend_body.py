@@ -367,14 +367,30 @@ def test_build_prev_day_trend_body_dememe_chart_labels_and_colors() -> None:
         assert [to_hex(patch.get_facecolor()) for patch in ax.patches] == ["#0072bd"] * 6
 
 
-def test_build_prev_day_trend_body_race_table_has_kyakushitsu_column(
-    simple_result_df: pd.DataFrame,
-) -> None:
-    """各レースの表で、4角通過順位の右に脚質を載せる。"""
+def test_build_prev_day_trend_body_race_table_columns(simple_result_df: pd.DataFrame) -> None:
+    """各レースの表は4角通過に脚質の略称、後3Fに上がり順位をカッコで添える。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
-    assert "| 4角通過順位 | 脚質 | 後3ハロン |" in result.text
-    assert "番手 | 逃げ |" in result.text
+    assert "| 着順 | 枠 | 馬番 | 人気 | 4角通過 | 後3F |" in result.text
+    assert "| 1着 | 1枠 | 1番 | 1人気 | 1番手 (逃) | 34.5秒 (1位) |" in result.text
+    assert "| 3着 | 8枠 | 15番 | 11人気 | 8番手 (追) | 35.5秒 (3位) |" in result.text
+
+
+def test_build_prev_day_trend_body_race_table_without_kyakushitsu_and_halon() -> None:
+    """脚質判定コードが無ければ4角通過にカッコを付けず、後3ハロンが無ければ後3Fは - になる。"""
+    result_df = _make_result_df([
+        {
+            "確定着順": 1,
+            "枠番": 1,
+            "馬番": 1,
+            "単勝人気順": 1,
+            "4コーナー順位": 2,
+            "後3ハロン": float("nan"),
+            "脚質判定コード": float("nan"),
+        },
+    ])
+    result = _call(mock_di=_make_mock_di(result_df=result_df))
+    assert "| 1着 | 1枠 | 1番 | 1人気 | 2番手 | - |" in result.text
 
 
 def test_build_prev_day_trend_body_multiple_races_sorted_by_race_bango() -> None:
