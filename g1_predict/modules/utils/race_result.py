@@ -49,7 +49,9 @@ def format_corner4(horse_row: pd.Series, unit: str = "") -> str:
         str: 例: "1番手 (逃)"。順位が無い場合は "-"。脚質判定が無い場合は括弧を付けない。
     """
     corner4 = horse_row["4コーナー順位"]
-    text = f"{int(corner4)}{unit}" if pd.notna(corner4) else "-"
+    if pd.isna(corner4):
+        return "-"
+    text = f"{int(corner4)}{unit}"
     kyakushitsu = kyakushitsu_display(horse_row)
     if kyakushitsu:
         text += f" ({KYAKUSHITSU_SHORT[kyakushitsu]})"

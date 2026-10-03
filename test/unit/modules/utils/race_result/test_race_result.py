@@ -70,6 +70,11 @@ def test_format_corner4_without_corner() -> None:
     assert format_corner4(_row(**{"4コーナー順位": float("nan")}, 脚質判定コード=None)) == "-"
 
 
+def test_format_corner4_without_corner_but_with_kyakushitsu() -> None:
+    """順位が無い場合は、脚質判定があっても「-」だけになる。"""
+    assert format_corner4(_row(**{"4コーナー順位": float("nan")}), "番手") == "-"
+
+
 # format_halon
 def test_format_halon_with_rank() -> None:
     """タイムと上がり順位を整形する。"""
