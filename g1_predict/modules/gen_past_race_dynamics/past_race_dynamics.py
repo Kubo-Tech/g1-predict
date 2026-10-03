@@ -27,6 +27,7 @@ _IMAGE_DIR = "img/past_dynamics"
 _NETKEIBA_SHUTUBA_URL = "https://race.netkeiba.com/race/shutuba.html?race_id={race_id}"
 _STRAIGHT_RACE_NOTE = "1000m直線コースのため展開評価の対象外。"
 _NO_PAST_RACE_NOTE = "中央の平地で出走した過去走なし。"
+_SUMMARY_TEXT = "過去走の展開評価を開く"
 # 出走取消・発走除外・競走除外の異常区分コード
 _NOT_STARTED_IJO_CODES: frozenset[str] = frozenset({"1", "2", "3"})
 
@@ -220,7 +221,7 @@ def _build_horse_details_lines(
     other_horse_ids: set[str],
     horse_races: list[_PastRace],
 ) -> list[str]:
-    """1頭分の折りたたみ要素の行リストを生成する。
+    """1頭分のセクション（馬名のh2見出しと、過去走を収めた折りたたみ要素）の行リストを生成する。
 
     `<details>` の直後と `</details>` の直前に空行を入れる。空行が無いと、
     はてなブログで中のMarkdownが変換されない。
@@ -235,7 +236,12 @@ def _build_horse_details_lines(
     Returns:
         list[str]: Markdownの行リスト。
     """
-    lines = [f"<details><summary>{umaban}. {horse_name}</summary>", ""]
+    lines = [
+        f"## {umaban}. {horse_name}",
+        "",
+        f"<details><summary>{_SUMMARY_TEXT}</summary>",
+        "",
+    ]
     if not horse_races:
         lines.extend([_NO_PAST_RACE_NOTE, ""])
     for past_race in horse_races:
@@ -260,7 +266,7 @@ def _build_past_race_lines(
     Returns:
         list[str]: Markdownの行リスト（末尾に空行は含まない）。
     """
-    lines = [past_race.title, ""]
+    lines = [f"### {past_race.title}", ""]
     dynamics = past_race.dynamics
     if dynamics is None:
         lines.append(_STRAIGHT_RACE_NOTE)

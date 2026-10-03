@@ -180,18 +180,21 @@ def _build(
     return body, fake
 
 
-def _horse_section(text: str, summary: str) -> str:
-    start = text.index(f"<details><summary>{summary}</summary>")
+def _horse_section(text: str, horse: str) -> str:
+    start = text.index(f"## {horse}\n")
     return text[start : text.index("</details>", start)]
 
 
 # 正常系
 @pytest.mark.usefixtures("evaluate_mock")
 def test_details_wrap_each_horse_with_blank_lines_in_umaban_order() -> None:
-    """馬ごとに details で囲み、開始タグの後と終了タグの前に空行を入れる。"""
+    """馬名をh2見出しにし、過去走を details で囲んで開始タグの後と終了タグの前に空行を入れる。"""
     body, _ = _build()
+    headings = re.findall(r"^## (.*)$", body.text, flags=re.MULTILINE)
+    assert headings == ["1. ホースA", "2. ホースB", "3. ホースC"]
     summaries = re.findall(r"<details><summary>(.*?)</summary>", body.text)
-    assert summaries == ["1. ホースA", "2. ホースB", "3. ホースC"]
+    assert summaries == ["過去走の展開評価を開く"] * 3
+    assert "## 1. ホースA\n\n<details><summary>過去走の展開評価を開く</summary>\n\n" in body.text
     lines = body.text.split("\n")
     for index, line in enumerate(lines):
         if line.startswith("<details>"):
@@ -215,7 +218,7 @@ def test_past_races_exclude_not_started_steeplechase_local_and_not_held() -> Non
     """出走取消・障害・地方・開催されなかったレースは数えず、新しい順に並べる。"""
     body, _ = _build()
     section = _horse_section(body.text, "1. ホースA")
-    dates = re.findall(r"^(\d+年\d+月\d+日) ", section, flags=re.MULTILINE)
+    dates = re.findall(r"^### (\d+年\d+月\d+日) ", section, flags=re.MULTILINE)
     assert dates == ["2026年9月6日", "2026年8月1日", "2026年7月5日", "2026年4月5日"]
 
 
@@ -224,7 +227,7 @@ def test_past_races_limited_to_num_past_races() -> None:
     """過去走は指定した数までで打ち切る。"""
     body, _ = _build(num_past_races=2)
     section = _horse_section(body.text, "1. ホースA")
-    dates = re.findall(r"^(\d+年\d+月\d+日) ", section, flags=re.MULTILINE)
+    dates = re.findall(r"^### (\d+年\d+月\d+日) ", section, flags=re.MULTILINE)
     assert dates == ["2026年9月6日", "2026年8月1日"]
 
 
@@ -233,7 +236,7 @@ def test_title_line_with_grade_and_url() -> None:
     """見出し行にレース名・出馬表のURL・グレードを載せる。"""
     body, _ = _build()
     assert (
-        "2026年9月6日 [産経賞セントウルステークス]"
+        "### 2026年9月6日 [産経賞セントウルステークス]"
         "(https://race.netkeiba.com/race/shutuba.html?race_id=202609040211) (G2)"
     ) in body.text
 
@@ -243,7 +246,7 @@ def test_title_line_condition_race_has_condition_name_and_no_grade() -> None:
     """条件戦は条件名を使い、グレードが無ければ括弧を付けない。"""
     body, _ = _build()
     assert (
-        "2026年7月5日 [2勝クラス]"
+        "### 2026年7月5日 [2勝クラス]"
         "(https://race.netkeiba.com/race/shutuba.html?race_id=202606010101)\n"
     ) in body.text
 
@@ -252,7 +255,7 @@ def test_title_line_condition_race_has_condition_name_and_no_grade() -> None:
 def test_title_line_uses_unified_race_name() -> None:
     """重賞は統一した競走名本題を使う。"""
     body, _ = _build()
-    assert "2026年4月5日 [新名ステークス]" in body.text
+    assert "### 2026年4月5日 [新名ステークス]" in body.text
 
 
 @pytest.mark.usefixtures("evaluate_mock")
@@ -261,7 +264,7 @@ def test_straight_race_has_note_instead_of_dynamics() -> None:
     body, _ = _build()
     section = _horse_section(body.text, "1. ホースA")
     assert (
-        "2026年8月1日 [アイビスサマーダッシュ]"
+        "### 2026年8月1日 [アイビスサマーダッシュ]"
         "(https://race.netkeiba.com/race/shutuba.html?race_id=202604020407) (G3)\n\n"
         "1000m直線コースのため展開評価の対象外。\n"
     ) in section
@@ -273,7 +276,8 @@ def test_horse_without_past_race_has_note() -> None:
     """過去走が無い馬は注記だけを載せる。"""
     body, _ = _build()
     assert _horse_section(body.text, "3. ホースC") == (
-        "<details><summary>3. ホースC</summary>\n\n中央の平地で出走した過去走なし。\n\n"
+        "## 3. ホースC\n\n<details><summary>過去走の展開評価を開く</summary>\n\n"
+        "中央の平地で出走した過去走なし。\n\n"
     )
 
 
