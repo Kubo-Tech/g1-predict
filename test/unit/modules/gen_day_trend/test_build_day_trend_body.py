@@ -163,7 +163,7 @@ def _call(
             return_value=figure,
         ),
     ):
-        return build_day_trend_body(race_code, race_info, kind)
+        return build_day_trend_body(race_code, race_info, "天皇賞春", kind)
 
 
 @pytest.fixture
@@ -228,7 +228,8 @@ def test_build_day_trend_body_prev_day_has_dememe_header() -> None:
     """マッチするレースがある場合、## 前日の出目 ヘッダーと説明文を含む。"""
     result = _call()
     assert (
-        "## 前日の出目\n\n各要素において、前日のレースで3着以内に入った頭数を集計。\n"
+        "## 前日の出目\n\n各要素において、前日のレースのうち天皇賞春と同じ競馬場、芝ダのレースで"
+        "3着以内に入った頭数を集計。\n"
     ) in result.text
 
 
@@ -319,7 +320,7 @@ def test_build_day_trend_body_prev_day_prev_date_passed_to_race_getter() -> None
             return_value="東京",
         ),
     ):
-        build_day_trend_body("2026050505010101", _make_race_info(), PREV_DAY)
+        build_day_trend_body("2026050505010101", _make_race_info(), "天皇賞春", PREV_DAY)
 
     mock_rg.get_race_shosai.assert_called_once_with(
         start_date=date(2026, 5, 4),
@@ -564,7 +565,7 @@ def test_build_day_trend_body_prev_day_race_data_uses_target_race_date_as_refere
             return_value=MagicMock(name="Figure"),
         ),
     ):
-        build_day_trend_body("2026050505010101", _make_race_info(), PREV_DAY)
+        build_day_trend_body("2026050505010101", _make_race_info(), "天皇賞春", PREV_DAY)
 
     mock_race_data_cls.assert_called_once_with(
         race_code="2026050405010106",
@@ -606,7 +607,7 @@ def test_build_day_trend_body_prev_day_race_data_created_once_per_race() -> None
             return_value=MagicMock(name="Figure"),
         ),
     ):
-        build_day_trend_body("2026050505010101", _make_race_info(), PREV_DAY)
+        build_day_trend_body("2026050505010101", _make_race_info(), "天皇賞春", PREV_DAY)
 
     assert mock_race_data_cls.call_count == 1
     mock_race_data.fetch_race_result.assert_called_once_with()

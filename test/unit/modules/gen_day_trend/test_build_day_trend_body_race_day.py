@@ -97,7 +97,7 @@ def _call(
         patch(f"{_MODULE}.evaluate_race_dynamics", return_value=MagicMock(cor_df=cor_df)),
         patch(f"{_MODULE}.make_time_plot", return_value=MagicMock(name="Figure")),
     ):
-        body = build_day_trend_body("2026050505010111", _make_race_info(), kind)
+        body = build_day_trend_body("2026050505010111", _make_race_info(), "天皇賞春", kind)
     return body, mock_rg, mock_race_data_cls
 
 
@@ -168,7 +168,10 @@ def test_build_day_trend_body_race_day_headings_and_description() -> None:
     """当日の傾向では、見出しと説明文の「前日」が「当日」になる。"""
     raw = _make_raw_shosai([("2026050505010106", "7", 6)])
     body, _, _ = _call(raw, RACE_DAY)
-    description = "各要素において、当日のレースで3着以内に入った頭数を集計。"
+    description = (
+        "各要素において、当日のレースのうち天皇賞春と同じ競馬場、芝ダのレースで"
+        "3着以内に入った頭数を集計。"
+    )
     assert f"## 当日の出目\n\n{description}\n" in body.text
     assert "前日" not in body.text
     assert "## 展開有利度の傾向" in body.text

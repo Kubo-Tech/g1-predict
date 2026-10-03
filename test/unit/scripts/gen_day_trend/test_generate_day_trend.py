@@ -202,4 +202,5 @@ def test_generate_day_trend_race_day_writes_race_day_article_and_images(public_d
         os.path.join(race_dir, "img", "race_day", "dynamics.png"), bbox_inches="tight"
     )
     mock_plt.close.assert_called_once_with(mock_figure)
-    assert mock_build.call_args.args[2] is RACE_DAY
+    assert mock_build.call_args.args[2] == "天皇賞春"
+    assert mock_build.call_args.args[3] is RACE_DAY

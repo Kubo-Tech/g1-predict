@@ -102,6 +102,7 @@ class _MatchedRace:
 def build_day_trend_body(
     race_code: str,
     race_info: pd.DataFrame,
+    race_label: str,
     kind: DayTrendKind,
 ) -> DayTrendBody:
     """傾向記事の本文を生成する。
@@ -114,6 +115,7 @@ def build_day_trend_body(
     Args:
         race_code (str): 16桁レースコード。
         race_info (pd.DataFrame): 対象レースの基本情報DataFrame（raw英語カラム名）。
+        race_label (str): 対象レースの表記名（例: "スプリンターズS"）。出目の説明文に使う。
         kind (DayTrendKind): 傾向記事の種類（PREV_DAY / RACE_DAY）。
 
     Returns:
@@ -157,7 +159,7 @@ def build_day_trend_body(
         for _, horse_row in top3.iterrows():
             top3_entries.append((horse_row, result_df))
 
-    dememe_text, dememe_images = _build_dememe_section(top3_entries, kind)
+    dememe_text, dememe_images = _build_dememe_section(top3_entries, race_label, kind)
     blocks: list[str] = [
         dememe_text,
         "",
@@ -470,6 +472,7 @@ def _format_race_block(race: _MatchedRace, venue_name: str, kind: DayTrendKind) 
 
 def _build_dememe_section(
     top3_entries: list[tuple[pd.Series, pd.DataFrame]],
+    race_label: str,
     kind: DayTrendKind,
 ) -> tuple[str, dict[str, Figure]]:
     """集計対象全レースの出目集計セクションを生成する。
@@ -478,6 +481,7 @@ def _build_dememe_section(
 
     Args:
         top3_entries (list[tuple[pd.Series, pd.DataFrame]]): (horse_row, result_df) のリスト。
+        race_label (str): 対象レースの表記名。
         kind (DayTrendKind): 傾向記事の種類。
 
     Returns:
@@ -532,7 +536,8 @@ def _build_dememe_section(
     lines: list[str] = [
         f"## {kind.label}の出目",
         "",
-        f"各要素において、{kind.label}のレースで3着以内に入った頭数を集計。",
+        f"各要素において、{kind.label}のレースのうち{race_label}と同じ競馬場、芝ダのレースで"
+        "3着以内に入った頭数を集計。",
     ]
     images: dict[str, Figure] = {}
     for name, url, file_name, labels, counts, colors in charts:

@@ -43,7 +43,7 @@ def generate_day_trend(race_code: str, kind: DayTrendKind) -> None:
     race_label = to_race_label(race_name)
     year = str(race_shosai["kaisai_nen"].iloc[0]).strip()
 
-    body = build_day_trend_body(race_code, race_shosai, kind)
+    body = build_day_trend_body(race_code, race_shosai, race_label, kind)
     content = _render_day_trend_content(race_label, year, body, kind)
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
