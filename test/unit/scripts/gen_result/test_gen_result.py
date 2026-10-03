@@ -117,7 +117,7 @@ def _run(
     marks: dict[int, str] | None = None,
     comments: dict[int, str] | None = None,
     race_code: str = _RACE_CODE,
-    dynamics: tuple[pd.DataFrame | None, Figure | None] = (None, None),
+    dynamics: tuple[MagicMock | None, Figure | None] = (None, None),
 ) -> MagicMock:
     """generate_result を実行し、展開評価のモックを返す。"""
     if marks is None:
@@ -247,17 +247,19 @@ def test_gen_result_result_section_without_values(dirs: tuple[str, str]) -> None
 
 
 def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str]) -> None:
-    """展開評価がある場合は有利度の表と標準化散布図を載せ、画像を保存する。"""
+    """展開評価がある場合は有利度の表・標準化散布図・総合評価の表を載せ、画像を保存する。"""
     public_dir, templates_dir = dirs
     cor_df = pd.DataFrame(
         {"差し有利度": [-0.79], "外枠有利度": [-0.15], "外有利度": [float("nan")]}
     )
+    eval_df = pd.DataFrame({"馬番": [5, 3], "総合評価": [-0.2, 0.31]})
+    dynamics = MagicMock(cor_df=cor_df, eval_df=eval_df)
     figure = MagicMock(spec=Figure)
     mock_evaluate = _run(
-        _make_mock_di([_normal_row(1, 5, "ホースA")]),
+        _make_mock_di([_normal_row(1, 5, "ホースA"), _normal_row(2, 3, "ホースB")]),
         public_dir,
         templates_dir,
-        dynamics=(cor_df, figure),
+        dynamics=(dynamics, figure),
     )
     content = _read_md(public_dir, _RACE_CODE, _RACE_NAME, _YEAR)
     assert (
@@ -265,6 +267,12 @@ def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str
         "| --- | --- | --- |\n"
         "| -79% | -15% | - |\n\n"
         f"![標準化散布図](img/race_result/{_RACE_CODE}.png)\n\n"
+        "評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
+        "走破タイムを補正した値（秒）。大きいほど展開の不利をはね返して好走した馬。\n\n"
+        "| 着順 | 馬番 | 馬名 | 評価値 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 2着 | 3 | ホースB | +0.31秒 |\n"
+        "| 1着 | 5 | ホースA | -0.20秒 |\n\n"
         "## 関連記事"
     ) in content
     expected_path = os.path.join(

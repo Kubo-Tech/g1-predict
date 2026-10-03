@@ -15,6 +15,7 @@ matplotlib.use("Agg")
 
 import pandas as pd  # noqa: E402
 from dotenv import find_dotenv, load_dotenv  # noqa: E402
+from evaluation import RaceDynamicsResult  # noqa: E402
 from keiba_data_interface import DataInterface  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 from mykeibadb.code_converter import convert_ijo_kubun_code  # noqa: E402
@@ -25,6 +26,7 @@ from g1_predict.modules.utils.md_utils import replace_section  # noqa: E402
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code  # noqa: E402
 from g1_predict.modules.utils.race_dynamics import (  # noqa: E402
     build_dynamics_table_lines,
+    build_total_evaluation_table_lines,
     evaluate_race_dynamics_with_plot,
 )
 from g1_predict.modules.utils.race_name import to_race_label  # noqa: E402
@@ -78,11 +80,11 @@ def generate_result(race_code: str) -> None:
 
     # 開催日の翌日を基準日にして、開催日当日でも確定済みのレースとして評価する
     race_date = datetime.strptime(race_code[0:8], "%Y%m%d").date()
-    cor_df, figure = evaluate_race_dynamics_with_plot(
+    dynamics, figure = evaluate_race_dynamics_with_plot(
         race_code, di, race_date + timedelta(days=1)
     )
     image_path = f"{_RESULT_IMAGE_DIR}/{race_code}.png"
-    result_section = _build_result_section(result_df, marks, cor_df, figure, image_path)
+    result_section = _build_result_section(result_df, marks, dynamics, figure, image_path)
     review_section = _build_review_section(result_df, marks, comments)
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
@@ -112,7 +114,7 @@ def main() -> None:
 def _build_result_section(
     result_df: pd.DataFrame,
     marks: dict[int, str],
-    cor_df: pd.DataFrame | None,
+    dynamics: RaceDynamicsResult | None,
     figure: Figure | None,
     image_path: str,
 ) -> str:
@@ -139,10 +141,20 @@ def _build_result_section(
             format_halon(row, result_df),
         ]
         lines.append("| " + " | ".join(cols) + " |")
-    if cor_df is not None:
-        lines.extend(["", *build_dynamics_table_lines(cor_df)])
+    if dynamics is not None:
+        lines.extend(["", *build_dynamics_table_lines(dynamics.cor_df)])
     if figure is not None:
         lines.extend(["", f"![標準化散布図]({image_path})"])
+    if dynamics is not None:
+        lines.extend(
+            [
+                "",
+                "評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
+                "走破タイムを補正した値（秒）。大きいほど展開の不利をはね返して好走した馬。",
+                "",
+                *build_total_evaluation_table_lines(dynamics.eval_df, result_df),
+            ]
+        )
     return "\n".join(lines)
 
 

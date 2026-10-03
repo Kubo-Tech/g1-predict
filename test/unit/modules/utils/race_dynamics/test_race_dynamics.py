@@ -7,6 +7,7 @@ import pandas as pd
 
 from g1_predict.modules.utils.race_dynamics import (
     build_dynamics_table_lines,
+    build_total_evaluation_table_lines,
     evaluate_race_dynamics_with_plot,
     format_correlation,
 )
@@ -43,21 +44,43 @@ def test_build_dynamics_table_lines() -> None:
     ]
 
 
+# build_total_evaluation_table_lines
+def test_build_total_evaluation_table_lines_sorted_by_value() -> None:
+    """評価値の高い順に並べ、総合評価が無い馬は載せない。"""
+    eval_df = pd.DataFrame(
+        {"馬番": [1, 2, 3, 4], "総合評価": [-0.31, 0.524, float("nan"), -0.001]}
+    )
+    result_df = pd.DataFrame(
+        {
+            "馬番": [1, 2, 3, 4],
+            "確定着順": [1, 3, float("nan"), 2],
+            "馬名": ["ホースA", "ホースB", "ホースC", "ホースD"],
+        }
+    )
+    assert build_total_evaluation_table_lines(eval_df, result_df) == [
+        "| 着順 | 馬番 | 馬名 | 評価値 |",
+        "| --- | --- | --- | --- |",
+        "| 3着 | 2 | ホースB | +0.52秒 |",
+        "| 2着 | 4 | ホースD | +0.00秒 |",
+        "| 1着 | 1 | ホースA | -0.31秒 |",
+    ]
+
+
 # evaluate_race_dynamics_with_plot
 def test_evaluate_race_dynamics_with_plot_returns_cor_df_and_figure() -> None:
-    """RaceDataを基準日付きで1回作り、相関係数と散布図を返す。"""
+    """RaceDataを基準日付きで1回作り、展開評価の結果と散布図を返す。"""
     race_data = MagicMock()
     race_data.is_straight_race.return_value = False
-    cor_df = _cor_df()
+    dynamics = MagicMock(cor_df=_cor_df())
     figure = MagicMock(name="Figure")
     di = MagicMock()
     with (
         patch(f"{_MODULE}.RaceData", return_value=race_data) as mock_cls,
-        patch(f"{_MODULE}.evaluate_race_dynamics", return_value=MagicMock(cor_df=cor_df)),
+        patch(f"{_MODULE}.evaluate_race_dynamics", return_value=dynamics),
         patch(f"{_MODULE}.make_time_plot", return_value=figure) as mock_plot,
     ):
         result = evaluate_race_dynamics_with_plot("2026092706040911", di, date(2026, 9, 28))
-    assert result == (cor_df, figure)
+    assert result == (dynamics, figure)
     mock_cls.assert_called_once_with(
         race_code="2026092706040911", data_interface=di, reference_date=date(2026, 9, 28)
     )

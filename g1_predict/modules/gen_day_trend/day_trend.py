@@ -151,9 +151,10 @@ def build_day_trend_body(
         matched_race_code = str(raw_row["race_code"])
         matched_race_info = di.get_race_basic_info(matched_race_code)
         result_df = di.get_result(matched_race_code)
-        cor_df, figure = evaluate_race_dynamics_with_plot(
+        dynamics, figure = evaluate_race_dynamics_with_plot(
             matched_race_code, di, trend_date + timedelta(days=1)
         )
+        cor_df = dynamics.cor_df if dynamics is not None else None
         matched_races.append(
             _MatchedRace(matched_race_code, matched_race_info, result_df, cor_df, figure)
         )
