@@ -361,13 +361,17 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
     lines: list[str] = [
         heading,
         "",
-        "| 着順 | 枠 | 馬番 | 人気 | 4角通過 | 後3F |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| 着順 | 枠番 | 人気 | 4角通過 | 後3F |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for _, horse_row in top3.iterrows():
         place = int(horse_row["確定着順"])
-        gate = int(horse_row["枠番"]) if pd.notna(horse_row["枠番"]) else "-"
-        horse_no = int(horse_row["馬番"]) if pd.notna(horse_row["馬番"]) else "-"
+        gate = horse_row["枠番"]
+        horse_no = horse_row["馬番"]
+        if pd.notna(gate) and pd.notna(horse_no):
+            gate_horse_str = f"{int(gate)}枠{int(horse_no)}番"
+        else:
+            gate_horse_str = "-"
         ninki = int(horse_row["単勝人気順"]) if pd.notna(horse_row["単勝人気順"]) else "-"
 
         corner4 = horse_row["4コーナー順位"]
@@ -385,8 +389,7 @@ def _format_race_block(race: _MatchedRace, venue_name: str) -> str:
             halon_str = "-"
 
         cols = [
-            f"{place}着", f"{gate}枠", f"{horse_no}番", f"{ninki}人気",
-            corner4_str, halon_str,
+            f"{place}着", gate_horse_str, f"{ninki}人気", corner4_str, halon_str,
         ]
         lines.append("| " + " | ".join(cols) + " |")
 

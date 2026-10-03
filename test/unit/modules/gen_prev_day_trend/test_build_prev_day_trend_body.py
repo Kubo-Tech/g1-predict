@@ -368,12 +368,12 @@ def test_build_prev_day_trend_body_dememe_chart_labels_and_colors() -> None:
 
 
 def test_build_prev_day_trend_body_race_table_columns(simple_result_df: pd.DataFrame) -> None:
-    """各レースの表は4角通過に脚質の略称、後3Fに上がり順位をカッコで添える。"""
+    """各レースの表は枠番を「8枠11番」の形で書き、4角通過に脚質の略称、後3Fに上がり順位をカッコで添える。"""
     mock_di = _make_mock_di(result_df=simple_result_df)
     result = _call(mock_di=mock_di)
-    assert "| 着順 | 枠 | 馬番 | 人気 | 4角通過 | 後3F |" in result.text
-    assert "| 1着 | 1枠 | 1番 | 1人気 | 1番手 (逃) | 34.5秒 (1位) |" in result.text
-    assert "| 3着 | 8枠 | 15番 | 11人気 | 8番手 (追) | 35.5秒 (3位) |" in result.text
+    assert "| 着順 | 枠番 | 人気 | 4角通過 | 後3F |" in result.text
+    assert "| 1着 | 1枠1番 | 1人気 | 1番手 (逃) | 34.5秒 (1位) |" in result.text
+    assert "| 3着 | 8枠15番 | 11人気 | 8番手 (追) | 35.5秒 (3位) |" in result.text
 
 
 def test_build_prev_day_trend_body_race_table_without_kyakushitsu_and_halon() -> None:
@@ -390,7 +390,7 @@ def test_build_prev_day_trend_body_race_table_without_kyakushitsu_and_halon() ->
         },
     ])
     result = _call(mock_di=_make_mock_di(result_df=result_df))
-    assert "| 1着 | 1枠 | 1番 | 1人気 | 2番手 | - |" in result.text
+    assert "| 1着 | 1枠1番 | 1人気 | 2番手 | - |" in result.text
 
 
 def test_build_prev_day_trend_body_multiple_races_sorted_by_race_bango() -> None:
