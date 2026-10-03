@@ -97,7 +97,10 @@ python -m scripts.gen_prev_day_trend --race-code 2026061409030411
 
 - `# {レース名}{年}前日の傾向`
 - `## 出目` … 3着以内に入った馬を、人気・枠番・脚質・上がり順位のグループごとに頭数集計した表。
-- `## 各レース` … レースごとの `### {競馬場}{R}R {条件} {距離}m {頭数}頭` と、3着以内の枠・馬番・人気・4角通過順・上がり3F・上がり順位の表。
+- `## 展開` … [race-dynamics-evaluation](https://github.com/KeibaAI-developer/race-dynamics-evaluation) を使った、レースごとの差し有利度・外枠有利度・外有利度の表。値は符号付き小数2桁、NaN と1000m直線コース（展開評価の対象外）は `-`。
+- `## 各レース` … レースごとの `### {競馬場}{R}R {条件} {距離}m {頭数}頭` と、3着以内の枠・馬番・人気・4角通過順・上がり3F・上がり順位の表。1000m直線コース以外は表の後に展開評価の標準化散布図（`make_time_plot`）の画像リンクが続く。
+
+画像は `public/{開催年}/{race_code}_{レース名}/img/prev_day/{前日のrace_code}.png` に保存される。保存とクローズは `scripts/gen_prev_day_trend.py` が行い、`g1_predict/modules/gen_prev_day_trend/prev_day_trend.py` はMarkdown本文と画像（Figure）を `PrevDayTrendBody` として返すだけでファイルを書かない。
 
 前日に対象となるレースが1つも無い場合は、タイトル行だけの記事が出力される。
 

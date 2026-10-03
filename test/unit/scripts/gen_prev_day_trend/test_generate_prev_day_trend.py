@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
+from g1_predict.modules.gen_prev_day_trend.prev_day_trend import PrevDayTrendBody
 from scripts.gen_prev_day_trend import generate_prev_day_trend
 
 
@@ -60,7 +61,10 @@ def _run(
     with (
         patch("scripts.gen_prev_day_trend.RaceGetter", return_value=mock_race_getter),
         patch("scripts.gen_prev_day_trend._PUBLIC_DIR", public_dir),
-        patch("scripts.gen_prev_day_trend.build_prev_day_trend_body", return_value=body),
+        patch(
+            "scripts.gen_prev_day_trend.build_prev_day_trend_body",
+            return_value=PrevDayTrendBody(text=body, images={}),
+        ),
     ):
         generate_prev_day_trend(race_code)
 
@@ -136,3 +140,34 @@ def test_generate_prev_day_trend_title_only_when_body_empty(public_dir: str) -> 
     _run(_make_mock_race_getter(race_name="天皇賞春", year="2026"), public_dir, body="")
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert content == "# 天皇賞春2026前日の傾向\n"
+
+
+def test_generate_prev_day_trend_saves_and_closes_image(public_dir: str) -> None:
+    """画像がimg/prev_day配下に保存され、保存後にFigureがcloseされる。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    mock_figure = MagicMock()
+    race_code = "2026013105010110"
+    body = PrevDayTrendBody(
+        text="## 出目\n\n本文\n",
+        images={"img/prev_day/2026013005010106.png": mock_figure},
+    )
+
+    with (
+        patch(
+            "scripts.gen_prev_day_trend.RaceGetter",
+            return_value=_make_mock_race_getter(),
+        ),
+        patch("scripts.gen_prev_day_trend._PUBLIC_DIR", public_dir),
+        patch("scripts.gen_prev_day_trend.build_prev_day_trend_body", return_value=body),
+        patch("scripts.gen_prev_day_trend.plt") as mock_plt,
+    ):
+        generate_prev_day_trend(race_code)
+
+    expected_path = os.path.join(
+        public_dir, "2026", f"{race_code}_天皇賞春", "img", "prev_day", "2026013005010106.png"
+    )
+    mock_figure.savefig.assert_called_once_with(expected_path, bbox_inches="tight")
+    mock_plt.close.assert_called_once_with(mock_figure)

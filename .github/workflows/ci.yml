@@ -53,6 +53,14 @@ jobs:
           uv venv --python 3.12
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
+      # race-dynamics-evaluation / feature-value-utils はKeibaAI-developerのprivateリポジトリのため、
+      # 依存解決前にトークンでgit認証を通す。
+      - name: Configure git for private KeibaAI-developer repositories
+        env:
+          KEIBAAI_DEVELOPER_TOKEN: ${{ secrets.KEIBAAI_DEVELOPER_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${KEIBAAI_DEVELOPER_TOKEN}@github.com/KeibaAI-developer/".insteadOf "https://github.com/KeibaAI-developer/"
+
       - name: Install dependencies
         run: uv pip install -e ".[dev]"
 

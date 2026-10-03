@@ -19,8 +19,10 @@ JRA の G1 レースについて、
 | --- | --- | --- |
 | mykeibadb（PostgreSQL） | [`mykeibadb-python`](https://github.com/KeibaAI-developer/mykeibadb-python) の `RaceGetter` / `MasterGetter` / `ShussobetsuGetter` / `analytics` | JRA-VAN 由来のレース・出走馬・血統・成績データ |
 | 同上（正規化済みビュー） | [`keiba-data-interface`](https://github.com/KeibaAI-developer/keiba-data-interface) の `DataInterface("mykeibadb")` | 日本語カラム名に整形された出走表・結果・過去成績 |
+| 同上（`RaceData` 経由） | [`race-data`](https://github.com/KeibaAI-developer/race-data) の `RaceData` | [`race-dynamics-evaluation`](https://github.com/KeibaAI-developer/race-dynamics-evaluation) の入力。`gen_prev_day_trend` の展開評価（差し有利度・外枠有利度・外有利度）で使用 |
 | TARGET frontier JV のデータファイル | `g1_predict/modules/utils/tfjv.py` で直接バイナリ読み書き | 自分でつけた**印**と、レースごとに書き溜めた**成績コメント** |
 | （データソースではない） | [`keiba-domain`](https://github.com/KeibaAI-developer/keiba-domain) | 競馬場・馬場状態などコード表由来の定義と判定。DB にも外部 API にも依存しない最下層ライブラリ |
+| （データソースではない） | [`race-dynamics-evaluation`](https://github.com/KeibaAI-developer/race-dynamics-evaluation)（private） | `RaceData` から展開評価の相関係数・標準化散布図を計算するアルゴリズムライブラリ。[`feature-value-utils`](https://github.com/KeibaAI-developer/feature-value-utils)（private）に依存する |
 
 同じ DB を2つのライブラリ経由で参照している点に注意が必要。
 

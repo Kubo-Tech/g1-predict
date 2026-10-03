@@ -29,6 +29,11 @@ dependencies = [
     "keiba-domain @ git+https://github.com/KeibaAI-developer/keiba-domain.git",
     "keiba-data-interface @ git+https://github.com/KeibaAI-developer/keiba-data-interface.git",
     "mykeibadb-python @ git+https://github.com/KeibaAI-developer/mykeibadb-python.git@develop",
+    "race-data @ git+https://github.com/KeibaAI-developer/race-data.git",
+    # race-dynamics-evaluationが要求するが、PyPIに無いため明示する。
+    "feature-value-utils @ git+https://github.com/KeibaAI-developer/feature-value-utils.git",
+    "race-dynamics-evaluation @ git+https://github.com/KeibaAI-developer/race-dynamics-evaluation.git",
+    "matplotlib>=3.8.0",
     "openpyxl>=3.1.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0",
