@@ -74,7 +74,7 @@ def _render_prev_day_trend_content(race_label: str, year: str, body: PrevDayTren
     Returns:
         str: 生成済み前日の傾向記事Markdown文字列。
     """
-    title = f"# {race_label}{year}前日の傾向"
+    title = f"# 【{race_label}{year}】前日の傾向"
     if not body.text:
         return title + "\n"
     return title + "\n\n" + body.text

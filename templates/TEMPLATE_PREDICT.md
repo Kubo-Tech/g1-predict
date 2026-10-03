@@ -1,4 +1,4 @@
-# {RaceName}{Year}予想
+# 【{RaceName}{Year}】予想
 
 ## ポイント
 

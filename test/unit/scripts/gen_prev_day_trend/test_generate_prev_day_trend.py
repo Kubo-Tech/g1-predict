@@ -88,7 +88,7 @@ def _read_output(public_dir: str, year: str, race_code: str, race_name: str) -> 
 
 # 正常系
 def test_generate_prev_day_trend_title_format(public_dir: str) -> None:
-    """生成ファイルのタイトルが # {race_name}{year}前日の傾向 になる。
+    """生成ファイルのタイトルが # 【{race_name}{year}】前日の傾向 になる。
 
     Args:
         public_dir (str): public ディレクトリパス。
@@ -99,7 +99,7 @@ def test_generate_prev_day_trend_title_format(public_dir: str) -> None:
         body="## 出目\n\n本文\n",
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert content.startswith("# 天皇賞春2026前日の傾向")
+    assert content.startswith("# 【天皇賞春2026】前日の傾向")
 
 
 def test_generate_prev_day_trend_creates_file_in_race_subdir(public_dir: str) -> None:
@@ -139,7 +139,7 @@ def test_generate_prev_day_trend_title_only_when_body_empty(public_dir: str) -> 
     """
     _run(_make_mock_race_getter(race_name="天皇賞春", year="2026"), public_dir, body="")
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert content == "# 天皇賞春2026前日の傾向\n"
+    assert content == "# 【天皇賞春2026】前日の傾向\n"
 
 
 def test_generate_prev_day_trend_saves_and_closes_image(public_dir: str) -> None:
