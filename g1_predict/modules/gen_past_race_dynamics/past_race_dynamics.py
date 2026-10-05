@@ -29,7 +29,7 @@ _NETKEIBA_RESULT_URL = "https://race.netkeiba.com/race/result.html?race_id={race
 _STRAIGHT_RACE_NOTE = "1000m直線コースのため展開評価の対象外。"
 _NO_PAST_RACE_NOTE = "中央の平地で出走した過去走なし。"
 _SUMMARY_TEXT = "過去走の展開評価を開く"
-_AVERAGE_HEADING = "## 展開評価値の合計値"
+_AVERAGE_HEADING = "## 展開評価値の平均値"
 _AVERAGE_DESCRIPTION = "過去{num_past_races}走の展開評価値の平均値のランキング"
 _AVERAGE_IMAGE_PATH = f"{_IMAGE_DIR}/average.png"
 # 出走取消・発走除外・競走除外の異常区分コード

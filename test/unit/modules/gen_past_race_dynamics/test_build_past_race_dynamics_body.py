@@ -189,7 +189,7 @@ def test_details_wrap_each_horse_with_blank_lines_in_umaban_order() -> None:
     """馬名をh2見出しにし、過去走を details で囲んで開始タグの後と終了タグの前に空行を入れる。"""
     body, _ = _build()
     headings = re.findall(r"^## (.*)$", body.text, flags=re.MULTILINE)
-    assert headings == ["展開評価値の合計値", "1. ホースA", "2. ホースB", "3. ホースC"]
+    assert headings == ["展開評価値の平均値", "1. ホースA", "2. ホースB", "3. ホースC"]
     summaries = re.findall(r"<details><summary>(.*?)</summary>", body.text)
     assert summaries == ["過去走の展開評価を開く"] * 3
     assert "## 1. ホースA\n\n<details><summary>過去走の展開評価を開く</summary>\n\n" in body.text
@@ -217,7 +217,7 @@ def test_average_section_before_horses() -> None:
     body, _ = _build(num_past_races=4)
     assert (
         "好走した馬。\n\n"
-        "## 展開評価値の合計値\n\n"
+        "## 展開評価値の平均値\n\n"
         "過去4走の展開評価値の平均値のランキング\n\n"
         "![展開評価値の平均値](img/past_dynamics/average.png)\n\n"
         "## 1. ホースA\n"
