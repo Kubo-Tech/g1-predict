@@ -18,6 +18,7 @@ from g1_predict.modules.utils.race_dynamics import (
     TOTAL_EVALUATION_DESCRIPTION,
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
+    make_average_evaluation_chart,
     make_total_evaluation_chart,
 )
 from g1_predict.modules.utils.race_result import grade_display, race_display_name
@@ -28,6 +29,9 @@ _NETKEIBA_RESULT_URL = "https://race.netkeiba.com/race/result.html?race_id={race
 _STRAIGHT_RACE_NOTE = "1000m直線コースのため展開評価の対象外。"
 _NO_PAST_RACE_NOTE = "中央の平地で出走した過去走なし。"
 _SUMMARY_TEXT = "過去走の展開評価を開く"
+_AVERAGE_HEADING = "## 展開評価値の合計値"
+_AVERAGE_DESCRIPTION = "過去{num_past_races}走の展開評価値の平均値のランキング"
+_AVERAGE_IMAGE_PATH = f"{_IMAGE_DIR}/average.png"
 # 出走取消・発走除外・競走除外の異常区分コード
 _NOT_STARTED_IJO_CODES: frozenset[str] = frozenset({"1", "2", "3"})
 
@@ -42,6 +46,7 @@ class PastRaceDynamicsBody:
             （例: "img/past_dynamics/xxx.png"）から画像へのマッピング。
             標準化散布図は、同じ過去走が出走馬を複数含んでいても1枚。
             展開評価値の棒グラフは、強調する馬が違うため過去走と出走馬の組ごとに1枚。
+            展開評価値の平均値の棒グラフは1枚。
     """
 
     text: str
@@ -73,7 +78,8 @@ def build_past_race_dynamics_body(
 ) -> PastRaceDynamicsBody:
     """出走馬の過去走の展開評価記事の本文を生成する。
 
-    出走馬を馬番順に並べ、馬ごとに折りたたみ要素の中へ、中央の平地で出走した
+    冒頭に、出走馬の過去走の展開評価値の平均値を大きい順に並べた棒グラフを載せる。
+    続けて出走馬を馬番順に並べ、馬ごとに折りたたみ要素の中へ、中央の平地で出走した
     直近の過去走の展開評価（有利度の表・標準化散布図・展開評価値の棒グラフ）を新しい順に載せる。
     同じ過去走が複数の出走馬に出てくる場合は、展開評価を1回だけ行って使い回す。
 
@@ -109,7 +115,25 @@ def build_past_race_dynamics_body(
         for past_race in past_races.values()
         if past_race.figure is not None
     }
-    lines = [DYNAMICS_DESCRIPTION, "", TOTAL_EVALUATION_DESCRIPTION, ""]
+    average_df = horses.loc[race_data.valid_horse_num, ["馬番", "枠番", "馬名"]].copy()
+    average_df["馬名"] = average_df["馬名"].astype(str).str.strip()
+    average_df["評価平均値"] = [
+        _average_evaluation(horse_ids[umaban], [past_races[code] for _, code in selected[umaban]])
+        for umaban in race_data.valid_horse_num
+    ]
+    images[_AVERAGE_IMAGE_PATH] = make_average_evaluation_chart(average_df)
+    lines = [
+        DYNAMICS_DESCRIPTION,
+        "",
+        TOTAL_EVALUATION_DESCRIPTION,
+        "",
+        _AVERAGE_HEADING,
+        "",
+        _AVERAGE_DESCRIPTION.format(num_past_races=num_past_races),
+        "",
+        f"![展開評価値の平均値]({_AVERAGE_IMAGE_PATH})",
+        "",
+    ]
     for umaban in race_data.valid_horse_num:
         horse_name = str(horses.loc[umaban, "馬名"]).strip()
         other_ids = {horse_id for num, horse_id in horse_ids.items() if num != umaban}
@@ -196,6 +220,31 @@ def _evaluate_past_races(
             figure=figure,
         )
     return past_races
+
+
+def _average_evaluation(horse_id: str, past_races: list[_PastRace]) -> float:
+    """馬の過去走の展開評価値の平均値を求める。
+
+    展開評価の対象外のレース（1000m直線コース）と、展開評価値が無いレースは平均に含めない。
+
+    Args:
+        horse_id (str): 馬の血統登録番号。
+        past_races (list[_PastRace]): 馬の過去走。
+
+    Returns:
+        float: 展開評価値の平均値。平均に含めるレースが無ければNaN。
+    """
+    values: list[float] = []
+    for past_race in past_races:
+        if past_race.dynamics is None:
+            continue
+        result_df = past_race.result_df
+        ids = result_df["血統登録番号"].astype(str).str.strip()
+        umabans = result_df.loc[ids == horse_id, "馬番"].astype(int).tolist()
+        eval_df = past_race.dynamics.eval_df
+        evaluations = eval_df.loc[eval_df["馬番"].astype(int).isin(umabans), "総合評価"].dropna()
+        values.extend(evaluations.astype(float).tolist())
+    return sum(values) / len(values) if values else float("nan")
 
 
 def _build_race_title(

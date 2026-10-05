@@ -34,6 +34,7 @@ def _entry_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "馬番": list(_HORSES),
+            "枠番": list(_HORSES),
             "血統登録番号": [horse_id for horse_id, _ in _HORSES.values()],
             "馬名": [name for _, name in _HORSES.values()],
         }
@@ -188,7 +189,7 @@ def test_details_wrap_each_horse_with_blank_lines_in_umaban_order() -> None:
     """馬名をh2見出しにし、過去走を details で囲んで開始タグの後と終了タグの前に空行を入れる。"""
     body, _ = _build()
     headings = re.findall(r"^## (.*)$", body.text, flags=re.MULTILINE)
-    assert headings == ["1. ホースA", "2. ホースB", "3. ホースC"]
+    assert headings == ["展開評価値の合計値", "1. ホースA", "2. ホースB", "3. ホースC"]
     summaries = re.findall(r"<details><summary>(.*?)</summary>", body.text)
     assert summaries == ["過去走の展開評価を開く"] * 3
     assert "## 1. ホースA\n\n<details><summary>過去走の展開評価を開く</summary>\n\n" in body.text
@@ -208,6 +209,32 @@ def test_body_starts_with_descriptions() -> None:
     assert body.text.startswith("差し有利度・外枠有利度・外有利度は、")
     assert "\n\n展開評価値は、" in body.text
     assert not body.text.startswith("#")
+
+
+@pytest.mark.usefixtures("evaluate_mock")
+def test_average_section_before_horses() -> None:
+    """説明の後、1頭目の前に、展開評価値の平均値のセクションを載せる。"""
+    body, _ = _build(num_past_races=4)
+    assert (
+        "好走した馬。\n\n"
+        "## 展開評価値の合計値\n\n"
+        "過去4走の展開評価値の平均値のランキング\n\n"
+        "![展開評価値の平均値](img/past_dynamics/average.png)\n\n"
+        "## 1. ホースA\n"
+    ) in body.text
+
+
+@pytest.mark.usefixtures("evaluate_mock")
+def test_average_chart_excludes_straight_race_and_horse_without_past_race() -> None:
+    """平均値は展開評価のある過去走で求め、平均値が無い馬はグラフに載せない。"""
+    horse_b = pd.DataFrame([_pp_row(_G2), _pp_row(_STRAIGHT)])
+    body, _ = _build(horse_b=horse_b)
+    ax = body.images["img/past_dynamics/average.png"].axes[0]
+    # ホースAはG2・条件戦・旧重賞で馬番1（0.4）、ホースBはG2で馬番2（0.3）
+    assert [patch.get_width() for patch in ax.patches] == pytest.approx([0.4, 0.3])
+    texts = [text.get_text() for text in ax.texts]
+    assert "ホースC" not in texts
+    assert {"ホースA", "ホースB", "+0.40", "+0.30"} <= set(texts)
 
 
 @pytest.mark.usefixtures("evaluate_mock")
@@ -337,7 +364,8 @@ def test_shared_past_race_is_evaluated_once_and_image_shared(evaluate_mock: Magi
     scatters = [f"img/past_dynamics/{code}.png" for code in (_G2, _CONDITION, _OLD)]
     charts = [f"img/past_dynamics/{_G2}_{umaban}.png" for umaban in (1, 2)]
     charts += [f"img/past_dynamics/{code}_1.png" for code in (_CONDITION, _OLD)]
-    assert sorted(body.images) == sorted(scatters + charts)
+    average = ["img/past_dynamics/average.png"]
+    assert sorted(body.images) == sorted(scatters + charts + average)
     assert body.text.count(f"![標準化散布図](img/past_dynamics/{_G2}.png)") == 2
 
 

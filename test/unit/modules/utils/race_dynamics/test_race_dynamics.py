@@ -15,6 +15,7 @@ from g1_predict.modules.utils.race_dynamics import (
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
     format_correlation,
+    make_average_evaluation_chart,
     make_total_evaluation_chart,
 )
 
@@ -81,7 +82,7 @@ def _texts_by_column(figure: Figure) -> dict[str, list[Text]]:
     header_x = {
         text.get_position()[0]: text.get_text() for text in ax.texts if text.get_position()[1] < 0
     }
-    columns: dict[str, list[Text]] = {name: [] for name in (*_COLUMNS, "馬名")}
+    columns: dict[str, list[Text]] = {name: [] for name in (*header_x.values(), "馬名")}
     for text in sorted(ax.texts, key=lambda text: text.get_position()[1]):
         x, y = text.get_position()
         if y < 0:
@@ -249,6 +250,47 @@ def test_make_total_evaluation_chart_runner_horse() -> None:
     ]
     for key in _COLUMNS:
         assert all(text.get_fontweight() == "normal" for text in columns[key])
+
+
+# make_average_evaluation_chart
+def _average_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "馬番": [1, 2, 3, 4, 5],
+            "枠番": [1, 2, 3, 4, 5],
+            "馬名": ["ホースA", "ホースB", "ホースC", "ホースD", "ホースE"],
+            "評価平均値": [-0.2, 0.3, float("nan"), 0.3, 0.1],
+        }
+    )
+
+
+def test_make_average_evaluation_chart_sorted_by_average() -> None:
+    """平均値の大きい順に並べ、同じ値の馬は馬番順で同じ順位にし、平均値が無い馬は載せない。"""
+    figure = make_average_evaluation_chart(_average_df())
+    columns = _texts_by_column(figure)
+    assert _texts(columns["馬番"]) == ["2", "4", "5", "1"]
+    assert _texts(columns["評価平均値"]) == ["+0.30", "+0.30", "+0.10", "-0.20"]
+    assert _texts(columns["順位"]) == ["1", "1", "3", "4"]
+    assert _texts(columns["馬名"]) == ["ホースB", "ホースD", "ホースE", "ホースA"]
+    ax = figure.axes[0]
+    assert [patch.get_width() for patch in ax.patches] == pytest.approx([0.3, 0.3, 0.1, -0.2])
+    assert {to_hex(patch.get_facecolor()).upper() for patch in ax.patches} == {_BAR_COLOR}
+    assert all(text.get_fontweight() == "normal" for text in ax.texts)
+    assert ax.get_xlim() == pytest.approx((-1.0, 1.0))
+
+
+def test_make_average_evaluation_chart_columns_and_boxes() -> None:
+    """左側に馬番・評価平均値・順位を書き、馬番は枠の色、順位の1〜3位は順位ごとの色で囲む。"""
+    figure = make_average_evaluation_chart(_average_df())
+    headers = [text for text in figure.axes[0].texts if text.get_position()[1] < 0]
+    assert _texts(headers) == ["馬番", "評価平均値", "順位"]
+    assert _box_colors(figure, "馬番") == [
+        WAKU_TO_COLOR_DICT[2].upper(),
+        WAKU_TO_COLOR_DICT[4].upper(),
+        WAKU_TO_COLOR_DICT[5].upper(),
+        WAKU_TO_COLOR_DICT[1].upper(),
+    ]
+    assert _box_colors(figure, "順位") == ["#FFF080", "#FFF080", "#F0C8A0"]
 
 
 def test_evaluate_race_dynamics_with_plot_returns_cor_df_and_figure() -> None:

@@ -1,7 +1,9 @@
 """記事に載せる展開評価（相関係数の表・標準化散布図・総合評価の棒グラフ）を生成するユーティリティ。"""
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass
 from datetime import date
+from typing import Literal
 
 import pandas as pd
 from evaluation import RaceDynamicsResult, evaluate_race_dynamics, make_time_plot
@@ -32,22 +34,18 @@ _RUNNER_COLOR = "#EDB120"
 _DARK_TEXT_WAKU = (1, 5, 7, 8)
 _JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
 _JAPANESE_BOLD_FONT = FontProperties(family="Noto Sans CJK JP", weight="bold")
-# グラフの寸法（インチ）。左側の余白に着順・馬番・評価値・評価順位の列を置く
+# グラフの寸法（インチ）。左側の余白に馬番・評価値などの列を置く
 _CHART_WIDTH = 9.0
-_CHART_LEFT = 2.75
 _CHART_RIGHT = 0.15
 _CHART_TOP = 0.4
 _CHART_BOTTOM = 0.4
 _CHART_ROW_HEIGHT = 0.32
 _CHART_BAR_HEIGHT = 0.7
-# 左側の列の中心の位置（グラフの左端からの距離、インチ）
-_RANK_COLUMN = 0.3
-_UMABAN_COLUMN = 0.85
-_VALUE_COLUMN = 1.5
-_EVALUATION_RANK_COLUMN = 2.25
-# 馬番・着順・評価順位を囲む四角の幅（インチ）
+# 左側の列とグラフの間の余白（インチ）
+_COLUMN_GAP = 0.2
+# 馬番・順位を囲む四角の幅（インチ）
 _BOX_WIDTH = 0.26
-# 着順・評価順位の1〜3位を囲む四角の色（netkeibaの人気・上がり順位の色）
+# 順位の1〜3位を囲む四角の色（netkeibaの人気・上がり順位の色）
 _TOP_RANK_COLORS = {1: "#FFF080", 2: "#CCDFFF", 3: "#F0C8A0"}
 # 横軸の範囲。範囲を超える評価値の棒は端で切れる
 _CHART_LIMIT = 1.0
@@ -131,6 +129,25 @@ def build_dynamics_table_lines(cor_df: pd.DataFrame) -> list[str]:
     ]
 
 
+@dataclass(frozen=True)
+class _ChartColumn:
+    """棒グラフの左側に置く列。
+
+    Attributes:
+        header (str): 見出し。
+        key (str): 行のDataFrameのカラム名。
+        kind (Literal["umaban", "rank", "value"]): 列の種類。umaban は枠の色の四角で囲み、
+            rank は1〜3位を順位ごとの色の四角で囲み（値が無ければ「-」）、
+            value は符号付き小数2桁で書く。
+        width (float): 列の幅（インチ）。
+    """
+
+    header: str
+    key: str
+    kind: Literal["umaban", "rank", "value"]
+    width: float
+
+
 def make_total_evaluation_chart(
     eval_df: pd.DataFrame,
     result_df: pd.DataFrame,
@@ -141,10 +158,7 @@ def make_total_evaluation_chart(
 
     上から確定着順の順に並べ、確定着順が無い馬（競走中止など）は最後に馬番順で並べる。
     総合評価が無い馬（競走除外など）は載せない。
-    棒は0から評価値まで伸び、0の位置に縦線を引く。横軸は-1.0から+1.0に固定する。
-    グラフの左側に着順・馬番・評価値・評価順位を縦に揃えて書き、馬番は枠の色の四角で囲む。
-    着順と評価順位の1〜3位は、順位ごとの色の四角で囲む。
-    馬名は棒と重ならないよう、評価値が正の馬は0の左側、負の馬は0の右側に書く。
+    グラフの左側に着順・馬番・評価値・評価順位を縦に揃えて書く。
 
     Args:
         eval_df (pd.DataFrame): 展開評価の馬ごとの評価DataFrame（馬番・総合評価カラムを使う）。
@@ -158,35 +172,100 @@ def make_total_evaluation_chart(
     """
     horses = result_df.set_index(result_df["馬番"].astype(int))
     evaluated = eval_df[eval_df["総合評価"].notna()]
+    umabans = evaluated["馬番"].astype(int).tolist()
     rows = pd.DataFrame(
         {
-            "umaban": evaluated["馬番"].astype(int).to_numpy(),
+            "馬番": umabans,
+            "枠番": [horses.loc[umaban, "枠番"] for umaban in umabans],
+            "馬名": [str(horses.loc[umaban, "馬名"]) for umaban in umabans],
             "value": evaluated["総合評価"].astype(float).to_numpy(),
+            "着順": [horses.loc[umaban, "確定着順"] for umaban in umabans],
         }
     )
-    rows["rank"] = [horses.loc[umaban, "確定着順"] for umaban in rows["umaban"]]
-    rows["evaluation_rank"] = rows["value"].rank(method="min", ascending=False).astype(int)
-    rows = rows.sort_values(["rank", "umaban"], na_position="last").reset_index(drop=True)
+    rows["評価順位"] = rows["value"].rank(method="min", ascending=False)
+    rows["bar_color"] = [
+        _HIGHLIGHT_COLOR
+        if umaban in highlight_horse_nums
+        else _RUNNER_COLOR
+        if umaban in runner_horse_nums
+        else _BAR_COLOR
+        for umaban in umabans
+    ]
+    rows["bold"] = [umaban in highlight_horse_nums for umaban in umabans]
+    rows["name_bold"] = [umaban in runner_horse_nums for umaban in umabans]
+    rows = rows.sort_values(["着順", "馬番"], na_position="last").reset_index(drop=True)
+    columns = (
+        _ChartColumn("着順", "着順", "rank", 0.6),
+        _ChartColumn("馬番", "馬番", "umaban", 0.5),
+        _ChartColumn("評価値", "value", "value", 0.75),
+        _ChartColumn("評価順位", "評価順位", "rank", 0.7),
+    )
+    return _make_horse_bar_chart(rows, columns)
 
+
+def make_average_evaluation_chart(average_df: pd.DataFrame) -> Figure:
+    """馬ごとの展開評価値の平均値を、大きい順に並べた横向きの棒グラフにする。
+
+    平均値が同じ馬は馬番順に並べて同じ順位にする。平均値が無い馬は載せない。
+    グラフの左側に馬番・評価平均値・順位を縦に揃えて書く。
+
+    Args:
+        average_df (pd.DataFrame): 馬番・枠番・馬名・評価平均値カラムを持つDataFrame。
+
+    Returns:
+        Figure: 棒グラフ。
+    """
+    averaged = average_df[average_df["評価平均値"].notna()]
+    rows = pd.DataFrame(
+        {
+            "馬番": averaged["馬番"].astype(int).to_numpy(),
+            "枠番": averaged["枠番"].astype(int).to_numpy(),
+            "馬名": averaged["馬名"].astype(str).to_numpy(),
+            "value": averaged["評価平均値"].astype(float).to_numpy(),
+        }
+    )
+    rows["順位"] = rows["value"].rank(method="min", ascending=False)
+    rows["bar_color"] = _BAR_COLOR
+    rows["bold"] = False
+    rows["name_bold"] = False
+    rows = rows.sort_values(["value", "馬番"], ascending=[False, True]).reset_index(drop=True)
+    columns = (
+        _ChartColumn("馬番", "馬番", "umaban", 0.6),
+        _ChartColumn("評価平均値", "value", "value", 0.9),
+        _ChartColumn("順位", "順位", "rank", 0.6),
+    )
+    return _make_horse_bar_chart(rows, columns)
+
+
+def _make_horse_bar_chart(rows: pd.DataFrame, columns: Sequence[_ChartColumn]) -> Figure:
+    """馬ごとの値を横向きの棒グラフにし、左側に列を縦に揃えて書く。
+
+    上から行の順に並べる。棒は0から値まで伸び、0の位置に縦線を引く。
+    横軸は-1.0から+1.0に固定する。
+    馬番は枠の色の四角で囲み、順位の1〜3位は順位ごとの色の四角で囲む。
+    馬名は棒と重ならないよう、値が正の馬は0の左側、負の馬は0の右側に書く。
+
+    Args:
+        rows (pd.DataFrame): 1行1頭のDataFrame（並び順は上からの順）。馬番・枠番・馬名・
+            value（棒の値）・bar_color（棒の色）・bold（左側の列と馬名を太字にするか）・
+            name_bold（馬名を太字にするか）と、各列のkeyのカラムを持つ。
+        columns (Sequence[_ChartColumn]): 左側の列（左から順）。
+
+    Returns:
+        Figure: 棒グラフ。
+    """
+    chart_left = sum(column.width for column in columns) + _COLUMN_GAP
     height = _CHART_ROW_HEIGHT * len(rows) + _CHART_TOP + _CHART_BOTTOM
     figure = Figure(figsize=(_CHART_WIDTH, height))
     figure.subplots_adjust(
-        left=_CHART_LEFT / _CHART_WIDTH,
+        left=chart_left / _CHART_WIDTH,
         right=1 - _CHART_RIGHT / _CHART_WIDTH,
         top=1 - _CHART_TOP / height,
         bottom=_CHART_BOTTOM / height,
     )
     ax = figure.subplots()
     positions = list(range(len(rows)))
-    colors = []
-    for umaban in rows["umaban"]:
-        if umaban in highlight_horse_nums:
-            colors.append(_HIGHLIGHT_COLOR)
-        elif umaban in runner_horse_nums:
-            colors.append(_RUNNER_COLOR)
-        else:
-            colors.append(_BAR_COLOR)
-    ax.barh(positions, rows["value"], color=colors, height=_CHART_BAR_HEIGHT)
+    ax.barh(positions, rows["value"], color=rows["bar_color"].tolist(), height=_CHART_BAR_HEIGHT)
     ax.axvline(0, color="black", linewidth=0.8)
     ax.set_xlim(-_CHART_LIMIT, _CHART_LIMIT)
     ax.set_xticks(_CHART_TICKS)
@@ -197,28 +276,18 @@ def make_total_evaluation_chart(
 
     # xは軸の幅に対する割合、yはデータ座標の位置として左側の列を置く
     column_transform = ax.get_yaxis_transform()
-    axes_width = _CHART_WIDTH - _CHART_LEFT - _CHART_RIGHT
-
-    def column_x(column: float) -> float:
-        return (column - _CHART_LEFT) / axes_width
-
-    headers = (
-        (_RANK_COLUMN, "着順"),
-        (_UMABAN_COLUMN, "馬番"),
-        (_VALUE_COLUMN, "評価値"),
-        (_EVALUATION_RANK_COLUMN, "評価順位"),
-    )
-    for column, header in headers:
-        ax.text(
-            column_x(column), -1.0, header, ha="center", va="center",
-            transform=column_transform, fontproperties=_JAPANESE_FONT,
-        )  # fmt: skip
+    axes_width = _CHART_WIDTH - chart_left - _CHART_RIGHT
     box_width = _BOX_WIDTH / axes_width
+    column_xs: list[float] = []
+    left = 0.0
+    for column in columns:
+        column_xs.append((left + column.width / 2 - chart_left) / axes_width)
+        left += column.width
 
-    def add_box(column: float, position: int, facecolor: str, edgecolor: str) -> None:
+    def add_box(x: float, position: int, facecolor: str, edgecolor: str) -> None:
         figure.add_artist(
             Rectangle(
-                (column_x(column) - box_width / 2, position - _CHART_BAR_HEIGHT / 2),
+                (x - box_width / 2, position - _CHART_BAR_HEIGHT / 2),
                 box_width,
                 _CHART_BAR_HEIGHT,
                 transform=column_transform,
@@ -230,43 +299,39 @@ def make_total_evaluation_chart(
             )
         )
 
-    wakus = horses["枠番"].astype(int).to_dict()
-    for position, umaban, value, rank, evaluation_rank in zip(
-        positions,
-        rows["umaban"].astype(int).tolist(),
-        rows["value"].astype(float).tolist(),
-        rows["rank"].tolist(),
-        rows["evaluation_rank"].astype(int).tolist(),
-        strict=True,
-    ):
-        highlighted = umaban in highlight_horse_nums
-        weight = "bold" if highlighted else "normal"
-        waku = wakus[umaban]
-        add_box(_UMABAN_COLUMN, position, WAKU_TO_COLOR_DICT[waku], "black")
-        if pd.notna(rank) and int(rank) in _TOP_RANK_COLORS:
-            add_box(_RANK_COLUMN, position, _TOP_RANK_COLORS[int(rank)], "none")
-        if evaluation_rank in _TOP_RANK_COLORS:
-            add_box(_EVALUATION_RANK_COLUMN, position, _TOP_RANK_COLORS[evaluation_rank], "none")
-        rank_text = f"{int(rank)}" if pd.notna(rank) else "-"
-        # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
-        value_text = f"{round(value, 2) + 0.0:+.2f}"
-        cells = (
-            (_RANK_COLUMN, rank_text, "black"),
-            (_UMABAN_COLUMN, str(umaban), "black" if waku in _DARK_TEXT_WAKU else "white"),
-            (_VALUE_COLUMN, value_text, "black"),
-            (_EVALUATION_RANK_COLUMN, str(evaluation_rank), "black"),
-        )
-        for column, text, color in cells:
+    for x, column in zip(column_xs, columns, strict=True):
+        ax.text(
+            x, -1.0, column.header, ha="center", va="center",
+            transform=column_transform, fontproperties=_JAPANESE_FONT,
+        )  # fmt: skip
+    for position, row in zip(positions, rows.to_dict("records"), strict=True):
+        weight = "bold" if row["bold"] else "normal"
+        for x, column in zip(column_xs, columns, strict=True):
+            cell = row[column.key]
+            color = "black"
+            if column.kind == "umaban":
+                waku = int(row["枠番"])
+                add_box(x, position, WAKU_TO_COLOR_DICT[waku], "black")
+                text = str(int(cell))
+                color = "black" if waku in _DARK_TEXT_WAKU else "white"
+            elif column.kind == "rank":
+                text = str(int(cell)) if pd.notna(cell) else "-"
+                if pd.notna(cell) and int(cell) in _TOP_RANK_COLORS:
+                    add_box(x, position, _TOP_RANK_COLORS[int(cell)], "none")
+            else:
+                # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
+                text = f"{round(float(cell), 2) + 0.0:+.2f}"
             ax.text(
-                column_x(column), position, text, ha="center", va="center", color=color,
+                x, position, text, ha="center", va="center", color=color,
                 transform=column_transform, fontweight=weight,
             )  # fmt: skip
-        name_bold = highlighted or umaban in runner_horse_nums
+        name_bold = row["bold"] or row["name_bold"]
         name_font = _JAPANESE_BOLD_FONT if name_bold else _JAPANESE_FONT
-        # 棒は0から評価値の側へ伸びるため、反対側の空きに馬名を書く
-        x, align = (-_NAME_OFFSET, "right") if value >= 0 else (_NAME_OFFSET, "left")
+        # 棒は0から値の側へ伸びるため、反対側の空きに馬名を書く
+        value = float(row["value"])
+        x_name, align = (-_NAME_OFFSET, "right") if value >= 0 else (_NAME_OFFSET, "left")
         ax.text(
-            x, position, str(horses.loc[umaban, "馬名"]), ha=align, va="center",
+            x_name, position, str(row["馬名"]), ha=align, va="center",
             fontproperties=name_font,
         )  # fmt: skip
     return figure
