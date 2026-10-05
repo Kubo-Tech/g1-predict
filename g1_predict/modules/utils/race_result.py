@@ -31,13 +31,18 @@ def race_condition_display(race_info: pd.DataFrame) -> str:
 
     Returns:
         str: 競走条件の表示名。
+
+    Raises:
+        ValueError: 競走条件名称が無く、競走条件コードが無いか表示名の無いコードの場合。
     """
     cond_raw = race_info["競走条件名称"].iloc[0]
     if pd.notna(cond_raw) and str(cond_raw).strip():
         return str(cond_raw).strip()
     joken_code_raw = race_info["競走条件コード"].iloc[0]
     joken_code = str(joken_code_raw) if pd.notna(joken_code_raw) else ""
-    return _KYOSO_JOKEN_CODE_DISPLAY.get(joken_code, "")
+    if joken_code not in _KYOSO_JOKEN_CODE_DISPLAY:
+        raise ValueError(f"競走条件コードの表示名が無い: {joken_code!r}")
+    return _KYOSO_JOKEN_CODE_DISPLAY[joken_code]
 
 
 def grade_display(race_info: pd.DataFrame) -> str:

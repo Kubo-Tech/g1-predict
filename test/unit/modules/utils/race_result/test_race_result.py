@@ -118,11 +118,18 @@ def test_race_condition_display_prefers_condition_name() -> None:
 
 @pytest.mark.parametrize(
     "code, expected",
-    [("701", "新馬"), ("703", "未勝利"), ("005", "1勝クラス"), ("999", "オープン"), (None, "")],
+    [("701", "新馬"), ("703", "未勝利"), ("005", "1勝クラス"), ("999", "オープン")],
 )
 def test_race_condition_display_falls_back_to_code_name(code: object, expected: str) -> None:
     """競走条件名称が空なら、競走条件コードの表示名を返す。"""
     assert race_condition_display(_race_info(condition_name="", condition_code=code)) == expected
+
+
+@pytest.mark.parametrize("code", [None, "123"])
+def test_race_condition_display_unknown_code_raises(code: object) -> None:
+    """競走条件名称が空で、競走条件コードが無いか表示名の無いコードなら例外を送出する。"""
+    with pytest.raises(ValueError, match="競走条件コードの表示名が無い"):
+        race_condition_display(_race_info(condition_name="", condition_code=code))
 
 
 # grade_display

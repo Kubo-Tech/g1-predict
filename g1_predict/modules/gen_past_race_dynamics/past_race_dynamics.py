@@ -94,8 +94,11 @@ def build_past_race_dynamics_body(
         PastRaceDynamicsBody: 記事本文（H1見出しを除く）と画像。
 
     Raises:
+        ValueError: num_past_races が1未満の場合。
         CornerDataError: 過去走のレース結果情報または4コーナーの通過順データが存在しない場合。
     """
+    if num_past_races < 1:
+        raise ValueError(f"num_past_races は1以上: {num_past_races}")
     data_interface = DataInterface("mykeibadb")
     race_date = datetime.strptime(race_code[0:8], "%Y%m%d").date()
     race_data = RaceData(race_code, data_interface, reference_date=race_date)

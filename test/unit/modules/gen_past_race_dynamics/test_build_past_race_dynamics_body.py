@@ -419,3 +419,10 @@ def test_dynamics_error_is_not_suppressed() -> None:
         pytest.raises(ValueError, match="no corner"),
     ):
         _build()
+
+
+@pytest.mark.parametrize("num_past_races", [0, -1])
+def test_num_past_races_less_than_one_raises(num_past_races: int) -> None:
+    """載せる過去走の数が1未満なら例外を送出する。"""
+    with pytest.raises(ValueError, match="num_past_races は1以上"):
+        build_past_race_dynamics_body(_TARGET, num_past_races)

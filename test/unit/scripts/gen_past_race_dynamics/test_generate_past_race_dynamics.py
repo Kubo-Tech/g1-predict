@@ -67,3 +67,19 @@ def test_generate_rejects_invalid_race_code(public_dir: str) -> None:
     """16桁の数字でないrace_codeはValueErrorになる。"""
     with pytest.raises(ValueError):
         generate_past_race_dynamics("abc")
+
+
+def test_generate_does_not_write_article_when_saving_images_fails(public_dir: str) -> None:
+    """画像の保存に失敗した場合は、記事を書き出さずに例外を送出する。"""
+    body = PastRaceDynamicsBody(text="本文\n", images={"img/past_dynamics/x.png": Figure()})
+    with (
+        patch(
+            "scripts.gen_past_race_dynamics.save_images", side_effect=ValueError("too many colors")
+        ),
+        pytest.raises(ValueError, match="too many colors"),
+    ):
+        _run(public_dir, body)
+    path = os.path.join(
+        public_dir, "2026", f"{_RACE_CODE}_スプリンターズS", "出走馬の過去走の展開評価.md"
+    )
+    assert not os.path.exists(path)

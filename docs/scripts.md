@@ -14,10 +14,10 @@
 | `gen_table` | ○ | − | `table.yml` | − | `table/*.xlsx` |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
-| `gen_past_race_dynamics` | ○ | − | − | − | `出走馬の過去走の展開評価.md`, `img/past_dynamics/{過去走のrace_code}.png` |
+| `gen_past_race_dynamics` | ○ | − | − | − | `出走馬の過去走の展開評価.md`, `img/past_dynamics/*.png` |
 | `gen_predict` | ○ | 読み | `hatena.yml` | `TEMPLATE_PREDICT.md`, `points/` | `予想.md` |
 | `gen_result_comment` | ○ | 書き | − | − | TFJV の `KEK_COM` |
-| `gen_result` | ○ | 読み | `hatena.yml` | `TEMPLATE_RESULT.md` | `回顧.md`, `img/race_result/{race_code}.png` |
+| `gen_result` | ○ | 読み | `hatena.yml` | `TEMPLATE_RESULT.md` | `回顧.md`, `img/race_result/{race_code}.png`, `img/race_result/{race_code}_evaluation.png` |
 | `hatena_publish` | − | − | `hatena.yml` | − | はてなブログ記事 |
 
 ---

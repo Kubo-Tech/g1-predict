@@ -48,9 +48,10 @@ def generate_day_trend(race_code: str, kind: DayTrendKind) -> None:
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, f"{kind.label}の傾向.md")
+    # 画像の保存に失敗したときに、画像の無い記事を残さないよう先に保存する
+    save_images(race_dir, body.images)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
-    save_images(race_dir, body.images)
     print(f"Generated: {output_path}")
 
 

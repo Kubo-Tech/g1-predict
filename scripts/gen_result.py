@@ -100,13 +100,14 @@ def generate_result(race_code: str) -> None:
 
     os.makedirs(race_dir, exist_ok=True)
     output_path = os.path.join(race_dir, "回顧.md")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(content)
     images: dict[str, Figure] = {}
     if dynamics is not None and figure is not None:
         images[image_path] = figure
         images[chart_path] = make_total_evaluation_chart(dynamics.eval_df, result_df)
+    # 画像の保存に失敗したときに、画像の無い記事を残さないよう先に保存する
     save_images(race_dir, images)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
     print(f"Generated: {output_path}")
 
 
