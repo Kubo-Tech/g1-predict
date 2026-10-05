@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from matplotlib.colors import to_hex
 
 from g1_predict.modules.gen_past_race_dynamics.past_race_dynamics import (
     PastRaceDynamicsBody,
@@ -282,28 +283,45 @@ def test_horse_without_past_race_has_note() -> None:
 
 
 @pytest.mark.usefixtures("evaluate_mock")
-def test_bold_own_row_and_other_runners_name() -> None:
-    """その馬の行は全セル、今回の他の出走馬は馬名のセルだけを太字にする。"""
+def test_highlight_own_bar_and_bold_other_runners_name() -> None:
+    """その馬は棒の色を変えて馬番・評価値・馬名を太字にし、今回の他の出走馬は馬名だけを太字にする。"""
     body, _ = _build()
-    section = _horse_section(body.text, "1. ホースA")
-    assert "| **3着** | **1** | **ホースA** | **+0.40** |" in section
-    assert "| 1着 | 2 | **ホースB** | +0.30 |" in section
-    assert "| 2着 | 3 | ホースX | +0.20 |" in section
-    section_b = _horse_section(body.text, "2. ホースB")
-    assert "| 3着 | 1 | **ホースA** | +0.40 |" in section_b
-    assert "| **1着** | **2** | **ホースB** | **+0.30** |" in section_b
+    chart = body.images[f"img/past_dynamics/{_G2}_1.png"]
+    ax = chart.axes[0]
+    # 着順の順: 2(1着)・3(2着)・1(3着)・4(4着)
+    assert [to_hex(patch.get_facecolor()).upper() for patch in ax.patches] == [
+        "#0072BD",
+        "#0072BD",
+        "#D95319",
+        "#0072BD",
+    ]
+    weights = {text.get_text(): text.get_fontweight() for text in ax.texts}
+    names = {name: weights[name] for name in ("ホースA", "ホースB", "ホースX", "ホースY")}
+    assert names == {"ホースA": "bold", "ホースB": "bold", "ホースX": "normal", "ホースY": "normal"}
+    columns = {text: weights[text] for text in ("1", "+0.40", "2")}
+    assert columns == {"1": "bold", "+0.40": "bold", "2": "normal"}
 
 
 @pytest.mark.usefixtures("evaluate_mock")
-def test_dynamics_tables_and_image_link() -> None:
-    """有利度の表・標準化散布図・展開評価値の表を順に載せる。"""
+def test_highlight_differs_by_horse() -> None:
+    """同じ過去走でも、折りたたみの主の馬ごとに別の棒グラフを作り、強調する棒を変える。"""
+    body, _ = _build()
+    chart = body.images[f"img/past_dynamics/{_G2}_2.png"]
+    colors = [to_hex(patch.get_facecolor()).upper() for patch in chart.axes[0].patches]
+    assert colors == ["#D95319", "#0072BD", "#0072BD", "#0072BD"]
+
+
+@pytest.mark.usefixtures("evaluate_mock")
+def test_dynamics_table_scatter_and_chart_link() -> None:
+    """有利度の表・標準化散布図・展開評価値の棒グラフを順に載せ、展開評価値の表は載せない。"""
     body, _ = _build()
     section = _horse_section(body.text, "2. ホースB")
     assert (
         "| 差し有利度 | 外枠有利度 | 外有利度 |\n| --- | --- | --- |\n| +10% | -20% | +30% |\n\n"
         f"![標準化散布図](img/past_dynamics/{_G2}.png)\n\n"
-        "| 着順 | 馬番 | 馬名 | 展開評価値 |"
+        f"![展開評価値](img/past_dynamics/{_G2}_2.png)\n"
     ) in section
+    assert "展開評価値 |" not in body.text
 
 
 def test_shared_past_race_is_evaluated_once_and_image_shared(evaluate_mock: MagicMock) -> None:
@@ -312,9 +330,10 @@ def test_shared_past_race_is_evaluated_once_and_image_shared(evaluate_mock: Magi
     evaluated = [call.args[0] for call in evaluate_mock.call_args_list]
     assert sorted(evaluated) == sorted([_G2, _STRAIGHT, _CONDITION, _OLD])
     assert all(call.args[2] == date(2026, 9, 27) for call in evaluate_mock.call_args_list)
-    assert sorted(body.images) == sorted(
-        f"img/past_dynamics/{code}.png" for code in (_G2, _CONDITION, _OLD)
-    )
+    scatters = [f"img/past_dynamics/{code}.png" for code in (_G2, _CONDITION, _OLD)]
+    charts = [f"img/past_dynamics/{_G2}_{umaban}.png" for umaban in (1, 2)]
+    charts += [f"img/past_dynamics/{code}_1.png" for code in (_CONDITION, _OLD)]
+    assert sorted(body.images) == sorted(scatters + charts)
     assert body.text.count(f"![標準化散布図](img/past_dynamics/{_G2}.png)") == 2
 
 

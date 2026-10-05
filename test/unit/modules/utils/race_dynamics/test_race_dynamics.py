@@ -4,12 +4,16 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
+from matplotlib.colors import to_hex
+from matplotlib.figure import Figure
+from matplotlib.text import Text
 
 from g1_predict.modules.utils.race_dynamics import (
     build_dynamics_table_lines,
-    build_total_evaluation_table_lines,
     evaluate_race_dynamics_with_plot,
     format_correlation,
+    make_total_evaluation_chart,
 )
 
 _MODULE = "g1_predict.modules.utils.race_dynamics"
@@ -44,57 +48,162 @@ def test_build_dynamics_table_lines() -> None:
     ]
 
 
-# build_total_evaluation_table_lines
-def test_build_total_evaluation_table_lines_sorted_by_value() -> None:
-    """評価値の高い順に並べ、総合評価が無い馬は載せない。"""
+# make_total_evaluation_chart
+_BAR_COLOR = "#0072BD"
+_HIGHLIGHT_COLOR = "#D95319"
+
+
+def _chart_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
     eval_df = pd.DataFrame(
-        {"馬番": [1, 2, 3, 4], "総合評価": [-0.31, 0.524, float("nan"), -0.001]}
+        {"馬番": [1, 2, 3, 4, 5], "総合評価": [-0.31, 0.524, float("nan"), -0.001, 0.2]}
     )
     result_df = pd.DataFrame(
         {
-            "馬番": [1, 2, 3, 4],
-            "確定着順": [1, 3, float("nan"), 2],
-            "馬名": ["ホースA", "ホースB", "ホースC", "ホースD"],
+            "馬番": [1, 2, 3, 4, 5],
+            "確定着順": [1, 3, 4, 2, float("nan")],
+            "馬名": ["ホースA", "ホースB", "ホースC", "ホースD", "ホースE"],
         }
-    )
-    assert build_total_evaluation_table_lines(eval_df, result_df) == [
-        "| 着順 | 馬番 | 馬名 | 展開評価値 |",
-        "| --- | --- | --- | --- |",
-        "| 3着 | 2 | ホースB | +0.52 |",
-        "| 2着 | 4 | ホースD | +0.00 |",
-        "| 1着 | 1 | ホースA | -0.31 |",
-    ]
-
-
-def _bold_eval_and_result() -> tuple[pd.DataFrame, pd.DataFrame]:
-    eval_df = pd.DataFrame({"馬番": [1, 2, 3], "総合評価": [0.3, 0.2, 0.1]})
-    result_df = pd.DataFrame(
-        {"馬番": [1, 2, 3], "確定着順": [1, 2, 3], "馬名": ["ホースA", "ホースB", "ホースC"]}
     )
     return eval_df, result_df
 
 
-def test_build_total_evaluation_table_lines_bold_row_and_name() -> None:
-    """行全体の太字は全セル、馬名のみの太字は馬名のセルだけを太字にする。"""
-    eval_df, result_df = _bold_eval_and_result()
-    assert build_total_evaluation_table_lines(
-        eval_df, result_df, bold_row_horse_nums=[1], bold_name_horse_nums=[3]
-    ) == [
-        "| 着順 | 馬番 | 馬名 | 展開評価値 |",
-        "| --- | --- | --- | --- |",
-        "| **1着** | **1** | **ホースA** | **+0.30** |",
-        "| 2着 | 2 | ホースB | +0.20 |",
-        "| 3着 | 3 | **ホースC** | +0.10 |",
+def _texts_by_column(figure: Figure) -> dict[str, dict[float, Text]]:
+    """左端の列（馬番・評価値）と馬名のテキストを、y位置をキーにして返す。"""
+    ax = figure.axes[0]
+    columns: dict[str, dict[float, Text]] = {"umaban": {}, "value": {}, "name": {}}
+    for text in ax.texts:
+        x = text.get_position()[0]
+        y = text.get_position()[1]
+        if y < 0:
+            continue
+        if x == pytest.approx(-0.14):
+            columns["umaban"][y] = text
+        elif x == pytest.approx(-0.015):
+            columns["value"][y] = text
+        else:
+            columns["name"][y] = text
+    return columns
+
+
+def test_make_total_evaluation_chart_sorted_by_rank_with_unranked_last() -> None:
+    """上から着順の順に並べ、確定着順が無い馬は最後に置き、総合評価が無い馬は載せない。"""
+    figure = make_total_evaluation_chart(*_chart_inputs())
+    columns = _texts_by_column(figure)
+    assert [columns["umaban"][y].get_text() for y in sorted(columns["umaban"])] == [
+        "1",
+        "4",
+        "2",
+        "5",
     ]
-
-
-def test_build_total_evaluation_table_lines_bold_row_takes_precedence() -> None:
-    """行全体と馬名のみの両方に指定された馬は、行全体を太字にする。"""
-    eval_df, result_df = _bold_eval_and_result()
-    lines = build_total_evaluation_table_lines(
-        eval_df, result_df, bold_row_horse_nums=[2], bold_name_horse_nums=[2]
+    assert [columns["name"][y].get_text() for y in sorted(columns["name"])] == [
+        "ホースA",
+        "ホースD",
+        "ホースB",
+        "ホースE",
+    ]
+    ax = figure.axes[0]
+    assert [patch.get_width() for patch in ax.patches] == pytest.approx(
+        [-0.31, -0.001, 0.524, 0.2]
     )
-    assert lines[3] == "| **2着** | **2** | **ホースB** | **+0.20** |"
+    assert ax.get_ylim()[0] > ax.get_ylim()[1]
+
+
+def test_make_total_evaluation_chart_unranked_horses_sorted_by_umaban() -> None:
+    """確定着順が無い馬が複数いるときは、馬番順に並べる。"""
+    eval_df = pd.DataFrame({"馬番": [3, 1, 2], "総合評価": [0.1, 0.2, 0.3]})
+    result_df = pd.DataFrame(
+        {
+            "馬番": [3, 1, 2],
+            "確定着順": [float("nan"), float("nan"), 1],
+            "馬名": ["C", "A", "B"],
+        }
+    )
+    columns = _texts_by_column(make_total_evaluation_chart(eval_df, result_df))
+    assert [columns["umaban"][y].get_text() for y in sorted(columns["umaban"])] == ["2", "1", "3"]
+
+
+def test_make_total_evaluation_chart_left_columns_text() -> None:
+    """左端に馬番と、符号付き小数2桁の評価値を書く。0に丸まる負の値は「-0.00」にしない。"""
+    figure = make_total_evaluation_chart(*_chart_inputs())
+    columns = _texts_by_column(figure)
+    ys = sorted(columns["value"])
+    assert [columns["value"][y].get_text() for y in ys] == ["-0.31", "+0.00", "+0.52", "+0.20"]
+    assert all(columns["umaban"][y].get_ha() == "right" for y in ys)
+    assert all(columns["value"][y].get_ha() == "right" for y in ys)
+    assert all(text.get_fontweight() == "normal" for text in columns["umaban"].values())
+    headers = [text.get_text() for text in figure.axes[0].texts if text.get_position()[1] < 0]
+    assert headers == ["馬番", "評価値"]
+
+
+def test_make_total_evaluation_chart_name_placed_opposite_to_bar() -> None:
+    """馬名は、評価値が正なら0の左で右揃え、負なら0の右で左揃えにする。"""
+    columns = _texts_by_column(make_total_evaluation_chart(*_chart_inputs()))
+    names = {text.get_text(): text for text in columns["name"].values()}
+    for name in ("ホースB", "ホースE"):
+        assert names[name].get_position()[0] < 0
+        assert names[name].get_ha() == "right"
+    for name in ("ホースA", "ホースD"):
+        assert names[name].get_position()[0] > 0
+        assert names[name].get_ha() == "left"
+
+
+def test_make_total_evaluation_chart_zero_value_is_treated_as_positive() -> None:
+    """評価値が0の馬は、正と同じく0の左に馬名を書く。"""
+    eval_df = pd.DataFrame({"馬番": [1], "総合評価": [0.0]})
+    result_df = pd.DataFrame({"馬番": [1], "確定着順": [1], "馬名": ["ホースA"]})
+    columns = _texts_by_column(make_total_evaluation_chart(eval_df, result_df))
+    name = columns["name"][0]
+    assert name.get_position()[0] < 0
+    assert name.get_ha() == "right"
+
+
+def test_make_total_evaluation_chart_xlim_is_symmetric_with_margin() -> None:
+    """横軸は0を中心に左右対称で、評価値の絶対値の最大より広い。"""
+    ax = make_total_evaluation_chart(*_chart_inputs()).axes[0]
+    left, right = ax.get_xlim()
+    assert left == pytest.approx(-right)
+    assert right > 0.524
+
+
+def test_make_total_evaluation_chart_has_zero_line() -> None:
+    """0の位置に縦線を引く。"""
+    ax = make_total_evaluation_chart(*_chart_inputs()).axes[0]
+    assert any(list(line.get_xdata()) == [0, 0] for line in ax.lines)
+
+
+def test_make_total_evaluation_chart_default_colors_and_weights() -> None:
+    """強調しないときは、すべての棒を1色目にし、馬名も太字にしない。"""
+    ax = make_total_evaluation_chart(*_chart_inputs()).axes[0]
+    assert {to_hex(patch.get_facecolor()).upper() for patch in ax.patches} == {_BAR_COLOR}
+    assert all(text.get_fontweight() == "normal" for text in ax.texts)
+
+
+def test_make_total_evaluation_chart_highlight_horse() -> None:
+    """強調する馬は、棒を2色目にし、馬番・評価値・馬名を太字にする。他の馬は変えない。"""
+    figure = make_total_evaluation_chart(*_chart_inputs(), highlight_horse_nums=[2])
+    ax = figure.axes[0]
+    colors = [to_hex(patch.get_facecolor()).upper() for patch in ax.patches]
+    assert colors == [_BAR_COLOR, _BAR_COLOR, _HIGHLIGHT_COLOR, _BAR_COLOR]
+    columns = _texts_by_column(figure)
+    for column in columns.values():
+        weights = [column[y].get_fontweight() for y in sorted(column)]
+        assert weights == ["normal", "normal", "bold", "normal"]
+
+
+def test_make_total_evaluation_chart_name_bold_horse() -> None:
+    """馬名だけ太字にする馬は、棒の色と左端の馬番・評価値を変えない。"""
+    figure = make_total_evaluation_chart(*_chart_inputs(), name_bold_horse_nums=[4])
+    ax = figure.axes[0]
+    assert {to_hex(patch.get_facecolor()).upper() for patch in ax.patches} == {_BAR_COLOR}
+    columns = _texts_by_column(figure)
+    assert [columns["name"][y].get_fontweight() for y in sorted(columns["name"])] == [
+        "normal",
+        "bold",
+        "normal",
+        "normal",
+    ]
+    for key in ("umaban", "value"):
+        assert all(text.get_fontweight() == "normal" for text in columns[key].values())
 
 
 # evaluate_race_dynamics_with_plot

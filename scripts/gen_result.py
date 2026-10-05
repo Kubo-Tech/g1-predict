@@ -28,8 +28,8 @@ from g1_predict.modules.utils.race_dynamics import (  # noqa: E402
     DYNAMICS_DESCRIPTION,
     TOTAL_EVALUATION_DESCRIPTION,
     build_dynamics_table_lines,
-    build_total_evaluation_table_lines,
     evaluate_race_dynamics_with_plot,
+    make_total_evaluation_chart,
 )
 from g1_predict.modules.utils.race_name import to_race_label  # noqa: E402
 from g1_predict.modules.utils.race_result import format_corner4, format_halon  # noqa: E402
@@ -52,7 +52,7 @@ _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 # 関連記事に載せる記事ファイル名（拡張子を除く）
 _RELATED_ARTICLE_NAMES = ["予想"]
 _ABNORMAL_CODES = {"1", "2", "3", "4"}
-# 標準化散布図を保存する、記事ディレクトリからの相対ディレクトリ
+# 標準化散布図と展開評価値の棒グラフを保存する、記事ディレクトリからの相対ディレクトリ
 _RESULT_IMAGE_DIR = "img/race_result"
 
 
@@ -86,8 +86,9 @@ def generate_result(race_code: str) -> None:
         race_code, di, race_date + timedelta(days=1)
     )
     image_path = f"{_RESULT_IMAGE_DIR}/{race_code}.png"
+    chart_path = f"{_RESULT_IMAGE_DIR}/{race_code}_evaluation.png"
     result_section = _build_result_section(result_df, marks)
-    dynamics_section = _build_dynamics_section(dynamics, figure, image_path, result_df)
+    dynamics_section = _build_dynamics_section(dynamics, image_path, chart_path)
     review_section = _build_review_section(result_df, marks, comments)
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
@@ -101,7 +102,10 @@ def generate_result(race_code: str) -> None:
     output_path = os.path.join(race_dir, "回顧.md")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
-    images = {image_path: figure} if figure is not None else {}
+    images: dict[str, Figure] = {}
+    if dynamics is not None and figure is not None:
+        images[image_path] = figure
+        images[chart_path] = make_total_evaluation_chart(dynamics.eval_df, result_df)
     save_images(race_dir, images)
     print(f"Generated: {output_path}")
 
@@ -152,22 +156,20 @@ def _build_result_section(result_df: pd.DataFrame, marks: dict[int, str]) -> str
 
 def _build_dynamics_section(
     dynamics: RaceDynamicsResult | None,
-    figure: Figure | None,
     image_path: str,
-    result_df: pd.DataFrame,
+    chart_path: str,
 ) -> str | None:
     """展開評価セクションを生成する。
 
     Args:
         dynamics (RaceDynamicsResult | None): 展開評価の結果。対象外レースはNone。
-        figure (Figure | None): 標準化散布図。対象外レースはNone。
         image_path (str): 記事ディレクトリからの標準化散布図の相対パス。
-        result_df (pd.DataFrame): レース結果DataFrame。
+        chart_path (str): 記事ディレクトリからの展開評価値の棒グラフの相対パス。
 
     Returns:
         str | None: `## 展開評価` から始まるセクション文字列。展開評価の対象外レースはNone。
     """
-    if dynamics is None or figure is None:
+    if dynamics is None:
         return None
     lines = [
         "## 展開評価",
@@ -180,7 +182,7 @@ def _build_dynamics_section(
         "",
         TOTAL_EVALUATION_DESCRIPTION,
         "",
-        *build_total_evaluation_table_lines(dynamics.eval_df, result_df),
+        f"![展開評価値]({chart_path})",
     ]
     return "\n".join(lines)
 

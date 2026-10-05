@@ -17,12 +17,12 @@ from g1_predict.modules.utils.race_dynamics import (
     DYNAMICS_DESCRIPTION,
     TOTAL_EVALUATION_DESCRIPTION,
     build_dynamics_table_lines,
-    build_total_evaluation_table_lines,
     evaluate_race_dynamics_with_plot,
+    make_total_evaluation_chart,
 )
 from g1_predict.modules.utils.race_result import grade_display, race_display_name
 
-# 標準化散布図を保存する、記事ディレクトリからの相対ディレクトリ
+# 標準化散布図と展開評価値の棒グラフを保存する、記事ディレクトリからの相対ディレクトリ
 _IMAGE_DIR = "img/past_dynamics"
 _NETKEIBA_RESULT_URL = "https://race.netkeiba.com/race/result.html?race_id={race_id}"
 _STRAIGHT_RACE_NOTE = "1000m直線コースのため展開評価の対象外。"
@@ -39,8 +39,9 @@ class PastRaceDynamicsBody:
     Attributes:
         text (str): 記事本文（Markdown）。H1見出しは含まない。
         images (dict[str, Figure]): 記事ディレクトリからの相対パス
-            （例: "img/past_dynamics/xxx.png"）から標準化散布図へのマッピング。
-            同じ過去走は出走馬が複数いても1枚。
+            （例: "img/past_dynamics/xxx.png"）から画像へのマッピング。
+            標準化散布図は、同じ過去走が出走馬を複数含んでいても1枚。
+            展開評価値の棒グラフは、強調する馬が違うため過去走と出走馬の組ごとに1枚。
     """
 
     text: str
@@ -73,7 +74,7 @@ def build_past_race_dynamics_body(
     """出走馬の過去走の展開評価記事の本文を生成する。
 
     出走馬を馬番順に並べ、馬ごとに折りたたみ要素の中へ、中央の平地で出走した
-    直近の過去走の展開評価（有利度の表・標準化散布図・展開評価値の表）を新しい順に載せる。
+    直近の過去走の展開評価（有利度の表・標準化散布図・展開評価値の棒グラフ）を新しい順に載せる。
     同じ過去走が複数の出走馬に出てくる場合は、展開評価を1回だけ行って使い回す。
 
     Args:
@@ -81,7 +82,7 @@ def build_past_race_dynamics_body(
         num_past_races (int): 馬ごとに載せる過去走の数。
 
     Returns:
-        PastRaceDynamicsBody: 記事本文（H1見出しを除く）と標準化散布図。
+        PastRaceDynamicsBody: 記事本文（H1見出しを除く）と画像。
 
     Raises:
         CornerDataError: 過去走のレース結果情報または4コーナーの通過順データが存在しない場合。
@@ -103,20 +104,22 @@ def build_past_race_dynamics_body(
     }
     past_races = _evaluate_past_races(race_data, selected, data_interface)
 
+    images = {
+        _image_path(past_race.race_code): past_race.figure
+        for past_race in past_races.values()
+        if past_race.figure is not None
+    }
     lines = [DYNAMICS_DESCRIPTION, "", TOTAL_EVALUATION_DESCRIPTION, ""]
     for umaban in race_data.valid_horse_num:
         horse_name = str(horses.loc[umaban, "馬名"]).strip()
         other_ids = {horse_id for num, horse_id in horse_ids.items() if num != umaban}
         horse_races = [(runs_ago, past_races[code]) for runs_ago, code in selected[umaban]]
         args = (umaban, horse_name, horse_ids[umaban], other_ids, horse_races)
-        lines.extend(_build_horse_details_lines(*args))
+        horse_lines, horse_images = _build_horse_details_lines(*args)
+        lines.extend(horse_lines)
         lines.append("")
+        images.update(horse_images)
 
-    images = {
-        _image_path(past_race.race_code): past_race.figure
-        for past_race in past_races.values()
-        if past_race.figure is not None
-    }
     return PastRaceDynamicsBody(text="\n".join(lines), images=images)
 
 
@@ -227,8 +230,8 @@ def _build_horse_details_lines(
     horse_id: str,
     other_horse_ids: set[str],
     horse_races: list[tuple[int, _PastRace]],
-) -> list[str]:
-    """1頭分のセクション（馬名のh2見出しと、過去走を収めた折りたたみ要素）の行リストを生成する。
+) -> tuple[list[str], dict[str, Figure]]:
+    """1頭分のセクション（馬名のh2見出しと、過去走を収めた折りたたみ要素）を生成する。
 
     `<details>` の直後と `</details>` の直前に空行を入れる。空行が無いと、
     はてなブログで中のMarkdownが変換されない。
@@ -242,7 +245,9 @@ def _build_horse_details_lines(
 
     Returns:
         list[str]: Markdownの行リスト。
+        dict[str, Figure]: 記事ディレクトリからの相対パス → 展開評価値の棒グラフ。
     """
+    images: dict[str, Figure] = {}
     lines = [
         f"## {umaban}. {horse_name}",
         "",
@@ -252,21 +257,28 @@ def _build_horse_details_lines(
     if not horse_races:
         lines.extend([_NO_PAST_RACE_NOTE, ""])
     for runs_ago, past_race in horse_races:
-        lines.extend(_build_past_race_lines(runs_ago, past_race, horse_id, other_horse_ids))
+        past_race_lines, chart = _build_past_race_lines(
+            umaban, runs_ago, past_race, horse_id, other_horse_ids
+        )
+        lines.extend(past_race_lines)
         lines.append("")
+        if chart is not None:
+            images[_chart_image_path(past_race.race_code, umaban)] = chart
     lines.append("</details>")
-    return lines
+    return lines, images
 
 
 def _build_past_race_lines(
+    umaban: int,
     runs_ago: int,
     past_race: _PastRace,
     horse_id: str,
     other_horse_ids: set[str],
-) -> list[str]:
-    """過去走1レース分の行リストを生成する。
+) -> tuple[list[str], Figure | None]:
+    """過去走1レース分の行リストと、展開評価値の棒グラフを生成する。
 
     Args:
+        umaban (int): 折りたたみの主の馬の、対象レースでの馬番。
         runs_ago (int): 何走前か。
         past_race (_PastRace): 展開評価を終えた過去走。
         horse_id (str): 折りたたみの主の馬の血統登録番号。
@@ -274,26 +286,28 @@ def _build_past_race_lines(
 
     Returns:
         list[str]: Markdownの行リスト（末尾に空行は含まない）。
+        Figure | None: 展開評価値の棒グラフ。1000m直線コースはNone。
     """
     lines = [f"### {runs_ago}走前: {past_race.title}", ""]
     dynamics = past_race.dynamics
     if dynamics is None:
         lines.append(_STRAIGHT_RACE_NOTE)
-        return lines
+        return lines, None
     result_df = past_race.result_df
     ids = result_df["血統登録番号"].astype(str).str.strip()
-    bold_row = result_df.loc[ids == horse_id, "馬番"].astype(int).tolist()
-    bold_name = result_df.loc[ids.isin(other_horse_ids), "馬番"].astype(int).tolist()
+    highlight = result_df.loc[ids == horse_id, "馬番"].astype(int).tolist()
+    name_bold = result_df.loc[ids.isin(other_horse_ids), "馬番"].astype(int).tolist()
+    chart = make_total_evaluation_chart(dynamics.eval_df, result_df, highlight, name_bold)
     lines.extend(
         [
             *build_dynamics_table_lines(dynamics.cor_df),
             "",
             f"![標準化散布図]({_image_path(past_race.race_code)})",
             "",
-            *build_total_evaluation_table_lines(dynamics.eval_df, result_df, bold_row, bold_name),
+            f"![展開評価値]({_chart_image_path(past_race.race_code, umaban)})",
         ]
     )
-    return lines
+    return lines, chart
 
 
 def _image_path(race_code: str) -> str:
@@ -306,3 +320,16 @@ def _image_path(race_code: str) -> str:
         str: 相対パス。
     """
     return f"{_IMAGE_DIR}/{race_code}.png"
+
+
+def _chart_image_path(race_code: str, umaban: int) -> str:
+    """展開評価値の棒グラフの記事ディレクトリからの相対パスを返す。
+
+    Args:
+        race_code (str): 過去走のrace_code。
+        umaban (int): 折りたたみの主の馬の、対象レースでの馬番。
+
+    Returns:
+        str: 相対パス。
+    """
+    return f"{_IMAGE_DIR}/{race_code}_{umaban}.png"

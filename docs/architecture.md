@@ -103,7 +103,7 @@ g1-predict/
 │       ├── image_output.py         # 記事に貼る画像の保存
 │       ├── md_utils.py             # Markdown セクション置換
 │       ├── output_path.py          # 出力パスの検証
-│       ├── race_dynamics.py        # 展開評価の実行、有利度の書式と表
+│       ├── race_dynamics.py        # 展開評価の実行、有利度の書式と表、展開評価値の棒グラフ
 │       ├── race_result.py          # レース名・グレード・結果の行の整形（脚質・4角通過・後3F）
 │       └── tfjv.py                 # TARGET frontier JV ファイルの読み書き
 ├── scripts/                        # エントリポイント（python -m scripts.xxx）
