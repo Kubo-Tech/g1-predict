@@ -50,6 +50,12 @@ _TOP_RANK_COLORS = {1: "#FFF080", 2: "#CCDFFF", 3: "#F0C8A0"}
 # 横軸の範囲。範囲を超える評価値の棒は端で切れる
 _CHART_LIMIT = 1.0
 _CHART_TICKS = (-1.0, -0.5, 0.0, 0.5, 1.0)
+# 過去走の展開評価値の折れ線グラフの寸法（インチ）
+_TREND_FIGSIZE = (6.0, 3.0)
+# 折れ線の点に書く数値を点から離す距離（ポイント）
+_TREND_LABEL_OFFSET = 8
+# 縦軸の端からこの範囲にある点は、数値を図の内側に書く（外側に書くと図からはみ出すため）
+_TREND_LABEL_EDGE_MARGIN = 0.2
 # 馬名を0から離す距離（横軸の値）
 _NAME_OFFSET = 0.02
 
@@ -235,6 +241,61 @@ def make_average_evaluation_chart(average_df: pd.DataFrame) -> Figure:
         _ChartColumn("順位", "順位", "rank", 0.6),
     )
     return _make_horse_bar_chart(rows, columns)
+
+
+def make_past_evaluation_trend_chart(
+    evaluations: Sequence[tuple[int, float]], num_past_races: int
+) -> Figure:
+    """馬の過去走の展開評価値を、横軸に何走前をとった折れ線グラフにする。
+
+    横軸は左から古い順（N走前、…、1走前）に並べ、過去走が少なくても
+    num_past_races 走前までのラベルを残す。num_past_races より前の過去走があれば、その走まで広げる。
+    縦軸は-1.0から+1.0に固定する。範囲を超える点は図の外に出るが、数値は図の中の端に書く。
+    点の数値は、正の値は点の上、負の値は点の下に書く。縦軸の端に近い点は図の内側に書く。
+
+    Args:
+        evaluations (Sequence[tuple[int, float]]): (何走前, 展開評価値) のリスト。
+        num_past_races (int): 横軸に最低限並べる走数。
+
+    Returns:
+        Figure: 折れ線グラフ。
+    """
+    runs = sorted(evaluations, key=lambda evaluation: -evaluation[0])
+    max_runs_ago = max([num_past_races, *(runs_ago for runs_ago, _ in runs)])
+    figure = Figure(figsize=_TREND_FIGSIZE)
+    ax = figure.subplots()
+    xs = [-runs_ago for runs_ago, _ in runs]
+    ys = [value for _, value in runs]
+    ax.plot(xs, ys, color=_BAR_COLOR, marker="o")
+    ax.axhline(0, color="black", linewidth=0.8)
+    for x, y in zip(xs, ys, strict=True):
+        label_y = min(max(y, -_CHART_LIMIT), _CHART_LIMIT)
+        if label_y > _CHART_LIMIT - _TREND_LABEL_EDGE_MARGIN:
+            below = True
+        elif label_y < -_CHART_LIMIT + _TREND_LABEL_EDGE_MARGIN:
+            below = False
+        else:
+            below = label_y < 0
+        ax.annotate(
+            f"{round(y, 2) + 0.0:+.2f}",
+            (x, label_y),
+            xytext=(0, -_TREND_LABEL_OFFSET if below else _TREND_LABEL_OFFSET),
+            textcoords="offset points",
+            ha="center",
+            va="top" if below else "bottom",
+            # 範囲を超える点では線が数値の下を通るため、背景を白にして読めるようにする
+            bbox={"facecolor": "white", "edgecolor": "none", "pad": 1},
+        )
+    ticks = list(range(-max_runs_ago, 0))
+    ax.set_xticks(ticks)
+    ax.set_xticklabels([f"{-tick}走前" for tick in ticks], fontproperties=_JAPANESE_FONT)
+    ax.set_xlim(-max_runs_ago - 0.5, -0.5)
+    ax.set_ylim(-_CHART_LIMIT, _CHART_LIMIT)
+    ax.set_yticks(_CHART_TICKS)
+    ax.set_ylabel("展開評価値", fontproperties=_JAPANESE_FONT)
+    ax.grid(True, axis="y", linestyle="--", alpha=0.5)
+    figure.tight_layout()
+    return figure
 
 
 def _make_horse_bar_chart(rows: pd.DataFrame, columns: Sequence[_ChartColumn]) -> Figure:

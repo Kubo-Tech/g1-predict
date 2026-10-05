@@ -192,7 +192,7 @@ def test_details_wrap_each_horse_with_blank_lines_in_umaban_order() -> None:
     assert headings == ["展開評価値の平均値", "1. ホースA", "2. ホースB", "3. ホースC"]
     summaries = re.findall(r"<details><summary>(.*?)</summary>", body.text)
     assert summaries == ["過去走の展開評価を開く"] * 3
-    assert "## 1. ホースA\n\n<details><summary>過去走の展開評価を開く</summary>\n\n" in body.text
+    assert "## 3. ホースC\n\n<details><summary>過去走の展開評価を開く</summary>\n\n" in body.text
     lines = body.text.split("\n")
     for index, line in enumerate(lines):
         if line.startswith("<details>"):
@@ -235,6 +235,37 @@ def test_average_chart_excludes_straight_race_and_horse_without_past_race() -> N
     texts = [text.get_text() for text in ax.texts]
     assert "ホースC" not in texts
     assert {"ホースA", "ホースB", "+0.40", "+0.30"} <= set(texts)
+
+
+@pytest.mark.usefixtures("evaluate_mock")
+def test_trend_section_between_heading_and_details() -> None:
+    """馬名の見出しと折りたたみの間に、過去走の展開評価値の折れ線グラフを載せる。"""
+    body, _ = _build()
+    assert (
+        "## 1. ホースA\n\n"
+        "### 過去5走の展開評価値\n\n"
+        "![過去走の展開評価値](img/past_dynamics/trend_1.png)\n\n"
+        "<details><summary>過去走の展開評価を開く</summary>\n\n"
+    ) in body.text
+
+
+@pytest.mark.usefixtures("evaluate_mock")
+def test_trend_chart_plots_evaluations_by_runs_ago() -> None:
+    """折れ線グラフには、展開評価値のある過去走を何走前ごとに描く。"""
+    body, _ = _build()
+    ax = body.images["img/past_dynamics/trend_1.png"].axes[0]
+    # ホースAはG2が1走前、直線レースの2走前は対象外、条件戦が3走前、旧重賞が6走前
+    line = ax.lines[0]
+    points = sorted(zip(line.get_xdata(), line.get_ydata(), strict=True))
+    assert points == [(-6, 0.4), (-3, 0.4), (-1, 0.4)]
+
+
+@pytest.mark.usefixtures("evaluate_mock")
+def test_trend_section_omitted_without_evaluation() -> None:
+    """展開評価値のある過去走が無い馬には、折れ線グラフのセクションを載せない。"""
+    body, _ = _build()
+    assert "trend_3.png" not in body.text
+    assert "img/past_dynamics/trend_3.png" not in body.images
 
 
 @pytest.mark.usefixtures("evaluate_mock")
@@ -365,7 +396,8 @@ def test_shared_past_race_is_evaluated_once_and_image_shared(evaluate_mock: Magi
     charts = [f"img/past_dynamics/{_G2}_{umaban}.png" for umaban in (1, 2)]
     charts += [f"img/past_dynamics/{code}_1.png" for code in (_CONDITION, _OLD)]
     average = ["img/past_dynamics/average.png"]
-    assert sorted(body.images) == sorted(scatters + charts + average)
+    trends = [f"img/past_dynamics/trend_{umaban}.png" for umaban in (1, 2)]
+    assert sorted(body.images) == sorted(scatters + charts + average + trends)
     assert body.text.count(f"![標準化散布図](img/past_dynamics/{_G2}.png)") == 2
 
 

@@ -19,6 +19,7 @@ from g1_predict.modules.utils.race_dynamics import (
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
     make_average_evaluation_chart,
+    make_past_evaluation_trend_chart,
     make_total_evaluation_chart,
 )
 from g1_predict.modules.utils.race_result import grade_display, race_display_name
@@ -32,6 +33,7 @@ _SUMMARY_TEXT = "過去走の展開評価を開く"
 _AVERAGE_HEADING = "## 展開評価値の平均値"
 _AVERAGE_DESCRIPTION = "過去{num_past_races}走の展開評価値の平均値のランキング"
 _AVERAGE_IMAGE_PATH = f"{_IMAGE_DIR}/average.png"
+_TREND_HEADING = "### 過去{num_past_races}走の展開評価値"
 # 出走取消・発走除外・競走除外の異常区分コード
 _NOT_STARTED_IJO_CODES: frozenset[str] = frozenset({"1", "2", "3"})
 
@@ -47,6 +49,7 @@ class PastRaceDynamicsBody:
             標準化散布図は、同じ過去走が出走馬を複数含んでいても1枚。
             展開評価値の棒グラフは、強調する馬が違うため過去走と出走馬の組ごとに1枚。
             展開評価値の平均値の棒グラフは1枚。
+            過去走の展開評価値の折れ線グラフは、展開評価値のある過去走を持つ出走馬ごとに1枚。
     """
 
     text: str
@@ -117,9 +120,14 @@ def build_past_race_dynamics_body(
     }
     average_df = horses.loc[race_data.valid_horse_num, ["馬番", "枠番", "馬名"]].copy()
     average_df["馬名"] = average_df["馬名"].astype(str).str.strip()
-    average_df["評価平均値"] = [
-        _average_evaluation(horse_ids[umaban], [past_races[code] for _, code in selected[umaban]])
+    evaluations = {
+        umaban: _horse_evaluations(
+            horse_ids[umaban], [(runs_ago, past_races[code]) for runs_ago, code in selected[umaban]]
+        )
         for umaban in race_data.valid_horse_num
+    }
+    average_df["評価平均値"] = [
+        _average(evaluations[umaban]) for umaban in race_data.valid_horse_num
     ]
     images[_AVERAGE_IMAGE_PATH] = make_average_evaluation_chart(average_df)
     lines = [
@@ -138,7 +146,21 @@ def build_past_race_dynamics_body(
         horse_name = str(horses.loc[umaban, "馬名"]).strip()
         other_ids = {horse_id for num, horse_id in horse_ids.items() if num != umaban}
         horse_races = [(runs_ago, past_races[code]) for runs_ago, code in selected[umaban]]
-        args = (umaban, horse_name, horse_ids[umaban], other_ids, horse_races)
+        lines.extend([f"## {umaban}. {horse_name}", ""])
+        if evaluations[umaban]:
+            trend_path = _trend_image_path(umaban)
+            images[trend_path] = make_past_evaluation_trend_chart(
+                evaluations[umaban], num_past_races
+            )
+            lines.extend(
+                [
+                    _TREND_HEADING.format(num_past_races=num_past_races),
+                    "",
+                    f"![過去走の展開評価値]({trend_path})",
+                    "",
+                ]
+            )
+        args = (umaban, horse_ids[umaban], other_ids, horse_races)
         horse_lines, horse_images = _build_horse_details_lines(*args)
         lines.extend(horse_lines)
         lines.append("")
@@ -222,29 +244,45 @@ def _evaluate_past_races(
     return past_races
 
 
-def _average_evaluation(horse_id: str, past_races: list[_PastRace]) -> float:
-    """馬の過去走の展開評価値の平均値を求める。
+def _horse_evaluations(
+    horse_id: str, horse_races: list[tuple[int, _PastRace]]
+) -> list[tuple[int, float]]:
+    """馬の過去走ごとの展開評価値を求める。
 
-    展開評価の対象外のレース（1000m直線コース）と、展開評価値が無いレースは平均に含めない。
+    展開評価の対象外のレース（1000m直線コース）と、展開評価値が無いレースは含めない。
 
     Args:
         horse_id (str): 馬の血統登録番号。
-        past_races (list[_PastRace]): 馬の過去走。
+        horse_races (list[tuple[int, _PastRace]]): (何走前, 過去走) のリスト。
 
     Returns:
-        float: 展開評価値の平均値。平均に含めるレースが無ければNaN。
+        list[tuple[int, float]]: (何走前, 展開評価値) のリスト。
     """
-    values: list[float] = []
-    for past_race in past_races:
+    evaluations: list[tuple[int, float]] = []
+    for runs_ago, past_race in horse_races:
         if past_race.dynamics is None:
             continue
         result_df = past_race.result_df
         ids = result_df["血統登録番号"].astype(str).str.strip()
         umabans = result_df.loc[ids == horse_id, "馬番"].astype(int).tolist()
         eval_df = past_race.dynamics.eval_df
-        evaluations = eval_df.loc[eval_df["馬番"].astype(int).isin(umabans), "総合評価"].dropna()
-        values.extend(evaluations.astype(float).tolist())
-    return sum(values) / len(values) if values else float("nan")
+        values = eval_df.loc[eval_df["馬番"].astype(int).isin(umabans), "総合評価"].dropna()
+        evaluations.extend((runs_ago, value) for value in values.astype(float).tolist())
+    return evaluations
+
+
+def _average(evaluations: list[tuple[int, float]]) -> float:
+    """展開評価値の平均値を求める。
+
+    Args:
+        evaluations (list[tuple[int, float]]): (何走前, 展開評価値) のリスト。
+
+    Returns:
+        float: 平均値。展開評価値が無ければNaN。
+    """
+    if not evaluations:
+        return float("nan")
+    return sum(value for _, value in evaluations) / len(evaluations)
 
 
 def _build_race_title(
@@ -275,19 +313,17 @@ def _build_race_title(
 
 def _build_horse_details_lines(
     umaban: int,
-    horse_name: str,
     horse_id: str,
     other_horse_ids: set[str],
     horse_races: list[tuple[int, _PastRace]],
 ) -> tuple[list[str], dict[str, Figure]]:
-    """1頭分のセクション（馬名のh2見出しと、過去走を収めた折りたたみ要素）を生成する。
+    """1頭分の、過去走を収めた折りたたみ要素を生成する。
 
     `<details>` の直後と `</details>` の直前に空行を入れる。空行が無いと、
     はてなブログで中のMarkdownが変換されない。
 
     Args:
         umaban (int): 馬番。
-        horse_name (str): 馬名。
         horse_id (str): 馬の血統登録番号。
         other_horse_ids (set[str]): 対象レースの他の出走馬の血統登録番号。
         horse_races (list[tuple[int, _PastRace]]): (何走前, 過去走) のリスト（新しい順）。
@@ -297,12 +333,7 @@ def _build_horse_details_lines(
         dict[str, Figure]: 記事ディレクトリからの相対パス → 展開評価値の棒グラフ。
     """
     images: dict[str, Figure] = {}
-    lines = [
-        f"## {umaban}. {horse_name}",
-        "",
-        f"<details><summary>{_SUMMARY_TEXT}</summary>",
-        "",
-    ]
+    lines = [f"<details><summary>{_SUMMARY_TEXT}</summary>", ""]
     if not horse_races:
         lines.extend([_NO_PAST_RACE_NOTE, ""])
     for runs_ago, past_race in horse_races:
@@ -369,6 +400,18 @@ def _image_path(race_code: str) -> str:
         str: 相対パス。
     """
     return f"{_IMAGE_DIR}/{race_code}.png"
+
+
+def _trend_image_path(umaban: int) -> str:
+    """過去走の展開評価値の折れ線グラフの記事ディレクトリからの相対パスを返す。
+
+    Args:
+        umaban (int): 対象レースでの馬番。
+
+    Returns:
+        str: 相対パス。
+    """
+    return f"{_IMAGE_DIR}/trend_{umaban}.png"
 
 
 def _chart_image_path(race_code: str, umaban: int) -> str:

@@ -16,6 +16,7 @@ from g1_predict.modules.utils.race_dynamics import (
     evaluate_race_dynamics_with_plot,
     format_correlation,
     make_average_evaluation_chart,
+    make_past_evaluation_trend_chart,
     make_total_evaluation_chart,
 )
 
@@ -291,6 +292,53 @@ def test_make_average_evaluation_chart_columns_and_boxes() -> None:
         WAKU_TO_COLOR_DICT[1].upper(),
     ]
     assert _box_colors(figure, "順位") == ["#FFF080", "#FFF080", "#F0C8A0"]
+
+
+# make_past_evaluation_trend_chart
+def _annotations(figure: Figure) -> dict[str, Text]:
+    """折れ線の点に書いた数値を、文字列をキーにして返す。"""
+    return {text.get_text(): text for text in figure.axes[0].texts}
+
+
+def test_make_past_evaluation_trend_chart_axes() -> None:
+    """横軸は左から5走前〜1走前のラベルを残し、縦軸は-1.0から+1.0に固定する。"""
+    figure = make_past_evaluation_trend_chart([(1, 0.2), (3, -0.1)], 5)
+    ax = figure.axes[0]
+    labels = [label.get_text() for label in ax.get_xticklabels()]
+    assert labels == ["5走前", "4走前", "3走前", "2走前", "1走前"]
+    assert ax.get_ylim() == pytest.approx((-1.0, 1.0))
+    line = ax.lines[0]
+    assert list(line.get_xdata()) == [-3, -1]
+    assert list(line.get_ydata()) == pytest.approx([-0.1, 0.2])
+
+
+def test_make_past_evaluation_trend_chart_extends_to_older_race() -> None:
+    """num_past_races より前の過去走があれば、横軸をその走まで広げる。"""
+    figure = make_past_evaluation_trend_chart([(1, 0.2), (7, 0.1)], 5)
+    labels = [label.get_text() for label in figure.axes[0].get_xticklabels()]
+    assert labels[0] == "7走前"
+    assert len(labels) == 7
+
+
+def test_make_past_evaluation_trend_chart_labels() -> None:
+    """点に符号付き小数2桁の数値を書き、正は点の上、負は点の下に書く。"""
+    texts = _annotations(make_past_evaluation_trend_chart([(1, 0.2), (2, -0.3)], 5))
+    assert texts["+0.20"].xy == pytest.approx((-1, 0.2))
+    assert texts["+0.20"].get_va() == "bottom"
+    assert texts["-0.30"].xy == pytest.approx((-2, -0.3))
+    assert texts["-0.30"].get_va() == "top"
+
+
+def test_make_past_evaluation_trend_chart_labels_inside_for_out_of_range() -> None:
+    """縦軸の範囲を超える点や端に近い点は、数値を図の中の端から内側に書く。"""
+    figure = make_past_evaluation_trend_chart([(1, 1.3), (2, -1.2), (3, 0.9), (4, -0.9)], 5)
+    texts = _annotations(figure)
+    assert texts["+1.30"].xy == pytest.approx((-1, 1.0))
+    assert texts["+1.30"].get_va() == "top"
+    assert texts["-1.20"].xy == pytest.approx((-2, -1.0))
+    assert texts["-1.20"].get_va() == "bottom"
+    assert texts["+0.90"].get_va() == "top"
+    assert texts["-0.90"].get_va() == "bottom"
 
 
 def test_evaluate_race_dynamics_with_plot_returns_cor_df_and_figure() -> None:
