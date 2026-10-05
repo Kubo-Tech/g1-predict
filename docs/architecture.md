@@ -100,7 +100,7 @@ g1-predict/
 │   │   └── table_utils.py          # フィルタ、色ルール、セル変換
 │   └── utils/
 │       ├── hatena_links.py         # 関連記事のはてなブログ記事リンク取得
-│       ├── image_output.py         # 記事に貼る画像の保存
+│       ├── image_output.py         # 記事に貼る画像の保存（指定した色を残して256色に減色したPNG）
 │       ├── md_utils.py             # Markdown セクション置換
 │       ├── output_path.py          # 出力パスの検証
 │       ├── race_dynamics.py        # 展開評価の実行、有利度の書式と表、展開評価値の棒グラフ

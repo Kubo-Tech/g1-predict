@@ -257,7 +257,8 @@ def test_gen_result_result_section_dynamics_chart_and_image(dirs: tuple[str, str
     )
     eval_df = pd.DataFrame({"馬番": [5, 3], "総合評価": [-0.2, 0.31]})
     dynamics = MagicMock(cor_df=cor_df, eval_df=eval_df)
-    figure = MagicMock(spec=Figure)
+    figure = Figure()
+    figure.subplots().plot([0, 1], [0, 1])
     mock_evaluate = _run(
         _make_mock_di([_normal_row(1, 5, "ホースA"), _normal_row(2, 3, "ホースB")]),
         public_dir,
@@ -285,7 +286,7 @@ def test_gen_result_result_section_dynamics_chart_and_image(dirs: tuple[str, str
     expected_path = os.path.join(
         public_dir, _YEAR, f"{_RACE_CODE}_{_RACE_NAME}", "img", "race_result", f"{_RACE_CODE}.png"
     )
-    figure.savefig.assert_called_once_with(expected_path, bbox_inches="tight")
+    assert os.path.isfile(expected_path)
     assert os.path.isfile(expected_path.replace(".png", "_evaluation.png"))
     assert mock_evaluate.call_args.args[2] == date(2026, 5, 25)
 

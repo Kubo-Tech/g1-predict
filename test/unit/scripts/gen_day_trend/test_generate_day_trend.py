@@ -142,8 +142,8 @@ def test_generate_day_trend_prev_day_title_only_when_body_empty(public_dir: str)
     assert content == "# 【天皇賞春2026】前日の傾向\n"
 
 
-def test_generate_day_trend_prev_day_saves_and_closes_image(public_dir: str) -> None:
-    """画像がimg/prev_day配下に保存され、保存後にFigureがcloseされる。
+def test_generate_day_trend_prev_day_saves_images(public_dir: str) -> None:
+    """記事の画像を記事ディレクトリへ保存する。
 
     Args:
         public_dir (str): public ディレクトリパス。
@@ -162,15 +162,12 @@ def test_generate_day_trend_prev_day_saves_and_closes_image(public_dir: str) -> 
         ),
         patch("scripts.gen_day_trend._PUBLIC_DIR", public_dir),
         patch("scripts.gen_day_trend.build_day_trend_body", return_value=body),
-        patch("g1_predict.modules.utils.image_output.plt") as mock_plt,
+        patch("scripts.gen_day_trend.save_images") as mock_save,
     ):
         generate_day_trend(race_code, PREV_DAY)
 
-    expected_path = os.path.join(
-        public_dir, "2026", f"{race_code}_天皇賞春", "img", "prev_day", "2026013005010106.png"
-    )
-    mock_figure.savefig.assert_called_once_with(expected_path, bbox_inches="tight")
-    mock_plt.close.assert_called_once_with(mock_figure)
+    race_dir = os.path.join(public_dir, "2026", f"{race_code}_天皇賞春")
+    mock_save.assert_called_once_with(race_dir, body.images)
 
 
 def test_generate_day_trend_race_day_writes_race_day_article_and_images(public_dir: str) -> None:
@@ -190,7 +187,7 @@ def test_generate_day_trend_race_day_writes_race_day_article_and_images(public_d
         patch("scripts.gen_day_trend.RaceGetter", return_value=_make_mock_race_getter()),
         patch("scripts.gen_day_trend._PUBLIC_DIR", public_dir),
         patch("scripts.gen_day_trend.build_day_trend_body", return_value=body) as mock_build,
-        patch("g1_predict.modules.utils.image_output.plt") as mock_plt,
+        patch("scripts.gen_day_trend.save_images") as mock_save,
     ):
         generate_day_trend(race_code, RACE_DAY)
 
@@ -198,9 +195,6 @@ def test_generate_day_trend_race_day_writes_race_day_article_and_images(public_d
     with open(os.path.join(race_dir, "当日の傾向.md"), encoding="utf-8") as f:
         assert f.read() == "# 【天皇賞春2026】当日の傾向\n\n## 当日の出目\n\n本文\n"
     assert not os.path.exists(os.path.join(race_dir, "前日の傾向.md"))
-    mock_figure.savefig.assert_called_once_with(
-        os.path.join(race_dir, "img", "race_day", "dynamics.png"), bbox_inches="tight"
-    )
-    mock_plt.close.assert_called_once_with(mock_figure)
+    mock_save.assert_called_once_with(race_dir, body.images)
     assert mock_build.call_args.args[2] == "天皇賞春"
     assert mock_build.call_args.args[3] is RACE_DAY
