@@ -24,7 +24,7 @@
 
 - [architecture.md](architecture.md) — リポジトリ構成、データフロー、モジュール構成、`race_code` の仕様
 - [setup.md](setup.md) — 依存インストール、環境変数、DB・TFJV データの準備
-- [workflow.md](workflow.md) — 傾向 → 分析表 → 前日の傾向 → 予想 → 当日の傾向 → 結果 → 公開までの手順
+- [workflow.md](workflow.md) — 傾向 → 分析表 → 前日の傾向 → 出走馬の過去走の展開評価 → 予想 → 当日の傾向 → 結果 → 公開までの手順
 - [scripts.md](scripts.md) — `scripts/` 配下5+1スクリプトの詳細仕様
 - [config-reference.md](config-reference.md) — `trends.yml` / `table.yml` の YAML スキーマと `source.type` 一覧
 - [tfjv-data.md](tfjv-data.md) — TARGET frontier JV のファイル構造と読み書き仕様

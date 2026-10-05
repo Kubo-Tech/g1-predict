@@ -42,6 +42,7 @@ def _normal_row(
     return {
         "確定着順": chakusa,
         "馬番": umaban,
+        "枠番": (umaban + 1) // 2,
         "馬名": horse_name,
         "異常区分コード": "0",
         "単勝人気順": ninki,
@@ -55,6 +56,7 @@ def _abnormal_row(umaban: int, horse_name: str, ijo_code: str) -> dict:
     return {
         "確定着順": float("nan"),
         "馬番": umaban,
+        "枠番": (umaban + 1) // 2,
         "馬名": horse_name,
         "異常区分コード": ijo_code,
         "単勝人気順": float("nan"),
@@ -247,15 +249,16 @@ def test_gen_result_result_section_without_values(dirs: tuple[str, str]) -> None
     assert "| 2着 |  | 3 | ホースB | 1 | 4 | 35.0秒 (1位) |\n" in content
 
 
-def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str]) -> None:
-    """展開評価があれば、総評の後の展開評価セクションに説明・表・散布図を載せ、画像を保存する。"""
+def test_gen_result_result_section_dynamics_chart_and_image(dirs: tuple[str, str]) -> None:
+    """展開評価があれば、総評の後の展開評価セクションに説明・散布図・棒グラフを載せ、画像を保存する。"""
     public_dir, templates_dir = dirs
     cor_df = pd.DataFrame(
         {"差し有利度": [-0.79], "外枠有利度": [-0.15], "外有利度": [float("nan")]}
     )
     eval_df = pd.DataFrame({"馬番": [5, 3], "総合評価": [-0.2, 0.31]})
     dynamics = MagicMock(cor_df=cor_df, eval_df=eval_df)
-    figure = MagicMock(spec=Figure)
+    figure = Figure()
+    figure.subplots().plot([0, 1], [0, 1])
     mock_evaluate = _run(
         _make_mock_di([_normal_row(1, 5, "ホースA"), _normal_row(2, 3, "ホースB")]),
         public_dir,
@@ -274,18 +277,17 @@ def test_gen_result_result_section_dynamics_table_and_image(dirs: tuple[str, str
         f"![標準化散布図](img/race_result/{_RACE_CODE}.png)\n\n"
         "展開評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
         "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。\n\n"
-        "| 着順 | 馬番 | 馬名 | 展開評価値 |\n"
-        "| --- | --- | --- | --- |\n"
-        "| 2着 | 3 | ホースB | +0.31 |\n"
-        "| 1着 | 5 | ホースA | -0.20 |\n\n"
+        f"![展開評価値](img/race_result/{_RACE_CODE}_evaluation.png)\n\n"
         "## 回顧"
     ) in content
+    assert "展開評価値 |" not in content
     result_section = content[content.index("## 結果") : content.index("## 関連記事")]
     assert "差し有利度" not in result_section
     expected_path = os.path.join(
         public_dir, _YEAR, f"{_RACE_CODE}_{_RACE_NAME}", "img", "race_result", f"{_RACE_CODE}.png"
     )
-    figure.savefig.assert_called_once_with(expected_path, bbox_inches="tight")
+    assert os.path.isfile(expected_path)
+    assert os.path.isfile(expected_path.replace(".png", "_evaluation.png"))
     assert mock_evaluate.call_args.args[2] == date(2026, 5, 25)
 
 
