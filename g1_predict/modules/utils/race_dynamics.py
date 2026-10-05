@@ -5,9 +5,11 @@ from datetime import date
 
 import pandas as pd
 from evaluation import RaceDynamicsResult, evaluate_race_dynamics, make_time_plot
+from evaluation.params import WAKU_TO_COLOR_DICT
 from keiba_data_interface import DataInterface
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
+from matplotlib.patches import Rectangle
 from race_data import RaceData
 
 # 展開評価の相関係数カラム
@@ -22,23 +24,34 @@ TOTAL_EVALUATION_DESCRIPTION = (
     "展開評価値は、展開（4角の位置・馬番・コーナーでの内外）の有利不利で"
     "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。"
 )
-# MATLABの標準色の1色目（通常の棒）・2色目（強調する馬の棒）
+# MATLABの標準色の1色目（通常の棒）・2色目（強調する馬の棒）・3色目（今回の出走馬の棒）
 _BAR_COLOR = "#0072BD"
 _HIGHLIGHT_COLOR = "#D95319"
+_RUNNER_COLOR = "#EDB120"
+# 枠の色のうち、馬番の文字を黒にする明るい色の枠（白・黄・橙・桃）。他の枠は白
+_DARK_TEXT_WAKU = (1, 5, 7, 8)
 _JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
 _JAPANESE_BOLD_FONT = FontProperties(family="Noto Sans CJK JP", weight="bold")
-_CHART_WIDTH = 8.0
+# グラフの寸法（インチ）。左側の余白に着順・馬番・評価値・評価順位の列を置く
+_CHART_WIDTH = 9.0
+_CHART_LEFT = 2.75
+_CHART_RIGHT = 0.15
+_CHART_TOP = 0.4
+_CHART_BOTTOM = 0.4
 _CHART_ROW_HEIGHT = 0.32
-_CHART_BASE_HEIGHT = 1.2
 _CHART_BAR_HEIGHT = 0.7
-# 横軸の範囲は、評価値の絶対値の最大にこの倍率と余白を足した値（馬名を書く余地を確保する）
-_CHART_LIMIT_SCALE = 1.1
-_CHART_LIMIT_MARGIN = 0.1
-# 左端の列の右端の位置（軸の幅に対する割合。負の値は軸の左外側）
-_UMABAN_COLUMN_X = -0.14
-_VALUE_COLUMN_X = -0.015
-# 馬名を0から離す距離（横軸の範囲に対する割合）
-_NAME_OFFSET_RATIO = 0.02
+# 左側の列の中心の位置（グラフの左端からの距離、インチ）
+_RANK_COLUMN = 0.3
+_UMABAN_COLUMN = 0.85
+_VALUE_COLUMN = 1.5
+_EVALUATION_RANK_COLUMN = 2.25
+# 馬番を囲む四角の幅（インチ）
+_UMABAN_BOX_WIDTH = 0.26
+# 横軸の範囲。範囲を超える評価値の棒は端で切れる
+_CHART_LIMIT = 1.0
+_CHART_TICKS = (-1.0, -0.5, 0.0, 0.5, 1.0)
+# 馬名を0から離す距離（横軸の値）
+_NAME_OFFSET = 0.02
 
 
 def evaluate_race_dynamics_with_plot(
@@ -120,22 +133,22 @@ def make_total_evaluation_chart(
     eval_df: pd.DataFrame,
     result_df: pd.DataFrame,
     highlight_horse_nums: Collection[int] = (),
-    name_bold_horse_nums: Collection[int] = (),
+    runner_horse_nums: Collection[int] = (),
 ) -> Figure:
     """馬ごとの展開の総合評価を、着順の順に並べた横向きの棒グラフにする。
 
     上から確定着順の順に並べ、確定着順が無い馬（競走中止など）は最後に馬番順で並べる。
     総合評価が無い馬（競走除外など）は載せない。
-    棒は0から評価値まで伸び、0の位置に縦線を引く。グラフの左外側に馬番と評価値を縦に揃えて書き、
+    棒は0から評価値まで伸び、0の位置に縦線を引く。横軸は-1.0から+1.0に固定する。
+    グラフの左側に着順・馬番・評価値・評価順位を縦に揃えて書き、馬番は枠の色の四角で囲む。
     馬名は棒と重ならないよう、評価値が正の馬は0の左側、負の馬は0の右側に書く。
-    横軸は0を中心に左右対称にする。
 
     Args:
         eval_df (pd.DataFrame): 展開評価の馬ごとの評価DataFrame（馬番・総合評価カラムを使う）。
-        result_df (pd.DataFrame): レース結果DataFrame（馬番・確定着順・馬名カラムを使う）。
-        highlight_horse_nums (Collection[int]): 棒を強調色にし、馬番・評価値・馬名を
+        result_df (pd.DataFrame): レース結果DataFrame（馬番・枠番・確定着順・馬名カラムを使う）。
+        highlight_horse_nums (Collection[int]): 棒を2色目にし、左側の列と馬名を
             太字にする馬の馬番。
-        name_bold_horse_nums (Collection[int]): 馬名だけを太字にする馬の馬番。
+        runner_horse_nums (Collection[int]): 棒を3色目にし、馬名を太字にする馬の馬番。
 
     Returns:
         Figure: 棒グラフ。
@@ -149,57 +162,100 @@ def make_total_evaluation_chart(
         }
     )
     rows["rank"] = [horses.loc[umaban, "確定着順"] for umaban in rows["umaban"]]
+    rows["evaluation_rank"] = rows["value"].rank(method="min", ascending=False).astype(int)
     rows = rows.sort_values(["rank", "umaban"], na_position="last").reset_index(drop=True)
 
-    limit = float(rows["value"].abs().max()) * _CHART_LIMIT_SCALE + _CHART_LIMIT_MARGIN
-    figure = Figure(figsize=(_CHART_WIDTH, _CHART_ROW_HEIGHT * len(rows) + _CHART_BASE_HEIGHT))
+    height = _CHART_ROW_HEIGHT * len(rows) + _CHART_TOP + _CHART_BOTTOM
+    figure = Figure(figsize=(_CHART_WIDTH, height))
+    figure.subplots_adjust(
+        left=_CHART_LEFT / _CHART_WIDTH,
+        right=1 - _CHART_RIGHT / _CHART_WIDTH,
+        top=1 - _CHART_TOP / height,
+        bottom=_CHART_BOTTOM / height,
+    )
     ax = figure.subplots()
     positions = list(range(len(rows)))
-    highlighted = [int(umaban) in highlight_horse_nums for umaban in rows["umaban"]]
-    ax.barh(
-        positions,
-        rows["value"],
-        color=[_HIGHLIGHT_COLOR if flag else _BAR_COLOR for flag in highlighted],
-        height=_CHART_BAR_HEIGHT,
-    )
+    colors = []
+    for umaban in rows["umaban"]:
+        if umaban in highlight_horse_nums:
+            colors.append(_HIGHLIGHT_COLOR)
+        elif umaban in runner_horse_nums:
+            colors.append(_RUNNER_COLOR)
+        else:
+            colors.append(_BAR_COLOR)
+    ax.barh(positions, rows["value"], color=colors, height=_CHART_BAR_HEIGHT)
     ax.axvline(0, color="black", linewidth=0.8)
-    ax.set_xlim(-limit, limit)
+    ax.set_xlim(-_CHART_LIMIT, _CHART_LIMIT)
+    ax.set_xticks(_CHART_TICKS)
     ax.set_ylim(len(rows) - 0.5, -0.5)
     ax.set_yticks([])
     ax.grid(True, axis="x", linestyle="--", alpha=0.5)
     ax.set_axisbelow(True)
 
-    # xは軸の幅に対する割合、yはデータ座標の位置として左端の列を置く
+    # xは軸の幅に対する割合、yはデータ座標の位置として左側の列を置く
     column_transform = ax.get_yaxis_transform()
-    header_y = -1.0
-    ax.text(
-        _UMABAN_COLUMN_X, header_y, "馬番", ha="right", va="center",
-        transform=column_transform, fontproperties=_JAPANESE_FONT,
-    )  # fmt: skip
-    ax.text(
-        _VALUE_COLUMN_X, header_y, "評価値", ha="right", va="center",
-        transform=column_transform, fontproperties=_JAPANESE_FONT,
-    )  # fmt: skip
-    for position, umaban, value, flag in zip(
-        positions, rows["umaban"], rows["value"], highlighted, strict=True
+    axes_width = _CHART_WIDTH - _CHART_LEFT - _CHART_RIGHT
+
+    def column_x(column: float) -> float:
+        return (column - _CHART_LEFT) / axes_width
+
+    headers = (
+        (_RANK_COLUMN, "着順"),
+        (_UMABAN_COLUMN, "馬番"),
+        (_VALUE_COLUMN, "評価値"),
+        (_EVALUATION_RANK_COLUMN, "評価順位"),
+    )
+    for column, header in headers:
+        ax.text(
+            column_x(column), -1.0, header, ha="center", va="center",
+            transform=column_transform, fontproperties=_JAPANESE_FONT,
+        )  # fmt: skip
+    box_width = _UMABAN_BOX_WIDTH / axes_width
+    wakus = horses["枠番"].astype(int).to_dict()
+    for position, umaban, value, rank, evaluation_rank in zip(
+        positions,
+        rows["umaban"].astype(int).tolist(),
+        rows["value"].astype(float).tolist(),
+        rows["rank"].tolist(),
+        rows["evaluation_rank"].astype(int).tolist(),
+        strict=True,
     ):
-        umaban = int(umaban)
-        weight = "bold" if flag else "normal"
+        highlighted = umaban in highlight_horse_nums
+        weight = "bold" if highlighted else "normal"
+        waku = wakus[umaban]
+        figure.add_artist(
+            Rectangle(
+                (column_x(_UMABAN_COLUMN) - box_width / 2, position - _CHART_BAR_HEIGHT / 2),
+                box_width,
+                _CHART_BAR_HEIGHT,
+                transform=column_transform,
+                facecolor=WAKU_TO_COLOR_DICT[waku],
+                edgecolor="black",
+                linewidth=0.5,
+                # 軸より奥に描き、軸に書く馬番の文字を隠さない
+                zorder=-1,
+            )
+        )
+        rank_text = f"{int(rank)}" if pd.notna(rank) else "-"
         # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
-        value_text = f"{round(float(value), 2) + 0.0:+.2f}"
-        for column_x, text in ((_UMABAN_COLUMN_X, str(umaban)), (_VALUE_COLUMN_X, value_text)):
+        value_text = f"{round(value, 2) + 0.0:+.2f}"
+        cells = (
+            (_RANK_COLUMN, rank_text, "black"),
+            (_UMABAN_COLUMN, str(umaban), "black" if waku in _DARK_TEXT_WAKU else "white"),
+            (_VALUE_COLUMN, value_text, "black"),
+            (_EVALUATION_RANK_COLUMN, str(evaluation_rank), "black"),
+        )
+        for column, text, color in cells:
             ax.text(
-                column_x, position, text, ha="right", va="center",
+                column_x(column), position, text, ha="center", va="center", color=color,
                 transform=column_transform, fontweight=weight,
             )  # fmt: skip
-        name_bold = flag or umaban in name_bold_horse_nums
+        name_bold = highlighted or umaban in runner_horse_nums
         name_font = _JAPANESE_BOLD_FONT if name_bold else _JAPANESE_FONT
-        offset = limit * _NAME_OFFSET_RATIO
         # 棒は0から評価値の側へ伸びるため、反対側の空きに馬名を書く
-        x, align = (-offset, "right") if value >= 0 else (offset, "left")
+        x, align = (-_NAME_OFFSET, "right") if value >= 0 else (_NAME_OFFSET, "left")
         ax.text(
             x, position, str(horses.loc[umaban, "馬名"]), ha=align, va="center",
             fontproperties=name_font,
         )  # fmt: skip
-    figure.tight_layout()
     return figure

@@ -70,6 +70,7 @@ def _result_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "馬番": [1, 2, 3, 4],
+            "枠番": [1, 2, 3, 4],
             "確定着順": [3, 1, 2, 4],
             "馬名": ["ホースA", "ホースB", "ホースX", "ホースY"],
             "血統登録番号": ["0000000001", "0000000002", "0000000009", "0000000008"],
@@ -284,22 +285,25 @@ def test_horse_without_past_race_has_note() -> None:
 
 @pytest.mark.usefixtures("evaluate_mock")
 def test_highlight_own_bar_and_bold_other_runners_name() -> None:
-    """その馬は棒の色を変えて馬番・評価値・馬名を太字にし、今回の他の出走馬は馬名だけを太字にする。"""
+    """その馬は棒を2色目にして左側の列と馬名を太字にし、今回の他の出走馬は棒を3色目にして馬名だけを太字にする。"""
     body, _ = _build()
     chart = body.images[f"img/past_dynamics/{_G2}_1.png"]
     ax = chart.axes[0]
     # 着順の順: 2(1着)・3(2着)・1(3着)・4(4着)
     assert [to_hex(patch.get_facecolor()).upper() for patch in ax.patches] == [
-        "#0072BD",
+        "#EDB120",
         "#0072BD",
         "#D95319",
         "#0072BD",
     ]
-    weights = {text.get_text(): text.get_fontweight() for text in ax.texts}
-    names = {name: weights[name] for name in ("ホースA", "ホースB", "ホースX", "ホースY")}
-    assert names == {"ホースA": "bold", "ホースB": "bold", "ホースX": "normal", "ホースY": "normal"}
-    columns = {text: weights[text] for text in ("1", "+0.40", "2")}
-    assert columns == {"1": "bold", "+0.40": "bold", "2": "normal"}
+    weights: dict[float, dict[str, str]] = {}
+    for text in ax.texts:
+        weights.setdefault(text.get_position()[1], {})[text.get_text()] = text.get_fontweight()
+    assert set(weights[2].values()) == {"bold"}
+    assert {text: weight for text, weight in weights[0].items() if weight == "bold"} == {
+        "ホースB": "bold"
+    }
+    assert set(weights[1].values()) == {"normal"}
 
 
 @pytest.mark.usefixtures("evaluate_mock")
@@ -308,7 +312,7 @@ def test_highlight_differs_by_horse() -> None:
     body, _ = _build()
     chart = body.images[f"img/past_dynamics/{_G2}_2.png"]
     colors = [to_hex(patch.get_facecolor()).upper() for patch in chart.axes[0].patches]
-    assert colors == ["#D95319", "#0072BD", "#0072BD", "#0072BD"]
+    assert colors == ["#D95319", "#0072BD", "#EDB120", "#0072BD"]
 
 
 @pytest.mark.usefixtures("evaluate_mock")

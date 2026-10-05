@@ -42,6 +42,7 @@ def _normal_row(
     return {
         "確定着順": chakusa,
         "馬番": umaban,
+        "枠番": (umaban + 1) // 2,
         "馬名": horse_name,
         "異常区分コード": "0",
         "単勝人気順": ninki,
@@ -55,6 +56,7 @@ def _abnormal_row(umaban: int, horse_name: str, ijo_code: str) -> dict:
     return {
         "確定着順": float("nan"),
         "馬番": umaban,
+        "枠番": (umaban + 1) // 2,
         "馬名": horse_name,
         "異常区分コード": ijo_code,
         "単勝人気順": float("nan"),

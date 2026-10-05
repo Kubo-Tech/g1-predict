@@ -296,8 +296,8 @@ def _build_past_race_lines(
     result_df = past_race.result_df
     ids = result_df["血統登録番号"].astype(str).str.strip()
     highlight = result_df.loc[ids == horse_id, "馬番"].astype(int).tolist()
-    name_bold = result_df.loc[ids.isin(other_horse_ids), "馬番"].astype(int).tolist()
-    chart = make_total_evaluation_chart(dynamics.eval_df, result_df, highlight, name_bold)
+    runners = result_df.loc[ids.isin(other_horse_ids), "馬番"].astype(int).tolist()
+    chart = make_total_evaluation_chart(dynamics.eval_df, result_df, highlight, runners)
     lines.extend(
         [
             *build_dynamics_table_lines(dynamics.cor_df),
