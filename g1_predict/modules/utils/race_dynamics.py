@@ -244,27 +244,27 @@ def make_average_evaluation_chart(average_df: pd.DataFrame) -> Figure:
 
 
 def make_past_evaluation_trend_chart(
-    evaluations: Sequence[tuple[int, float]], num_past_races: int
+    evaluations: Sequence[tuple[int, float]], axis_runs_ago: Sequence[int]
 ) -> Figure:
     """馬の過去走の展開評価値を、横軸に何走前をとった折れ線グラフにする。
 
-    横軸は左から古い順（N走前、…、1走前）に並べ、過去走が少なくても
-    num_past_races 走前までのラベルを残す。num_past_races より前の過去走があれば、その走まで広げる。
+    横軸には axis_runs_ago の走を、左から古い順に等間隔で並べる。
     縦軸は-1.0から+1.0に固定する。範囲を超える点は図の外に出るが、数値は図の中の端に書く。
     点の数値は、正の値は点の上、負の値は点の下に書く。縦軸の端に近い点は図の内側に書く。
 
     Args:
         evaluations (Sequence[tuple[int, float]]): (何走前, 展開評価値) のリスト。
-        num_past_races (int): 横軸に最低限並べる走数。
+            何走前はすべて axis_runs_ago に含まれること。
+        axis_runs_ago (Sequence[int]): 横軸に並べる何走前のリスト。
 
     Returns:
         Figure: 折れ線グラフ。
     """
+    slots = sorted(axis_runs_ago, reverse=True)
     runs = sorted(evaluations, key=lambda evaluation: -evaluation[0])
-    max_runs_ago = max([num_past_races, *(runs_ago for runs_ago, _ in runs)])
     figure = Figure(figsize=_TREND_FIGSIZE)
     ax = figure.subplots()
-    xs = [-runs_ago for runs_ago, _ in runs]
+    xs = [slots.index(runs_ago) for runs_ago, _ in runs]
     ys = [value for _, value in runs]
     ax.plot(xs, ys, color=_BAR_COLOR, marker="o")
     ax.axhline(0, color="black", linewidth=0.8)
@@ -286,10 +286,9 @@ def make_past_evaluation_trend_chart(
             # 範囲を超える点では線が数値の下を通るため、背景を白にして読めるようにする
             bbox={"facecolor": "white", "edgecolor": "none", "pad": 1},
         )
-    ticks = list(range(-max_runs_ago, 0))
-    ax.set_xticks(ticks)
-    ax.set_xticklabels([f"{-tick}走前" for tick in ticks], fontproperties=_JAPANESE_FONT)
-    ax.set_xlim(-max_runs_ago - 0.5, -0.5)
+    ax.set_xticks(range(len(slots)))
+    ax.set_xticklabels([f"{runs_ago}走前" for runs_ago in slots], fontproperties=_JAPANESE_FONT)
+    ax.set_xlim(-0.5, len(slots) - 0.5)
     ax.set_ylim(-_CHART_LIMIT, _CHART_LIMIT)
     ax.set_yticks(_CHART_TICKS)
     ax.set_ylabel("展開評価値", fontproperties=_JAPANESE_FONT)

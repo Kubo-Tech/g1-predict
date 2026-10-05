@@ -301,41 +301,44 @@ def _annotations(figure: Figure) -> dict[str, Text]:
 
 
 def test_make_past_evaluation_trend_chart_axes() -> None:
-    """横軸は左から5走前〜1走前のラベルを残し、縦軸は-1.0から+1.0に固定する。"""
-    figure = make_past_evaluation_trend_chart([(1, 0.2), (3, -0.1)], 5)
+    """横軸は左から古い順に指定した走を並べ、縦軸は-1.0から+1.0に固定する。"""
+    figure = make_past_evaluation_trend_chart([(1, 0.2), (3, -0.1)], [1, 2, 3, 4, 5])
     ax = figure.axes[0]
     labels = [label.get_text() for label in ax.get_xticklabels()]
     assert labels == ["5走前", "4走前", "3走前", "2走前", "1走前"]
     assert ax.get_ylim() == pytest.approx((-1.0, 1.0))
     line = ax.lines[0]
-    assert list(line.get_xdata()) == [-3, -1]
+    assert list(line.get_xdata()) == [2, 4]
     assert list(line.get_ydata()) == pytest.approx([-0.1, 0.2])
 
 
-def test_make_past_evaluation_trend_chart_extends_to_older_race() -> None:
-    """num_past_races より前の過去走があれば、横軸をその走まで広げる。"""
-    figure = make_past_evaluation_trend_chart([(1, 0.2), (7, 0.1)], 5)
-    labels = [label.get_text() for label in figure.axes[0].get_xticklabels()]
-    assert labels[0] == "7走前"
-    assert len(labels) == 7
+def test_make_past_evaluation_trend_chart_skipped_runs_are_evenly_spaced() -> None:
+    """飛んだ走は横軸に並べず、指定した走だけを等間隔に並べる。"""
+    figure = make_past_evaluation_trend_chart([(1, 0.2), (8, 0.1)], [8, 1, 7, 4, 5])
+    ax = figure.axes[0]
+    labels = [label.get_text() for label in ax.get_xticklabels()]
+    assert labels == ["8走前", "7走前", "5走前", "4走前", "1走前"]
+    assert list(ax.lines[0].get_xdata()) == [0, 4]
 
 
 def test_make_past_evaluation_trend_chart_labels() -> None:
     """点に符号付き小数2桁の数値を書き、正は点の上、負は点の下に書く。"""
-    texts = _annotations(make_past_evaluation_trend_chart([(1, 0.2), (2, -0.3)], 5))
-    assert texts["+0.20"].xy == pytest.approx((-1, 0.2))
+    texts = _annotations(make_past_evaluation_trend_chart([(1, 0.2), (2, -0.3)], [1, 2, 3, 4, 5]))
+    assert texts["+0.20"].xy == pytest.approx((4, 0.2))
     assert texts["+0.20"].get_va() == "bottom"
-    assert texts["-0.30"].xy == pytest.approx((-2, -0.3))
+    assert texts["-0.30"].xy == pytest.approx((3, -0.3))
     assert texts["-0.30"].get_va() == "top"
 
 
 def test_make_past_evaluation_trend_chart_labels_inside_for_out_of_range() -> None:
     """縦軸の範囲を超える点や端に近い点は、数値を図の中の端から内側に書く。"""
-    figure = make_past_evaluation_trend_chart([(1, 1.3), (2, -1.2), (3, 0.9), (4, -0.9)], 5)
+    figure = make_past_evaluation_trend_chart(
+        [(1, 1.3), (2, -1.2), (3, 0.9), (4, -0.9)], [1, 2, 3, 4, 5]
+    )
     texts = _annotations(figure)
-    assert texts["+1.30"].xy == pytest.approx((-1, 1.0))
+    assert texts["+1.30"].xy == pytest.approx((4, 1.0))
     assert texts["+1.30"].get_va() == "top"
-    assert texts["-1.20"].xy == pytest.approx((-2, -1.0))
+    assert texts["-1.20"].xy == pytest.approx((3, -1.0))
     assert texts["-1.20"].get_va() == "bottom"
     assert texts["+0.90"].get_va() == "top"
     assert texts["-0.90"].get_va() == "bottom"

@@ -251,13 +251,16 @@ def test_trend_section_between_heading_and_details() -> None:
 
 @pytest.mark.usefixtures("evaluate_mock")
 def test_trend_chart_plots_evaluations_by_runs_ago() -> None:
-    """折れ線グラフには、展開評価値のある過去走を何走前ごとに描く。"""
+    """横軸に載せる過去走の走を並べ、展開評価値のある過去走に点を描く。"""
     body, _ = _build()
     ax = body.images["img/past_dynamics/trend_1.png"].axes[0]
     # ホースAはG2が1走前、直線レースの2走前は対象外、条件戦が3走前、旧重賞が6走前
+    # 載せる過去走は1・2・3・6走前の4走なので、足りない1走を4走前で埋める
+    labels = [label.get_text() for label in ax.get_xticklabels()]
+    assert labels == ["6走前", "4走前", "3走前", "2走前", "1走前"]
     line = ax.lines[0]
     points = sorted(zip(line.get_xdata(), line.get_ydata(), strict=True))
-    assert points == [(-6, 0.4), (-3, 0.4), (-1, 0.4)]
+    assert points == [(0, 0.4), (2, 0.4), (4, 0.4)]
 
 
 @pytest.mark.usefixtures("evaluate_mock")

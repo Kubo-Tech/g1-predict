@@ -149,8 +149,11 @@ def build_past_race_dynamics_body(
         lines.extend([f"## {umaban}. {horse_name}", ""])
         if evaluations[umaban]:
             trend_path = _trend_image_path(umaban)
+            axis_runs_ago = _trend_axis_runs_ago(
+                [runs_ago for runs_ago, _ in selected[umaban]], num_past_races
+            )
             images[trend_path] = make_past_evaluation_trend_chart(
-                evaluations[umaban], num_past_races
+                evaluations[umaban], axis_runs_ago
             )
             lines.extend(
                 [
@@ -269,6 +272,28 @@ def _horse_evaluations(
         values = eval_df.loc[eval_df["馬番"].astype(int).isin(umabans), "総合評価"].dropna()
         evaluations.extend((runs_ago, value) for value in values.astype(float).tolist())
     return evaluations
+
+
+def _trend_axis_runs_ago(selected_runs_ago: list[int], num_past_races: int) -> list[int]:
+    """過去走の展開評価値の折れ線グラフの横軸に並べる何走前を決める。
+
+    記事に載せる過去走の走を並べる。num_past_races 走に満たない場合は、
+    載せる過去走に無い走を1走前から小さい順に足して num_past_races 走にする。
+
+    Args:
+        selected_runs_ago (list[int]): 記事に載せる過去走の何走前のリスト。
+        num_past_races (int): 横軸に並べる走数。
+
+    Returns:
+        list[int]: 何走前のリスト（順不同）。
+    """
+    axis_runs_ago = list(selected_runs_ago)
+    candidate = 1
+    while len(axis_runs_ago) < num_past_races:
+        if candidate not in axis_runs_ago:
+            axis_runs_ago.append(candidate)
+        candidate += 1
+    return axis_runs_ago
 
 
 def _average(evaluations: list[tuple[int, float]]) -> float:
