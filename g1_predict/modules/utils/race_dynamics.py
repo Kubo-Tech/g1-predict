@@ -45,8 +45,10 @@ _RANK_COLUMN = 0.3
 _UMABAN_COLUMN = 0.85
 _VALUE_COLUMN = 1.5
 _EVALUATION_RANK_COLUMN = 2.25
-# 馬番を囲む四角の幅（インチ）
-_UMABAN_BOX_WIDTH = 0.26
+# 馬番・着順・評価順位を囲む四角の幅（インチ）
+_BOX_WIDTH = 0.26
+# 着順・評価順位の1〜3位を囲む四角の色（netkeibaの人気・上がり順位の色）
+_TOP_RANK_COLORS = {1: "#FFF080", 2: "#CCDFFF", 3: "#F0C8A0"}
 # 横軸の範囲。範囲を超える評価値の棒は端で切れる
 _CHART_LIMIT = 1.0
 _CHART_TICKS = (-1.0, -0.5, 0.0, 0.5, 1.0)
@@ -141,6 +143,7 @@ def make_total_evaluation_chart(
     総合評価が無い馬（競走除外など）は載せない。
     棒は0から評価値まで伸び、0の位置に縦線を引く。横軸は-1.0から+1.0に固定する。
     グラフの左側に着順・馬番・評価値・評価順位を縦に揃えて書き、馬番は枠の色の四角で囲む。
+    着順と評価順位の1〜3位は、順位ごとの色の四角で囲む。
     馬名は棒と重ならないよう、評価値が正の馬は0の左側、負の馬は0の右側に書く。
 
     Args:
@@ -210,7 +213,23 @@ def make_total_evaluation_chart(
             column_x(column), -1.0, header, ha="center", va="center",
             transform=column_transform, fontproperties=_JAPANESE_FONT,
         )  # fmt: skip
-    box_width = _UMABAN_BOX_WIDTH / axes_width
+    box_width = _BOX_WIDTH / axes_width
+
+    def add_box(column: float, position: int, facecolor: str, edgecolor: str) -> None:
+        figure.add_artist(
+            Rectangle(
+                (column_x(column) - box_width / 2, position - _CHART_BAR_HEIGHT / 2),
+                box_width,
+                _CHART_BAR_HEIGHT,
+                transform=column_transform,
+                facecolor=facecolor,
+                edgecolor=edgecolor,
+                linewidth=0.5,
+                # 軸より奥に描き、軸に書く文字を隠さない
+                zorder=-1,
+            )
+        )
+
     wakus = horses["枠番"].astype(int).to_dict()
     for position, umaban, value, rank, evaluation_rank in zip(
         positions,
@@ -223,19 +242,11 @@ def make_total_evaluation_chart(
         highlighted = umaban in highlight_horse_nums
         weight = "bold" if highlighted else "normal"
         waku = wakus[umaban]
-        figure.add_artist(
-            Rectangle(
-                (column_x(_UMABAN_COLUMN) - box_width / 2, position - _CHART_BAR_HEIGHT / 2),
-                box_width,
-                _CHART_BAR_HEIGHT,
-                transform=column_transform,
-                facecolor=WAKU_TO_COLOR_DICT[waku],
-                edgecolor="black",
-                linewidth=0.5,
-                # 軸より奥に描き、軸に書く馬番の文字を隠さない
-                zorder=-1,
-            )
-        )
+        add_box(_UMABAN_COLUMN, position, WAKU_TO_COLOR_DICT[waku], "black")
+        if pd.notna(rank) and int(rank) in _TOP_RANK_COLORS:
+            add_box(_RANK_COLUMN, position, _TOP_RANK_COLORS[int(rank)], "none")
+        if evaluation_rank in _TOP_RANK_COLORS:
+            add_box(_EVALUATION_RANK_COLUMN, position, _TOP_RANK_COLORS[evaluation_rank], "none")
         rank_text = f"{int(rank)}" if pd.notna(rank) else "-"
         # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
         value_text = f"{round(value, 2) + 0.0:+.2f}"

@@ -94,10 +94,18 @@ def _texts(texts: list[Text]) -> list[str]:
     return [text.get_text() for text in texts]
 
 
-def _box_colors(figure: Figure) -> list[str]:
-    """馬番を囲む四角の色を、上から順に返す。"""
+def _box_colors(figure: Figure, header: str) -> list[str]:
+    """見出しの列にある四角の色を、上から順に返す。"""
+    header_x = next(
+        text.get_position()[0] for text in figure.axes[0].texts if text.get_text() == header
+    )
     boxes = sorted(
-        (artist for artist in figure.artists if isinstance(artist, Rectangle)),
+        (
+            artist
+            for artist in figure.artists
+            if isinstance(artist, Rectangle)
+            and artist.get_x() + artist.get_width() / 2 == pytest.approx(header_x)
+        ),
         key=lambda box: box.get_y(),
     )
     return [to_hex(box.get_facecolor()).upper() for box in boxes]
@@ -157,7 +165,7 @@ def test_make_total_evaluation_chart_umaban_box_has_waku_color() -> None:
     """馬番を枠の色の四角で囲み、明るい色の枠は文字を黒、他の枠は白にする。"""
     figure = make_total_evaluation_chart(*_chart_inputs())
     # 上から馬番1(1枠)・4(5枠)・2(2枠)・5(8枠)
-    assert _box_colors(figure) == [
+    assert _box_colors(figure, "馬番") == [
         WAKU_TO_COLOR_DICT[1].upper(),
         WAKU_TO_COLOR_DICT[5].upper(),
         WAKU_TO_COLOR_DICT[2].upper(),
@@ -165,6 +173,14 @@ def test_make_total_evaluation_chart_umaban_box_has_waku_color() -> None:
     ]
     text_colors = [to_hex(text.get_color()) for text in _texts_by_column(figure)["馬番"]]
     assert text_colors == ["#000000", "#000000", "#ffffff", "#000000"]
+
+
+def test_make_total_evaluation_chart_top_ranks_have_colored_box() -> None:
+    """着順と評価順位の1〜3位を、黄・水色・薄い茶色の四角で囲み、4位以下は囲まない。"""
+    figure = make_total_evaluation_chart(*_chart_inputs())
+    # 上から着順1・2・3・なし、評価順位4・3・1・2
+    assert _box_colors(figure, "着順") == ["#FFF080", "#CCDFFF", "#F0C8A0"]
+    assert _box_colors(figure, "評価順位") == ["#F0C8A0", "#FFF080", "#CCDFFF"]
 
 
 def test_make_total_evaluation_chart_name_placed_opposite_to_bar() -> None:
