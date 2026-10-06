@@ -220,3 +220,13 @@ def test_apply_trend_condition_no_matching_race_raises() -> None:
     with patch(f"{_CONDITION}.fetch_past_races", return_value=_make_past_races()):
         with pytest.raises(ValueError, match="条件に合う開催がありません"):
             apply_trend_condition(_make_context(), TrendCondition(course_kubun="E"))
+
+
+def test_apply_trend_condition_course_with_baba_no_matching_race_raises() -> None:
+    """コース区分と馬場状態を組み合わせて合う開催が無い場合は ValueError になる。"""
+    with patch(f"{_CONDITION}.fetch_past_races", return_value=_make_past_races().iloc[0:0]) as mock:
+        with pytest.raises(ValueError, match="条件に合う開催がありません"):
+            apply_trend_condition(
+                _make_context(), TrendCondition(course_kubun="B", babajotai_codes=("1",))
+            )
+    assert mock.call_args[0][1].babajotai_codes == ["1"]

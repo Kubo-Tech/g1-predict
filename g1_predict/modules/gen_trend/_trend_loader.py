@@ -138,7 +138,8 @@ def fetch_past_races(manager: ConnectionManager, condition: RaceCondition) -> pd
     """条件に合う過去のレースを返す。
 
     condition の keibajo_codes・kyori・shiba_da・tokubetsu_kyoso_bango・
-    year_from・year_to のうち指定されたものだけで絞り込む。
+    year_from・year_to・kaisai_nichime・babajotai_codes のうち指定されたものだけで絞り込む。
+    馬場状態は、ダートのレースはダート、それ以外は芝の馬場状態と比べる。
 
     Args:
         manager (ConnectionManager): DB接続マネージャ。
@@ -172,6 +173,15 @@ def fetch_past_races(manager: ConnectionManager, condition: RaceCondition) -> pd
     if condition.year_to:
         where_parts.append("r.kaisai_nen <= %s")
         params.append(condition.year_to)
+    if condition.kaisai_nichime:
+        where_parts.append("TRIM(r.kaisai_nichime)::INTEGER = ANY(%s)")
+        params.append([int(n) for n in condition.kaisai_nichime])
+    if condition.babajotai_codes:
+        where_parts.append(
+            "(CASE WHEN TRIM(r.track_code) BETWEEN '23' AND '29' "
+            "THEN TRIM(r.dirt_babajotai_code) ELSE TRIM(r.shiba_babajotai_code) END) = ANY(%s)"
+        )
+        params.append(list(condition.babajotai_codes))
     where_clause = " AND ".join(where_parts) if where_parts else "TRUE"
     sql = f"""
         SELECT TRIM(r.race_code) AS race_code,
