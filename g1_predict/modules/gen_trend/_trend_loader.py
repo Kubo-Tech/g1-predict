@@ -102,14 +102,14 @@ def decide_trend_years(
     """集計対象の初年と年数を決める。
 
     既定は対象レース年の前年までの過去 TREND_YEARS 年。
-    その期間にG1として行われていない年がある場合は、
-    G1として行われた最初の年から前年までを集計する。
+    同じ特別競走番号のレースがG1として行われた最初の年（G1でない開催がある場合は、
+    最後のG1でない開催より後の最初のG1の年）がその期間内にある場合は、その年から前年までを集計する。
+    G1になった年は、競馬場・距離・芝ダによらず特別競走番号だけで判定する。
 
     Args:
         manager (ConnectionManager): DB接続マネージャ。
         race_year (int): 対象レースの開催年。
-        base_condition (RaceCondition): 同じレースを特定する条件
-            （特別競走番号・競馬場・距離・芝ダ）。年の範囲は無視する。
+        base_condition (RaceCondition): 同じレースを特定する条件。特別競走番号だけを使う。
 
     Returns:
         int: 集計対象の初年。
@@ -118,16 +118,20 @@ def decide_trend_years(
     Raises:
         ValueError: 前年までにG1として行われた年が無い場合。
     """
-    first_year = race_year - TREND_YEARS
-    window = replace(base_condition, year_from=str(first_year), year_to=str(race_year - 1))
-    past_races = fetch_past_races(manager, window)
-    not_g1 = past_races[past_races["grade_code"] != _G1_GRADE_CODE]
-    if not not_g1.empty:
-        first_year = int(not_g1["kaisai_nen"].astype(int).max()) + 1
-    years = race_year - first_year
-    if years < 1:
+    history = RaceCondition(
+        tokubetsu_kyoso_bango=base_condition.tokubetsu_kyoso_bango, year_to=str(race_year - 1)
+    )
+    past_races = fetch_past_races(manager, history)
+    is_g1 = past_races["grade_code"] == _G1_GRADE_CODE
+    race_years = past_races["kaisai_nen"].astype(int)
+    g1_years = race_years[is_g1]
+    non_g1_years = race_years[~is_g1]
+    if not non_g1_years.empty:
+        g1_years = g1_years[g1_years > non_g1_years.max()]
+    if g1_years.empty:
         raise ValueError(f"前年までにG1として行われた開催がありません: race_year={race_year}")
-    return first_year, years
+    first_year = max(race_year - TREND_YEARS, int(g1_years.min()))
+    return first_year, race_year - first_year
 
 
 def fetch_past_races(manager: ConnectionManager, condition: RaceCondition) -> pd.DataFrame:

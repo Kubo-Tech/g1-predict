@@ -118,44 +118,60 @@ def test_build_race_context_unknown_track_code_raises() -> None:
 # --- decide_trend_years ---
 
 
+def _decide(years: list[int], grades: list[str]) -> tuple[int, int]:
+    """特別競走番号の過去の開催をモックして decide_trend_years を呼ぶ。"""
+    with patch(f"{_LOADER}.fetch_past_races", return_value=_make_past_races(years, grades)):
+        return decide_trend_years(MagicMock(), 2026, _make_base_condition())
+
+
 def test_decide_trend_years_all_g1_uses_trend_years() -> None:
-    """過去 TREND_YEARS 年がすべてG1なら、TREND_YEARS 年前から集計する。"""
-    years = list(range(2016, 2026))
-    with patch(f"{_LOADER}.fetch_past_races", return_value=_make_past_races(years, ["A"] * 10)):
-        first_year, count = decide_trend_years(MagicMock(), 2026, _make_base_condition())
-    assert (first_year, count) == (2016, TREND_YEARS)
+    """過去 TREND_YEARS 年より前からG1なら、TREND_YEARS 年前から集計する。"""
+    years = list(range(2000, 2026))
+    assert _decide(years, ["A"] * len(years)) == (2016, TREND_YEARS)
 
 
 def test_decide_trend_years_starts_from_first_g1_year() -> None:
-    """G1でない年がある場合は、G1になった最初の年から集計する。"""
-    years = list(range(2016, 2026))
-    grades = ["B"] + ["A"] * 9
-    with patch(f"{_LOADER}.fetch_past_races", return_value=_make_past_races(years, grades)):
-        first_year, count = decide_trend_years(MagicMock(), 2026, _make_base_condition())
-    assert (first_year, count) == (2017, 9)
+    """期間内にG1になった場合は、G1になった最初の年から集計する。"""
+    years = list(range(2000, 2026))
+    grades = ["B"] * 17 + ["A"] * 9
+    assert _decide(years, grades) == (2017, 9)
 
 
-def test_decide_trend_years_ignores_missing_years() -> None:
-    """同じ条件で開催されなかった年があっても、G1でない年として扱わない。"""
-    years = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2025]
-    with patch(f"{_LOADER}.fetch_past_races", return_value=_make_past_races(years, ["A"] * 9)):
-        first_year, count = decide_trend_years(MagicMock(), 2026, _make_base_condition())
-    assert (first_year, count) == (2016, 10)
+def test_decide_trend_years_new_g1_without_previous_editions() -> None:
+    """G1として新設されたレースは、最初の開催年から集計する。"""
+    assert _decide([2020, 2021, 2022, 2023, 2024, 2025], ["A"] * 6) == (2020, 6)
 
 
-def test_decide_trend_years_uses_year_window_of_trend_years() -> None:
-    """集計年数の決定には、前年までの TREND_YEARS 年を絞り込み条件にする。"""
+def test_decide_trend_years_skips_years_without_editions() -> None:
+    """最後のG1でない開催と最初のG1の開催の間に休止の年があれば、最初のG1の年から集計する。"""
+    years = [2010, 2011, 2012, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    grades = ["B", "B", "B"] + ["A"] * 8
+    assert _decide(years, grades) == (2018, 8)
+
+
+def test_decide_trend_years_ignores_missing_years_after_g1() -> None:
+    """G1になった後に行われなかった年があっても、集計期間は縮めない。"""
+    years = [2000, 2001, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2025]
+    assert _decide(years, ["A"] * len(years)) == (2016, 10)
+
+
+def test_decide_trend_years_uses_tokubetsu_number_only() -> None:
+    """G1になった年は、競馬場・距離・芝ダによらず特別競走番号と前年までで判定する。"""
     with patch(
         f"{_LOADER}.fetch_past_races", return_value=_make_past_races([2025], ["A"])
     ) as mock_fetch:
         decide_trend_years(MagicMock(), 2026, _make_base_condition())
-    window = mock_fetch.call_args[0][1]
-    assert window.year_from == "2016"
-    assert window.year_to == "2025"
+    history = mock_fetch.call_args[0][1]
+    assert history.tokubetsu_kyoso_bango == "0008"
+    assert history.keibajo_codes is None
+    assert history.kyori is None
+    assert history.shiba_da is None
+    assert history.year_from is None
+    assert history.year_to == "2025"
 
 
 def test_decide_trend_years_no_g1_before_race_year_raises() -> None:
-    """前年がG1でない場合（G1になった初年）は ValueError になる。"""
+    """前年までにG1として行われていない場合（G1になった初年）は ValueError になる。"""
     with patch(f"{_LOADER}.fetch_past_races", return_value=_make_past_races([2025], ["B"])):
         with pytest.raises(ValueError, match="G1"):
             decide_trend_years(MagicMock(), 2026, _make_base_condition())
