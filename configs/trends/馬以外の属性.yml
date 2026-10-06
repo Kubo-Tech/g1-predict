@@ -1,0 +1,38 @@
+name: 馬以外の属性
+description: 過去{years}年の出走馬の騎手・生産者・血統に関する傾向
+items:
+  騎手:
+    source: {type: jockey_name}
+    rows: &top10_rows
+      type: dynamic
+      top_n: 10
+  生産者:
+    source: {type: breeder_name}
+    rows: *top10_rows
+  種牡馬:
+    source: {type: sire_name}
+    rows: *top10_rows
+  継続騎乗:
+    source: {type: jockey_continuity}
+    rows:
+      type: fixed
+      items:
+        - {label: "継続騎乗", op: "==", value: "継続"}
+        - {label: "乗り戻り", op: "==", value: "乗り戻り"}
+        - {label: "テン乗り", op: "==", value: "テン乗り"}
+  父実績:
+    note: ※父の実績は過去30年のレースで判定
+    rows:
+      type: boolean_multi
+      items:
+        - label: "父{race_name}勝ち"
+          source:
+            type: sire_race_condition_finisher
+            race_name: "{race_name}"
+            years: 30
+        - label: "父{kyori}mG1勝ち"
+          source:
+            type: sire_race_condition_finisher
+            grade_codes: ["A"]
+            kyori: "{kyori}"
+            years: 30

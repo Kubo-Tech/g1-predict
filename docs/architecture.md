@@ -78,16 +78,21 @@ flowchart TD
 g1-predict/
 ├── configs/
 │   ├── hatena.yml                  # ブログURL、記事の置き場所・種別 → はてなカテゴリの対応
+│   ├── trends/                     # 傾向表の項目の共有定義（カテゴリごとに1ファイル）
 │   └── {レース名}/
-│       ├── trends.yml              # 傾向表の定義
+│       ├── trends.yml              # 傾向表に使う項目名と開催条件
 │       └── table.yml               # 分析表の定義
 ├── g1_predict/modules/
 │   ├── constants.py                # 複数機能で共有する定数（トラックコード → 芝/ダ、グレード表示）
 │   ├── gen_trend/                  # 傾向分析の生成ロジック
-│   │   ├── _trend_models.py        # RowStats（着度数・回収率）と既定年数
-│   │   ├── _trend_loader.py        # RaceCondition の構築、metric 別 condition の適用
+│   │   ├── _trend_models.py        # RowStats（着度数・回収率）、既定年数、開催条件
+│   │   ├── _trend_catalog.py       # 共有定義とレースの trends.yml を読み、項目ごとの定義に展開
+│   │   ├── _trend_condition.py     # 注入された開催条件の検証と、集計対象の絞り込み
+│   │   ├── _course_days.py         # 開催日がコース区分の何日目かを求める
+│   │   ├── _trend_loader.py        # 集計対象レースと集計年数（G1として行われた年数）の決定
+│   │   ├── _trend_sql_exprs.py     # 過去走などから値を求める集計項目の SQL 式
 │   │   ├── _trend_stats.py         # source.type → analytics 呼び出しと集計
-│   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル
+│   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル、注記
 │   │   └── trend_section.py        # 傾向セクション群の公開 API
 │   ├── gen_day_trend/              # 前日・当日の傾向の生成ロジック
 │   │   └── day_trend.py            # 前日または当日の同競馬場・同芝ダの結果集計

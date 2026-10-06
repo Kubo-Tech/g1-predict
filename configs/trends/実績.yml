@@ -1,0 +1,77 @@
+name: 実績
+description: 出走馬の過去の実績に関する傾向
+items:
+  勝利数:
+    source: {type: past_race_top_n_count, top_n: 1}
+    rows:
+      type: fixed
+      items:
+        - {label: "0勝", op: "==", value: 0}
+        - {label: "1勝", op: "==", value: 1}
+        - {label: "2勝", op: "==", value: 2}
+        - {label: "3勝以上", op: ">=", value: 3}
+  重賞勝利数:
+    source: {type: past_race_top_n_count, grade_codes: ["A", "B", "C"], top_n: 1}
+    rows:
+      type: fixed
+      items:
+        - {label: "0勝", op: "==", value: 0}
+        - {label: "1勝", op: "==", value: 1}
+        - {label: "2勝以上", op: ">=", value: 2}
+  中山勝利数:
+    source: {type: past_race_top_n_count, keibajo_codes: ["06"], top_n: 1}
+    rows: &venue_win_rows
+      type: fixed
+      items:
+        - {label: "0勝", op: "==", value: 0}
+        - {label: "1勝", op: "==", value: 1}
+        - {label: "2勝以上", op: ">=", value: 2}
+  東京勝利数:
+    source: {type: past_race_top_n_count, keibajo_codes: ["05"], top_n: 1}
+    rows: *venue_win_rows
+  中京勝利数:
+    source: {type: past_race_top_n_count, keibajo_codes: ["07"], top_n: 1}
+    rows: *venue_win_rows
+  京都勝利数:
+    source: {type: past_race_top_n_count, keibajo_codes: ["08"], top_n: 1}
+    rows: *venue_win_rows
+  阪神勝利数:
+    source: {type: past_race_top_n_count, keibajo_codes: ["09"], top_n: 1}
+    rows: *venue_win_rows
+  中山重賞好走実績:
+    source: {type: past_race_top_n_count, keibajo_codes: ["06"], grade_codes: ["A", "B", "C"], top_n: 3}
+    rows: &top3_count_rows
+      type: fixed
+      items:
+        - {label: "0回", op: "==", value: 0}
+        - {label: "1回", op: "==", value: 1}
+        - {label: "2回", op: "==", value: 2}
+        - {label: "3回以上", op: ">=", value: 3}
+  東京重賞好走実績:
+    source: {type: past_race_top_n_count, keibajo_codes: ["05"], grade_codes: ["A", "B", "C"], top_n: 3}
+    rows: *top3_count_rows
+  中京重賞好走実績:
+    source: {type: past_race_top_n_count, keibajo_codes: ["07"], grade_codes: ["A", "B", "C"], top_n: 3}
+    rows: *top3_count_rows
+  京都重賞好走実績:
+    source: {type: past_race_top_n_count, keibajo_codes: ["08"], grade_codes: ["A", "B", "C"], top_n: 3}
+    rows: *top3_count_rows
+  阪神重賞好走実績:
+    source: {type: past_race_top_n_count, keibajo_codes: ["09"], grade_codes: ["A", "B", "C"], top_n: 3}
+    rows: *top3_count_rows
+  リピーター:
+    source: {type: tokubetsu_race_finish, year_offset: 1, absent_label: 前年出走無し}
+    rows:
+      type: fixed
+      items:
+        - {label: "前年3着以内", op: "<=", value: 3}
+        - {label: "前年4着以内", op: "<=", value: 4}
+        - {label: "前年5着以内", op: "<=", value: 5}
+        - {label: "前年6着以下", op: ">=", value: 6}
+        - {label: "前年出走無し", op: "==", value: "前年出走無し"}
+  良馬場好走実績:
+    source: {type: good_baba_top3_count}
+    rows: *top3_count_rows
+  稍重以上好走実績:
+    source: {type: soft_baba_top3_count}
+    rows: *top3_count_rows

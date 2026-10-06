@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
+from g1_predict.modules.gen_trend.trend_section import TrendSections
 from scripts.gen_trend import generate_trend
 
 
@@ -47,7 +48,7 @@ def _run(
     mock_race_getter: MagicMock,
     public_dir: str,
     race_code: str = "2026013105010110",
-    trend_sections_map: dict[str, str] | None = None,
+    trend_sections: TrendSections | None = None,
 ) -> None:
     """generate_trend をパッチ環境で実行する。
 
@@ -55,15 +56,15 @@ def _run(
         mock_race_getter (MagicMock): RaceGetter のモック。
         public_dir (str): public ディレクトリパス。
         race_code (str): 16桁 JRA-VAN 形式の race_code。
-        trend_sections_map (dict[str, str] | None): 傾向セクションmap。
+        trend_sections (TrendSections | None): 集計対象の注記と傾向セクション。
     """
-    if trend_sections_map is None:
-        trend_sections_map = {}
+    if trend_sections is None:
+        trend_sections = TrendSections(scope_note="", sections={})
 
     with (
         patch("scripts.gen_trend.RaceGetter", return_value=mock_race_getter),
         patch("scripts.gen_trend._PUBLIC_DIR", public_dir),
-        patch("scripts.gen_trend._build_trend_sections", return_value=trend_sections_map),
+        patch("scripts.gen_trend._build_trend_sections", return_value=trend_sections),
     ):
         generate_trend(race_code)
 
@@ -118,11 +119,48 @@ def test_generate_trend_contains_dynamic_sections(public_dir: str) -> None:
     _run(
         _make_mock_race_getter(),
         public_dir,
-        trend_sections_map={
-            "出走馬傾向": "## 出走馬傾向\n\n過去10年出走馬傾向",
-            "騎手傾向": "## 騎手傾向\n\n過去10年騎手傾向",
-        },
+        trend_sections=TrendSections(
+            scope_note="※集計対象は、過去10年（2016〜2025年）に京都芝3200mで行われた天皇賞春（10回）。",
+            sections={
+                "基本項目": "## 基本項目\n\n同じG1レースの過去10年における傾向",
+                "前走": "## 前走\n\n出走馬の前走に関する傾向",
+            },
+        ),
     )
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
-    assert "## 出走馬傾向" in content
-    assert "## 騎手傾向" in content
+    assert "## 基本項目" in content
+    assert "## 前走" in content
+
+
+def test_generate_trend_scope_note_follows_title(public_dir: str) -> None:
+    """集計対象の注記がタイトルの直後、最初のカテゴリより前に出力される。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    scope_note = "※集計対象は、過去10年（2016〜2025年）に京都芝3200mで行われた天皇賞春（10回）。"
+    _run(
+        _make_mock_race_getter(),
+        public_dir,
+        trend_sections=TrendSections(
+            scope_note=scope_note,
+            sections={"基本項目": "## 基本項目\n\n同じG1レースの過去10年における傾向"},
+        ),
+    )
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
+    assert content == (
+        "# 【天皇賞春2026】傾向分析\n\n"
+        f"{scope_note}\n\n"
+        "## 基本項目\n\n同じG1レースの過去10年における傾向\n"
+    )
+
+
+def test_generate_trend_without_sections_has_title_only(public_dir: str) -> None:
+    """カテゴリが無い場合は、注記を出さずタイトルだけを出力する。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    _run(_make_mock_race_getter(), public_dir)
+    content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
+    assert content == "# 【天皇賞春2026】傾向分析\n"

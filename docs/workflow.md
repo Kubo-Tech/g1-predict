@@ -19,7 +19,7 @@ flowchart LR
 
 ## 0. 事前準備（そのレースを初めて扱うとき）
 
-- `configs/{レース名}/trends.yml` と `table.yml` を用意する → [config-reference.md](config-reference.md)
+- `configs/{レース名}/trends.yml`（`configs/trends/` の項目名を並べる）と `table.yml` を用意する → [config-reference.md](config-reference.md)
 - `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書く（`gen_predict` の `## ポイント` 見出しの下に流し込まれる）
 
 ## 1. 傾向分析（週の前半）
@@ -31,7 +31,6 @@ python -m scripts.gen_trend --race-code 2026061409030411
 `public/2026/2026061409030411_宝塚記念/過去の傾向.md` が生成される。ここから手で仕上げる。
 
 - 各表の下に `> 一言コメント` を足す（引用記法で書くのが既存記事のスタイル）。
-- 見出し直下に「※ 展開に関係する項目は開催4日目良馬場の21,22年のみを集計」のような集計方針の但し書きを足す。
 - 使わない表は削る。`### 比較表` プレースホルダは手で埋めるか削除する。
 
 ## 2. 分析表（Excel）

@@ -8,7 +8,7 @@ JRA-VAN のデータと TARGET frontier JV の自作メモをもとに、**JRA G
 
 | スクリプト | 生成物 | 概要 |
 | --- | --- | --- |
-| `scripts/gen_trend.py` | `public/{年}/{race_code}_{レース名}/過去の傾向.md` | 過去10年の着度数・回収率から傾向分析記事を生成する |
+| `scripts/gen_trend.py` | `public/{年}/{race_code}_{レース名}/過去の傾向.md` | 過去10年（G1になってから10年に満たないレースはG1になった年から）の着度数・回収率から傾向分析記事を生成する |
 | `scripts/gen_table.py` | `.../table/{race_code}_{レース名}.xlsx` | 出走馬・騎手・生産者・種牡馬の分析表（色付き Excel）を生成する |
 | `scripts/gen_past_race_dynamics.py` | `.../出走馬の過去走の展開評価.md` | 出走馬の過去5走の展開評価を馬ごとの折りたたみで並べた記事を生成する |
 | `scripts/gen_prev_day_trend.py` | `.../前日の傾向.md` | 前日の同競馬場・同芝ダの結果から前日の傾向記事を生成する |
@@ -47,7 +47,7 @@ python -m scripts.gen_predict        --race-code 2026061409030411
 
 ```
 g1-predict/
-├── configs/            # レースごとの傾向・分析表定義（YAML）
+├── configs/            # 傾向表の共有項目定義（trends/）とレースごとの傾向・分析表定義（YAML）
 ├── docs/               # 本ドキュメント
 ├── g1_predict/modules/ # 記事・分析表生成のコアロジック
 ├── public/             # 生成した記事・分析表・画像（はてなブログ投稿対象）
