@@ -91,6 +91,13 @@ def test_prev_race_finish_by_class_expr_filters_by_class() -> None:
     assert "= '新馬' THEN CAST(kakutei_chakujun AS INTEGER)" in expr
 
 
+def test_debut_month_expr_counts_started_runs_without_finish() -> None:
+    """デビュー月は、確定着順の無い競走中止なども含め、出走取消・除外を除いた最初の出走で決める。"""
+    expr = build_debut_month_expr(_RACE_CODES)
+    assert "TRIM(ijo_kubun) NOT IN ('1', '2', '3')" in expr
+    assert "kakutei_chakujun ~" not in expr.split("jsonb_object_agg")[-1]
+
+
 def test_transport_expr_has_all_labels() -> None:
     """輸送の3ラベルが式に含まれる。"""
     expr = build_transport_expr(_RACE_CODES)

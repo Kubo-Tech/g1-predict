@@ -28,6 +28,8 @@ BIRTH_MONTH_EXPR = (
 
 # 過去走として有効な着順（数字2桁で00でない）
 _VALID_RUN_SQL = "kakutei_chakujun ~ '^[0-9]{2}$' AND kakutei_chakujun != '00'"
+# 実際に出走した過去走（出走取消・発走除外・競走除外を除く。競走中止などは含む）
+_STARTED_RUN_SQL = "TRIM(ijo_kubun) NOT IN ('1', '2', '3')"
 
 # 競走条件コード（年齢別の5列の最大値）
 _JOKEN_SQL = (
@@ -171,7 +173,7 @@ def build_transport_expr(race_codes: list[str]) -> str:
     select_sql = (
         "SELECT rc || ketto AS k, "
         f"BOOL_OR(NOT {no_transport_hist}) AS v "
-        "FROM hist WHERE TRIM(ijo_kubun) NOT IN ('1', '2', '3') "
+        f"FROM hist WHERE {_STARTED_RUN_SQL} "
         "GROUP BY ketto, rc"
     )
     lookup = _history_lookup_expr(race_codes, select_sql)
@@ -213,12 +215,13 @@ def build_debut_month_expr(race_codes: list[str]) -> str:
         race_codes (list[str]): 集計対象レースのレースコード。
 
     Returns:
-        str: その馬が最初に出走したレースの月を返す SQL 式。
+        str: その馬が最初に出走したレース（出走取消・発走除外・競走除外を除き、
+            競走中止などは含む）の月を返す SQL 式。
     """
     select_sql = (
         "SELECT DISTINCT ON (ketto, rc) rc || ketto AS k, "
         "SUBSTRING(d2 FROM 5 FOR 2)::INTEGER AS v "
-        f"FROM hist WHERE {_VALID_RUN_SQL} "
+        f"FROM hist WHERE {_STARTED_RUN_SQL} "
         "ORDER BY ketto, rc, d2 ASC"
     )
     return _history_lookup_expr(race_codes, select_sql)
