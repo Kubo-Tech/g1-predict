@@ -50,6 +50,7 @@ items:
     source: {type: birth_month}
     rows:
       type: fixed
+      hide_empty: true
       items:
         - {label: "1月", op: "==", value: 1}
         - {label: "2月", op: "==", value: 2}
