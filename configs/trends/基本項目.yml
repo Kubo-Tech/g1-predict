@@ -92,6 +92,7 @@ items:
     source: {type: sex}
     rows:
       type: fixed
+      hide_empty: true
       items:
         - {label: "牡", op: "==", value: 1}
         - {label: "牝", op: "==", value: 2}
