@@ -195,7 +195,7 @@ def _parse_rule(raw: Any, item_name: str) -> ColorRule:
             f"{sorted(_LABELS_RULE_KEYS)} で指定してください: {sorted(keys)}"
         )
     color = raw["color"]
-    if color not in COLOR_NAMES:
+    if not isinstance(color, str) or color not in COLOR_NAMES:
         raise ValueError(f"{item_name}: 未対応の color です: {color!r}")
 
     if keys == _LABELS_RULE_KEYS:
@@ -208,9 +208,9 @@ def _parse_rule(raw: Any, item_name: str) -> ColorRule:
             raise ValueError(f"{item_name}: labels は文字列の空でないリストで指定してください。")
         return LabelsRule(color=color, labels=tuple(labels))
 
-    if raw["metric"] not in _METRICS:
+    if not isinstance(raw["metric"], str) or raw["metric"] not in _METRICS:
         raise ValueError(f"{item_name}: 未対応の metric です: {raw['metric']!r}")
-    if raw["op"] not in _OPERATORS:
+    if not isinstance(raw["op"], str) or raw["op"] not in _OPERATORS:
         raise ValueError(f"{item_name}: 未対応の op です: {raw['op']!r}")
     value = raw["value"]
     if not isinstance(value, (int, float)) or isinstance(value, bool):
