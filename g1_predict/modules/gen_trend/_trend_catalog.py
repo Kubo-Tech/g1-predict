@@ -11,8 +11,18 @@ from ._trend_models import TrendCondition
 
 _CATEGORY_KEYS = frozenset({"name", "description", "items"})
 _ITEM_KEYS = frozenset(
-    {"conditionable", "note", "source", "rows", "display_map", "hide_if_empty"}
+    {
+        "conditionable",
+        "uses_race_result",
+        "note",
+        "source",
+        "rows",
+        "display_map",
+        "hide_if_empty",
+    }
 )
+# 項目の設定そのものではなく、項目の扱いを指定するキー
+_ITEM_FLAG_KEYS = frozenset({"conditionable", "uses_race_result"})
 
 
 @dataclass(frozen=True)
@@ -22,10 +32,12 @@ class CatalogItem:
     Attributes:
         config (dict[str, Any]): source・rows・display_map・note・hide_if_empty の定義。
         conditionable (bool): 開催条件を注入できる項目か。
+        uses_race_result (bool): 今走の結果で値が決まる項目か。
     """
 
     config: dict[str, Any]
     conditionable: bool
+    uses_race_result: bool = False
 
 
 @dataclass(frozen=True)
@@ -51,11 +63,13 @@ class TrendItem:
         name (str): 項目名。
         config (dict[str, Any]): 対象レースの値を埋め込み済みの source・rows・display_map・note。
         condition (TrendCondition | None): 注入された開催条件。
+        uses_race_result (bool): 今走の結果で値が決まる項目か。
     """
 
     name: str
     config: dict[str, Any]
     condition: TrendCondition | None
+    uses_race_result: bool = False
 
 
 @dataclass(frozen=True)
@@ -170,9 +184,11 @@ def _parse_category(raw: Any, file_name: str) -> CatalogCategory:
             )
         if "rows" not in raw_item:
             raise ValueError(f"{file_name}: {item_name} に rows がありません。")
-        config = {key: value for key, value in raw_item.items() if key != "conditionable"}
+        config = {key: value for key, value in raw_item.items() if key not in _ITEM_FLAG_KEYS}
         items[item_name] = CatalogItem(
-            config=config, conditionable=bool(raw_item.get("conditionable", False))
+            config=config,
+            conditionable=bool(raw_item.get("conditionable", False)),
+            uses_race_result=bool(raw_item.get("uses_race_result", False)),
         )
     return CatalogCategory(name=raw["name"], description=raw["description"], items=items)
 
@@ -221,6 +237,7 @@ def _build_item(
         name=item_name,
         config=_embed_placeholders(catalog_item.config, placeholders),
         condition=condition,
+        uses_race_result=catalog_item.uses_race_result,
     )
 
 

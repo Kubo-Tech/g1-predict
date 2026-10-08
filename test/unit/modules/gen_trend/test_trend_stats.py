@@ -1,7 +1,7 @@
 """_trend_stats の単体テスト。"""
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -16,10 +16,10 @@ from g1_predict.modules.gen_trend._trend_sql_exprs import (
 from g1_predict.modules.gen_trend._trend_stats import (
     _AGARI_3F_RANK_EXPR,
     _chakudo_row_to_stats,
-    _group_by_rows_cfg,
     _group_matches,
     _merge_stats,
     _yaml_rows_to_rowsdef,
+    build_item_grouping,
     compute_stats,
     get_juusho_race_names,
 )
@@ -158,67 +158,99 @@ def test_group_matches(group_str: str, op: str, threshold: object, expected: boo
     assert _group_matches(group_str, op, threshold) is expected
 
 
-# --- _group_by_rows_cfg ---
+# --- compute_stats の行の割り当て ---
 
 
-def test_group_by_rows_cfg_dynamic_returns_all() -> None:
-    """dynamic 型はそのまま変換する。"""
-    rows_cfg = {"type": "dynamic"}
-    result = _make_chakudo_result([_make_chakudo_row(group="武豊", wins=5, total=20)])
-    stats = _group_by_rows_cfg(result, rows_cfg)
-    assert "武豊" in stats
+def _compute_with_rows(rows_cfg: dict[str, Any], rows: list[ChakudoRow]) -> dict[str, RowStats]:
+    """gate_number の source に rows_cfg を指定して compute_stats を実行する。"""
+    metric_cfg = {"source": {"type": "gate_number"}, "rows": rows_cfg}
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=_make_chakudo_result(rows),
+    ):
+        return compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
+
+
+def test_compute_stats_dynamic_rows_returns_all_groups() -> None:
+    """dynamic 型はグループをそのまま行にする。"""
+    stats = _compute_with_rows(
+        {"type": "dynamic"}, [_make_chakudo_row(group="武豊", wins=5, total=20)]
+    )
     assert stats["武豊"].first == 5
 
 
-def test_group_by_rows_cfg_fixed_eq() -> None:
-    """fixed 型の == 条件で正しくグループ化される。"""
-    rows_cfg = {
-        "type": "fixed",
-        "items": [{"label": "1枠", "op": "==", "value": 1}],
-    }
-    result = _make_chakudo_result([
-        _make_chakudo_row(group="1", wins=3, total=10),
-        _make_chakudo_row(group="2", wins=2, total=10),
-    ])
-    stats = _group_by_rows_cfg(result, rows_cfg)
-    assert "1枠" in stats
+def test_compute_stats_fixed_eq_assigns_matching_group() -> None:
+    """fixed 型の == 条件で、一致するグループだけが行に入る。"""
+    rows_cfg = {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]}
+    stats = _compute_with_rows(
+        rows_cfg,
+        [
+            _make_chakudo_row(group="1", wins=3, total=10),
+            _make_chakudo_row(group="2", wins=2, total=10),
+        ],
+    )
+    assert list(stats) == ["1枠"]
     assert stats["1枠"].first == 3
-    assert "2枠" not in stats
 
 
-def test_group_by_rows_cfg_fixed_in_merges() -> None:
+def test_compute_stats_fixed_in_merges_groups() -> None:
     """fixed 型の in 条件で複数グループが合算される。"""
-    rows_cfg = {
-        "type": "fixed",
-        "items": [{"label": "4-6人気", "op": "in", "value": [4, 5, 6]}],
-    }
-    result = _make_chakudo_result([
-        _make_chakudo_row(group="4", wins=1, total=5, tansho_kaishuu=100.0, fukusho_kaishuu=80.0),
-        _make_chakudo_row(group="5", wins=2, total=5, tansho_kaishuu=80.0, fukusho_kaishuu=60.0),
-        _make_chakudo_row(group="7", wins=3, total=5),
-    ])
-    stats = _group_by_rows_cfg(result, rows_cfg)
-    assert "4-6人気" in stats
+    rows_cfg = {"type": "fixed", "items": [{"label": "4-6人気", "op": "in", "value": [4, 5, 6]}]}
+    stats = _compute_with_rows(
+        rows_cfg,
+        [
+            _make_chakudo_row(
+                group="4", wins=1, total=5, tansho_kaishuu=100.0, fukusho_kaishuu=80.0
+            ),
+            _make_chakudo_row(
+                group="5", wins=2, total=5, tansho_kaishuu=80.0, fukusho_kaishuu=60.0
+            ),
+            _make_chakudo_row(group="7", wins=3, total=5),
+        ],
+    )
+    assert list(stats) == ["4-6人気"]
     assert stats["4-6人気"].first == 3
     assert stats["4-6人気"].total == 10
-    assert "7" not in stats
 
 
-def test_group_by_rows_cfg_fixed_between() -> None:
+def test_compute_stats_fixed_between_merges_range() -> None:
     """fixed 型の between 条件で下限・上限を含む範囲のグループが合算される。"""
     rows_cfg = {
         "type": "fixed",
         "items": [{"label": "2-5番手", "op": "between", "value": [2, 5]}],
     }
-    result = _make_chakudo_result([
-        _make_chakudo_row(group="1", wins=9, total=10),
-        _make_chakudo_row(group="2", wins=1, total=5),
-        _make_chakudo_row(group="5", wins=2, total=5),
-        _make_chakudo_row(group="6", wins=3, total=5),
-    ])
-    stats = _group_by_rows_cfg(result, rows_cfg)
+    stats = _compute_with_rows(
+        rows_cfg,
+        [
+            _make_chakudo_row(group="1", wins=9, total=10),
+            _make_chakudo_row(group="2", wins=1, total=5),
+            _make_chakudo_row(group="5", wins=2, total=5),
+            _make_chakudo_row(group="6", wins=3, total=5),
+        ],
+    )
     assert stats["2-5番手"].first == 3
     assert stats["2-5番手"].total == 10
+
+
+def test_compute_stats_fixed_without_matching_group_is_empty() -> None:
+    """fixed 型で一致するグループが無い行は、全て0の集計値になる。"""
+    rows_cfg = {"type": "fixed", "items": [{"label": "8枠", "op": "==", "value": 8}]}
+    stats = _compute_with_rows(rows_cfg, [_make_chakudo_row(group="1", wins=3, total=10)])
+    assert stats["8枠"] == RowStats()
+
+
+def test_compute_stats_fixed_overlapping_rows_share_group() -> None:
+    """fixed 型で条件が重なる行は、同じグループをそれぞれ集計する。"""
+    rows_cfg = {
+        "type": "fixed",
+        "items": [
+            {"label": "3着以内", "op": "<=", "value": 3},
+            {"label": "4着以内", "op": "<=", "value": 4},
+        ],
+    }
+    stats = _compute_with_rows(rows_cfg, [_make_chakudo_row(group="3", wins=1, total=4)])
+    assert stats["3着以内"].total == 4
+    assert stats["4着以内"].total == 4
 
 
 # --- compute_stats ---
@@ -269,7 +301,7 @@ def test_compute_stats_prev_race_col_builds_fixed_group_by() -> None:
 
 
 def test_compute_stats_tokubetsu_race_finish_cumulative() -> None:
-    """tokubetsu_race_finish は history 取得 + _group_by_rows_cfg で累積計上される。"""
+    """tokubetsu_race_finish は history 取得 + 行の割り当てで累積計上される。"""
     from unittest.mock import patch
 
     from mykeibadb.analytics import AttrSource
@@ -417,7 +449,7 @@ def test_compute_stats_chokyo_match_days_unsupported_op_raises() -> None:
 
 
 def test_compute_stats_prev_race_grade_groups_by_grade_code() -> None:
-    """prev_race_grade は history 取得 + _group_by_rows_cfg でG1/G2/G3/その他に集計される。"""
+    """prev_race_grade は history 取得 + 行の割り当てでG1/G2/G3/その他に集計される。"""
     from unittest.mock import patch
 
     from mykeibadb.analytics import AttrSource
@@ -926,3 +958,139 @@ def test_compute_stats_boolean_multi_uses_race_name_and_kyori_from_source() -> N
     assert 2400 in sql_calls[1][1]["params"]
     assert stats["父東京優駿勝ち"].first == 2
     assert stats["父2400mG1勝ち"].first == 2
+
+
+# --- build_item_grouping ---
+
+
+def test_build_item_grouping_fixed_assigns_all_matching_rows() -> None:
+    """fixed 型は、グループの値が当てはまる行すべてを返す。"""
+    metric_cfg = {
+        "source": {"type": "gate_number"},
+        "rows": {
+            "type": "fixed",
+            "items": [
+                {"label": "内", "op": "<=", "value": 4},
+                {"label": "外", "op": ">=", "value": 5},
+                {"label": "1枠", "op": "==", "value": 1},
+            ],
+        },
+    }
+    grouping = build_item_grouping(metric_cfg, _make_manager(), _make_condition(), lambda: [])
+    assert grouping.group_by.kind == "race_col"
+    assert grouping.group_by.column == "u.wakuban"
+    assert grouping.assign_rows("1") == ["内", "1枠"]
+    assert grouping.assign_rows("6") == ["外"]
+    assert grouping.row_labels == ["内", "外", "1枠"]
+
+
+def test_build_item_grouping_dynamic_returns_group_value() -> None:
+    """dynamic 型は、グループの値をそのまま行の名前として返す。"""
+    metric_cfg = {"source": {"type": "jockey_name"}, "rows": {"type": "dynamic"}}
+    grouping = build_item_grouping(metric_cfg, _make_manager(), _make_condition(), lambda: [])
+    assert grouping.group_by.kind == "subject"
+    assert grouping.assign_rows("武豊") == ["武豊"]
+    assert grouping.row_labels is None
+
+
+def test_build_item_grouping_history_expr_uses_given_race_codes() -> None:
+    """過去走を参照する式には、渡したレースコードだけを埋め込む。"""
+    metric_cfg = {
+        "source": {"type": "prev_race_class"},
+        "rows": {"type": "fixed", "items": [{"label": "G1", "op": "==", "value": "G1"}]},
+    }
+    grouping = build_item_grouping(
+        metric_cfg, _make_manager(), _make_condition(), lambda: ["2026092706040911"]
+    )
+    assert grouping.group_by.column is not None
+    assert "u3.race_code IN ('2026092706040911')" in grouping.group_by.column
+
+
+def test_build_item_grouping_does_not_load_race_codes_for_plain_column() -> None:
+    """過去走を参照しない項目では、レースコードを取得しない。"""
+    metric_cfg = {
+        "source": {"type": "gate_number"},
+        "rows": {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]},
+    }
+
+    def fail() -> list[str]:
+        raise AssertionError("レースコードを取得してはいけない")
+
+    build_item_grouping(metric_cfg, _make_manager(), _make_condition(), fail)
+
+
+def test_build_item_grouping_chokyo_match_days_assigns_by_op() -> None:
+    """chokyo_match_days は、any_match・none_match・empty で行に割り当てる。"""
+    metric_cfg = {
+        "source": {
+            "type": "chokyo_match_days",
+            "chokyo_condition": [
+                {"course": "hanro", "metric": "gokei", "furlong": 2, "max_value": 239}
+            ],
+            "days_from": 1,
+            "days_to": 13,
+        },
+        "rows": {
+            "type": "fixed",
+            "items": [
+                {"label": "該当", "op": "any_match"},
+                {"label": "非該当", "op": "none_match"},
+                {"label": "記録なし", "op": "empty"},
+            ],
+        },
+    }
+    grouping = build_item_grouping(metric_cfg, _make_manager(), _make_condition(), lambda: [])
+    assert grouping.assign_rows("[[7, true]]") == ["該当"]
+    assert grouping.assign_rows("[[7, false]]") == ["非該当"]
+    assert grouping.assign_rows("[]") == ["記録なし"]
+
+
+def test_build_item_grouping_boolean_multi_assigns_rows_by_sire_name() -> None:
+    """boolean_multi は、種牡馬名でグループ分けし、父が条件を満たす行すべてを返す。"""
+    metric_cfg = {
+        "rows": {
+            "type": "boolean_multi",
+            "items": [
+                {"label": "父勝ち", "source": {"type": "sire_race_condition_finisher"}},
+                {
+                    "label": "父G1勝ち",
+                    "source": {"type": "sire_race_condition_finisher", "grade_codes": ["A"]},
+                },
+            ],
+        }
+    }
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats._get_sire_winner_set",
+        side_effect=[{"A", "B"}, {"A"}],
+    ):
+        grouping = build_item_grouping(metric_cfg, _make_manager(), _make_condition(), lambda: [])
+    assert grouping.group_by.kind == "subject"
+    assert grouping.assign_rows("A") == ["父勝ち", "父G1勝ち"]
+    assert grouping.assign_rows("B") == ["父勝ち"]
+    assert grouping.assign_rows("C") == []
+    assert grouping.row_labels == ["父勝ち", "父G1勝ち"]
+
+
+# 準正常系
+def test_build_item_grouping_chokyo_match_days_unknown_op_raises() -> None:
+    """chokyo_match_days の未対応の op は ValueError になる。"""
+    metric_cfg = {
+        "source": {
+            "type": "chokyo_match_days",
+            "chokyo_condition": [
+                {"course": "hanro", "metric": "gokei", "furlong": 2, "max_value": 239}
+            ],
+            "days_from": 1,
+            "days_to": 13,
+        },
+        "rows": {"type": "fixed", "items": [{"label": "該当", "op": "=="}]},
+    }
+    with pytest.raises(ValueError):
+        build_item_grouping(metric_cfg, _make_manager(), _make_condition(), lambda: [])
+
+
+def test_build_item_grouping_unknown_source_type_raises() -> None:
+    """未対応の source.type は ValueError になる。"""
+    metric_cfg = {"source": {"type": "unknown"}, "rows": {"type": "dynamic"}}
+    with pytest.raises(ValueError):
+        build_item_grouping(metric_cfg, _make_manager(), _make_condition(), lambda: [])

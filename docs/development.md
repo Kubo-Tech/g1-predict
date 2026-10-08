@@ -24,7 +24,7 @@ ruff は isort・flake8・darglint を置き換えたもので、KeibaAI の他�
 
 CI（`.github/workflows/ci.yml`）は `g1_predict/**` / `scripts/**` / `test/**` / `configs/**` / `pyproject.toml` / `ci.yml` の変更で起動し、ruff は `g1_predict/` + `scripts/` + `test/`、mypy は `g1_predict/` + `scripts/` を検査する。依存インストール前に、Secrets の `KEIBAAI_DEVELOPER_TOKEN` で `KeibaAI-developer` の private リポジトリ（`race-dynamics-evaluation` / `feature-value-utils`）への git アクセスを認証するステップが入る（詳細は [setup.md](setup.md)）。
 
-`pytest` は外部依存をモックしているので DB・TFJV データが無くても通る。ただし `openpyxl` などの依存は必要なので、事前に `pip install -e ".[dev]"` を済ませておく。
+`pytest` は外部依存をモックしているので DB・TFJV データが無くても通る。ただし `matplotlib` などの依存は必要なので、事前に `pip install -e ".[dev]"` を済ませておく。
 
 ## テストの置き場所
 
@@ -34,7 +34,7 @@ CI（`.github/workflows/ci.yml`）は `g1_predict/**` / `scripts/**` / `test/**`
 test/unit/
 ├── modules/
 │   ├── gen_trend/test_trend_stats.py
-│   ├── gen_table/table_utils/test_apply_color_rules.py
+│   ├── gen_trend/test_trend_table_config.py
 │   └── utils/tfjv/test_read_marks.py
 └── scripts/
     ├── gen_predict/test_generate_predict.py
@@ -58,13 +58,13 @@ test/unit/
 
 ## 機能追加の進め方
 
-傾向表・分析表に「今の `source.type` では表現できない項目」を足したくなったときの流れ。
+傾向表・比較表に「今の `source.type` では表現できない項目」を足したくなったときの流れ。
 
 1. **YAML で表現できないか先に確認する**。既存の `source.type` の組み合わせで済むことが多い。
 2. 済まない場合、追加する `source.type` の仕様（入力・出力・エラー時の挙動・行ラベル）を決める。
 3. 実装する。
    - 傾向表（trends）: `g1_predict/modules/gen_trend/_trend_stats.py` の `compute_stats()` に分岐を追加する。過去走から値を求める `race_col` 系の SQL 式は `_trend_sql_exprs.py` に置く。項目の共有定義は `configs/trends/`、行の出し方を変える場合は `_trend_renderer.py`、集計範囲を変える場合は `_trend_loader.py`、開催条件の絞り込みを変える場合は `_trend_condition.py`。
-   - 分析表（table）: `g1_predict/modules/gen_table/table_context.py` の `get_value()` に分岐を追加する。統計計算は `table_stat.py`、DB アクセスは `table_data_cache.py`、色ルール・フィルタは `table_utils.py`。
+   - 出走馬の判定は `build_item_grouping()` を共有するので追加の実装は要らない。比較表の色付けのルールを変える場合は `_trend_table_config.py`、画像の見た目を変える場合は `_trend_table_image.py`。
 4. 単体テストを追加する。
-5. `configs/{レース名}/` の YAML を更新し、実データで生成して表が欠損なく出ることを確認する。**動作確認で生成した記事や xlsx はコミットしない**。
+5. `configs/{レース名}/` の YAML を更新し、実データで生成して表が欠損なく出ることを確認する。**動作確認で生成した記事や画像はコミットしない**。
 6. [config-reference.md](config-reference.md) の一覧に追記する。

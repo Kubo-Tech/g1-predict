@@ -1,19 +1,19 @@
 # configs/{レース名}/ リファレンス
 
-レース1本分の「傾向表に何を出すか」「分析表にどの列を並べるか」を定義する設定ファイル群。Python を触らずにこれらのファイルだけで表現できることを優先している。
+レース1本分の「傾向表に何を出すか」「出走馬の比較表にどの項目を並べるか」を定義する設定ファイル群。Python を触らずにこれらのファイルだけで表現できることを優先している。
 
 - レースごとにディレクトリを作り、用途ごとのファイルを置く。
 
 ```
 configs/{レース名}/
 ├── trends.yml   # gen_trend が使う項目名と開催条件（省略可。無ければ見出しだけの記事になる）
-└── table.yml    # gen_table が使う（gen_table を使うなら必須）
+└── table.yml    # gen_trend の --with-entries が使う比較表の定義（--with-entries を使うなら必須）
 ```
 
 - ディレクトリ名は **DB の競走名本題（`kyosomei_hondai`）と完全一致**させる（例: `configs/宝塚記念/`）。スクリプトはレースコードから引いたレース名でディレクトリを探す。
 - ただし `g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録されているレースは、競走名本題ではなく対応表の略称をディレクトリ名にする（例: 競走名本題「スプリンターズステークス」→ `configs/スプリンターズS/`）。この略称は `templates/points/{レース名}.md` の参照、`public/` の出力先ディレクトリ・ファイル名、記事タイトルにも共通して使われる。DB照合には使えないため、競走名本題での照合が必要な処理には対応表変換前の値を渡す。
 - 現在ある設定: `東京優駿/` / `安田記念/` / `宝塚記念/` / `スプリンターズS/`。新しいレースは近いものをコピーして作るのが早い。
-- 各ファイルの最上位には `trends` / `table` のようなキーを書かず、中身（カテゴリ名やシート名）を直接書く。
+- 各ファイルの最上位には `trends` / `table` のようなキーを書かず、中身（カテゴリ名）を直接書く。
 - 傾向表の項目の定義は、レース共通の `configs/trends/` に置く（[trends.yml](#trendsyml--傾向分析記事の表)）。
 
 ---
@@ -50,10 +50,11 @@ items:
     rows: {...}
 ```
 
-- 項目に書けるキーは `source` / `rows` / `display_map` / `conditionable` / `note` / `hide_if_empty` で、`rows` は必須。
+- 項目に書けるキーは `source` / `rows` / `display_map` / `conditionable` / `uses_race_result` / `note` / `hide_if_empty` で、`rows` は必須。
 - `conditionable: true` の項目だけが、レースの `trends.yml` から開催条件を注入できる。
+- `uses_race_result: true` は、今走の結果で値が決まる項目（脚質・4角通過順位・上がり3F順位）に付ける。出走馬の確定後でもレース前には値が無いため、`--with-entries` の該当馬列は空になり、table.yml にも載せられない。
 - `note` を書くと、表の直下にその文字列を出す。
-- `hide_if_empty: true` を書くと、集計対象に該当馬が1頭もいない場合は表を見出しごと出さない（前走{クラス}着順で使う）。
+- `hide_if_empty: true` を書くと、集計対象にも今回の出走馬にも該当馬が1頭もいない場合は表を見出しごと出さない（前走{クラス}着順で使う）。
 - ファイル名はカテゴリ名から `/` を除いたもの（`同年/前年レース実績` → `同年前年レース実績.yml`）にする。
 - 項目の定義にある `{race_name}`・`{kyori}` は、対象レースの競走名本題・距離（m）に置き換えて使う（例: 父実績の `父{race_name}勝ち`）。
 
@@ -71,7 +72,7 @@ items:
 
 - カテゴリ名をキーに、項目名を並べる。記事にはこのファイルの並び順でカテゴリと項目を出力する。
 - 共有定義に無いカテゴリ名・項目名、`conditionable` でない項目への条件の注入、条件の未知のキーは `ValueError` になる。
-- 各カテゴリの末尾には空の `### 比較表` が自動で挿入される（手書き用のプレースホルダ）。
+- `--with-entries` を付けると、各表の右端に今回の出走馬の馬番を書く「該当馬」列が付く。さらに、`table.yml` に項目があるカテゴリの末尾に `### 比較表` と出走馬の比較表の画像が付く（[table.yml](#tableyml--出走馬の比較表)）。付けない場合はどちらも出さない。
 
 ## 集計対象と集計年数
 
@@ -122,7 +123,7 @@ condition:
 ```yaml
 rows:
   type: fixed
-  hide_empty: true          # 任意。頭数が0の行を出さない
+  hide_empty: true          # 任意。頭数が0の行を出さない（今回の出走馬が当たる行は出す）
   items:
     - {label: "1人気", op: "==", value: 1}
     - {label: "4-6人気", op: "in", value: [4, 5, 6]}
@@ -288,103 +289,69 @@ display_map:
 
 ---
 
-# table.yml — 出走馬分析表（Excel）
+# table.yml — 出走馬の比較表
+
+`python -m scripts.gen_trend --race-code ... --with-entries` で、今回の出走馬を項目ごとに見比べる比較表の画像を作るための定義。trends.yml と同じくカテゴリ名をキーに、比較表に載せる項目を並べる。
 
 ```yaml
-出走馬:              # シート名。任意個のシートを定義できる
-  - name: 枠勝率     # 列見出し
-    source: {...}    # 値の取得方法
-    display_map: {}  # 任意。表示だけ差し替える
-    color_rules: []  # 任意。条件付き書式
-騎手:
-  - ...
+基本項目:
+  - 枠順:
+      color_rules:
+        - {metric: 複勝率, op: ">=", value: 30, color: yellow}
+  - 前走脚質:
+      color_rules:
+        - {labels: [逃げ, 先行], color: yellow}
+  - 所属
+前走:
+  - 前走レース
+  - 前走クラス:
+      color_rules:
+        - {metric: 複勝率, op: ">=", value: 30, color: yellow}
+        - {metric: 複勝率, op: "==", value: 0, color: gray}
+馬以外の属性:
+  - 騎手:
+      color_rules:
+        - {metric: 勝率, op: ">=", value: 10, color: yellow}
 ```
 
-- 各シートの先頭には `枠` / `馬番` / `馬名` の3列が自動で付く（YAML に書く必要はない）。
-- 行は出走表の並び順（`entry_df` の順）。
-- 実際の運用では `出走馬` / `騎手` / `生産者` / `種牡馬` の4シート構成にしている。
+- 項目は、そのレースの trends.yml の同じカテゴリにある項目から選ぶ。並び順が比較表の列の順になる。
+- カテゴリごとに画像を1枚作り、`img/trend_table/{カテゴリ名}.png`（カテゴリ名の `/` は除く）に保存する。table.yml に項目が無いカテゴリには、比較表を出さない。記事に表が出ない項目（`hide_if_empty` で隠れた項目）は、比較表にも載せない。
+- そのレースの trends.yml に無いカテゴリ・項目、今走の結果で決まる項目（`uses_race_result: true`）、未知の `metric`・`op`・`color`、`color_rules` のキーの不足は `ValueError` になる。
+- `--with-entries` を付けたときに table.yml が無い場合は、例外で止まる。
 
-## color_rules — 条件付き書式
+## 比較表の見た目
 
-```yaml
-color_rules:
-  - condition: {op: ">=", value: 0.125}
-    color: yellow
-  - condition: {op: "==", value: "有馬記念"}
-    color: gray
+```
+| 枠 | 馬番 | 馬名 | 枠順 | 前走脚質 | 所属 | ... |
 ```
 
-- 先頭から評価し、**最初に一致したルール**の色で塗る。
-- 値が `None` / `NaN` の場合はどのルールにも一致しない。
-- `枠` 列だけは例外で、`color_rules` ではなく枠番に対応した JRA の枠色で塗られる。
+- 行は今回の出走馬を馬番順に並べる。出走取消・発走除外・競走除外の馬は含めない。
+- 各セルには、その馬が当たる行の名前（`display_map` があれば表示名）を書く。dynamic の項目で表に出ている行に当たらない馬は「その他」、値が求まらない馬（前走が無いなど）は「-」とする。父実績のように複数の行に当たる馬は「・」でつないで書く。
+- 見出し行は灰色で、`枠` 列は JRA の枠の色で塗る。
 
-使える `op`:
+## 出走馬が当たる行
 
-| `op` | 内容 |
-| --- | --- |
-| `==` `!=` `>=` `<=` `>` `<` | 通常の比較 |
-| `in` / `not_in` | `value` のリストに含まれるか |
-| `contains` | `value` の文字列がセル値に含まれるか |
-| `grade_finish_within` | `prev_race_grade_finish` 専用。`{G1: 9, G2: 2, G3: 1}` のようにグレードごとの着順上限を指定し、`"G1 5着"` 形式の値を判定する |
+出走馬がどの行に当たるかは、項目ごとに過去の集計と同じ `GroupBy` で `mykeibadb.analytics.get_race_entry_groups` から値を得て、過去の集計と同じ行の割り当て（`fixed` の `op`、`dynamic` の行名、`chokyo_match_days` の `op` など）で決める。
 
-使える `color`: `green` / `yellow` / `blue` / `red` / `orange` / `gray`
+- `dynamic` の項目（前走レース・騎手・生産者・種牡馬など）で、表に出ている行のどれにも当たらない馬は「その他」行に入る。
+- `boolean_multi`（父実績）は、出走馬の父がその行の条件を満たす種牡馬なら当たる。1頭が複数の行に当たることがある。
+- 値が求まらない馬はどの行にも入らない。
+- 今走の結果で決まる項目（脚質・4角通過順位・上がり3F順位）はレース前に値が無いため、該当馬は空になる。人気・馬体重のように当日に決まる値も、DB に入る前は空になる。
+- 項目に開催条件を注入していても、出走馬の判定には条件を使わない。条件は過去の集計対象を絞るためのもの。
 
-## filters — 過去走の絞り込み
+## color_rules — セルの色付け
 
-`past_field` / `debut_field` / `past_best` / `past_race_top_n_count` で使える共通オプション。
+`color_rules` は任意。先頭から評価し、最初に当てはまったルールの色でセルを塗る。次の2種類のルールを混ぜて書ける。
 
-```yaml
-filters:
-  - field: 異常区分コード
-    op: not_in
-    value: ["1", "2", "3"]
-```
-
-`field` には**過去成績 DataFrame の日本語カラム名**（`確定着順` / `競馬場コード` / `距離` / `グレードコード` / `異常区分コード` / `競走名本題` など）を指定する。`op` は `color_rules` と同じものが使える。
-
-> trends 側の `past_race_top_n_count` の `filters` は指定できる `field` が限定される（[前掲の表](#過去走履歴系)）。table 側は DataFrame に存在する列であれば指定できる。
-
-## table で使える source.type
-
-### 出走表・マスタからそのまま取る
-
-| `type` | パラメータ | 内容 |
+| 種類 | キー | 内容 |
 | --- | --- | --- |
-| `entry_field` | `field` | 出走表の列（日本語）。例: `所属コード` `馬齢` `性別コード` `騎手名略称` |
-| `kyosoba_field` | `field` | 競走馬マスタ2の列（英語）。例: `seisanshamei_hojinkaku_nashi` |
-| `umagoto_field` | `field` | 今回レースの馬ごと情報（コード変換済み） |
-| `recent_umagoto_field` | `field` | 直近走の馬ごと情報。例: `kyakushitsu`（前走脚質） |
+| 指標と基準値 | `metric` / `op` / `value` / `color` | 出走馬が当たる行の、過去の集計の指標で判定する。行の頭数が0の場合は判定しない |
+| 行の名前 | `labels` / `color` | 出走馬が当たる行の名前（`display_map` があれば表示名）が `labels` に含まれれば塗る |
 
-### 過去成績から取る
-
-| `type` | パラメータ | 内容 |
-| --- | --- | --- |
-| `past_field` | `field` / `filters` / `index`（既定 0） | 新しい順に `index` 番目の過去走の値。`index: 0` が前走 |
-| `debut_field` | `field` / `filters` | 最も古い過去走の値（デビュー戦） |
-| `past_best` | `field` / `agg`（`min`\|`max`） / `filters` | 過去走の最小値または最大値 |
-| `past_race_top_n_count` | `keibajo_codes` / `grade_codes` / `top_n` / `filters` | 条件に一致する過去走のうち `top_n` 着以内だった回数。`top_n` 省略で該当レース数 |
-| `prev_race_name` | `overseas_label` | 前走レース名。海外レースは `overseas_label` の値に置き換える。重賞（グレードコード `A`/`B`/`C`/`D`/`F`/`G`/`H`）かつJRA開催（競馬場コードが数字）で特別競走番号が `0000` 以外のレースは、同じ特別競走番号を持つ重賞レースのうち開催日が最も新しいレースの競走名本題に統一する |
-| `prev_race_grade_finish` | − | 前走を `"G1 5着"` 形式で返す（`A`→G1, `B`→G2, `C`→G3, その他→`非重賞`）。中止等で着順が取れない場合は空 |
-| `prev_race_kohan_3f_rank` | − | 前走の上がり3F順位（同レース出走馬中） |
-| `tokubetsu_race_finish` | `tokubetsu_kyoso_bango` / `year_offset` / `absent_label` | 対象レースから `year_offset` 年前（0=同年、1=前年）に行われた、特別競走番号が `tokubetsu_kyoso_bango` のレースでの着順。未出走なら `absent_label` |
-| `kishu_continuity` | − | `継続` / `乗り戻り` / `テン乗り` |
-| `chokyo_match_days` | `chokyo_condition` / `days_from` / `days_to` | 対象レース日の `days_to` 日前〜`days_from` 日前（両端含む）に行われた、対象コースの調教のうち調教閾値条件（`chokyo_condition`。`ChokyoThreshold` 形式のリストで `course` はすべて同一にする）に該当した本数（int）。確定着順の有無を問わず出走馬を対象にする。期間内に対象コースの調教記録が1本も無い場合は空セル（None） |
-
-### 統計値（`stat` を指定する）
-
-`stat` は `wins`（勝利数） / `top3`（3着内数） / `win_rate`（勝率） / `top3_rate`（複勝率）。率は小数（Excel 側で書式設定する）。
-
-| `type` | パラメータ | 内容 |
-| --- | --- | --- |
-| `waku_stat` | `stat` / `keibajo_code` / `track`(`shiba`\|`dirt`) / `kyori` / `years` / `course_kubun` / `week` | その馬の枠番の、指定コースでの成績。`course_kubun` は A〜E のコース区分。`week` は「その開催回でそのレースのコース区分が使われ始めた日から数えた暦週」（`(開催日 − 同一開催回・同一コース区分の最初の開催日).days // 7 + 1`）で、`course_kubun` の指定有無に関わらず適用される。`course_kubun` 未指定時はコース区分ごとに週を数えたうえで絞り込む |
-| `kishu_course_stat` | `stat` / `keibajo_code` / `track` / `kyori` / `years` | 騎手の指定コース成績 |
-| `sire_course_stat` | `stat` / `keibajo_code` / `track` / `kyori` / `years` / `track_condition` | 父の産駒の指定コース成績。`track_condition` は馬場状態コード |
-| `sire_race_stat` | `stat`（`name` も可） / `race_name_for_history` / `years` | 父の産駒の指定レース成績。`stat: name` のときは種牡馬名を返す |
-| `seisansha_race_stat` | `stat` / `race_name_for_history` / `years` | 生産者の指定レース成績 |
-| `sire_race_chakujun` | `race_name_for_history` / `years` | 父自身がそのレースに出走したときの着順（例: 父のダービー着順） |
-| `kishu_venue_stat` / `kishu_kyori_stat` / `seisansha_stat` | `field` / `period` | 出走別データ（JRA-VAN の出走別騎手・生産者情報）の列をそのまま取る。列名は `{field}_{period}` で解決する |
-
-未対応の `type` を書いた場合は `ValueError: 不明なsource type: ...` で落ちる。
+- `metric` は `勝率` / `複勝率` / `単回` / `複回`。記事の表に出ている整数の%（四捨五入後）で比べる。
+- `op` は `>=` `<=` `>` `<` `==`。`value` は%の数値。
+- 使える `color`: `green` / `yellow` / `blue` / `red` / `orange` / `gray`
+- 複数の行に当たる馬は、当たった行のうち先にルールに当てはまった行の色で塗る。
 
 ---
 
@@ -392,10 +359,9 @@ filters:
 
 1. 近いレースのディレクトリをコピーする（開催場が変わるレースなら `宝塚記念/`、素直なレースなら `安田記念/`）。
 2. ディレクトリ名を新しいレースの競走名本題に合わせる。`g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録するレースなら、その略称をディレクトリ名にする。
-3. `trends.yml` は、使う項目の名前を `configs/trends/` のカテゴリごとに選ぶ。`table.yml` は、距離・競馬場コードを含む箇所（`kyori` / `keibajo_code` / `keibajo_codes` など）を書き換える。
-4. `race_name_for_history` を新しいレースの競走名本題にする（DB照合に使うため、略称ではなく競走名本題を書く）。
-5. 開催条件が年によって変わるレースなら、`trends.yml` の `conditionable` な項目に `condition` を注入する。
-6. `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書いておく（`gen_predict` が `## ポイント` 見出しの下に流し込む）。
-7. `python -m scripts.gen_trend --race-code ...` で表が欠損なく出るか確認する。動作確認で生成した記事はコミットしない。
+3. `trends.yml` は、使う項目の名前を `configs/trends/` のカテゴリごとに選ぶ。`table.yml` は、trends.yml の項目から比較表に載せるものを選び、色付けの基準を書く。
+4. 開催条件が年によって変わるレースなら、`trends.yml` の `conditionable` な項目に `condition` を注入する。
+5. `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書いておく（`gen_predict` が `## ポイント` 見出しの下に流し込む）。
+6. `python -m scripts.gen_trend --race-code ...` で表が欠損なく出るか確認する。出走馬が確定していれば `--with-entries` も付けて、該当馬列と比較表も確認する。動作確認で生成した記事はコミットしない。
 
 `source.type` で表現できない集計が必要になったときは、`_trend_stats.py`（trends 側）または `table_context.py` / `table_stat.py`（table 側）に新しい type を追加する。追加の進め方は [development.md](development.md) を参照。

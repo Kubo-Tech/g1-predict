@@ -1,25 +1,170 @@
 """傾向データから Markdown セクションを生成するモジュール。"""
 
+from dataclasses import dataclass
+
 from keiba_domain import baba_from_code, keibajo_from_code
 from mykeibadb.analytics import EntryFilter
 
 from ._trend_catalog import TrendCategory, TrendItem
 from ._trend_condition import apply_trend_condition
+from ._trend_entries import find_entry_rows
 from ._trend_loader import TrendContext
 from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats, TrendCondition
 from ._trend_stats import compute_stats, get_juusho_race_names
 
 
-def build_category_section(category: TrendCategory, context: TrendContext) -> str:
+@dataclass(frozen=True)
+class ItemTable:
+    """1項目分の表の行と、今回の出走馬が当たる行。
+
+    Attributes:
+        item (TrendItem): 項目。
+        rows (list[str]): 表に出す行のラベル（display_map 適用前）。dynamic の項目は
+            最後に「その他」を含むことがある。
+        stats (dict[str, RowStats]): 行のラベル -> 過去の集計値。
+        entry_rows (dict[int, list[str]]): 馬番 -> 当たる行のラベル（表の行の順）。
+            当たる行が無い馬は含まない。
+    """
+
+    item: TrendItem
+    rows: list[str]
+    stats: dict[str, RowStats]
+    entry_rows: dict[int, list[str]]
+
+    def display_name(self, label: str) -> str:
+        """行のラベルの表示名を返す。
+
+        Args:
+            label (str): 行のラベル。
+
+        Returns:
+            str: display_map にあればその表示名、無ければラベルそのまま。
+        """
+        display_map: dict[str, str] = self.item.config.get("display_map", {})
+        return display_map.get(label, label)
+
+    def horse_nums(self, label: str) -> list[int]:
+        """行に当たる出走馬の馬番を昇順で返す。
+
+        Args:
+            label (str): 行のラベル。
+
+        Returns:
+            list[int]: 馬番。当たる馬がいない場合は空。
+        """
+        return sorted(num for num, rows in self.entry_rows.items() if label in rows)
+
+
+def build_item_table(
+    item: TrendItem,
+    context: TrendContext,
+    entry_race_code: str | None = None,
+) -> ItemTable | None:
+    """1項目分の表の行と集計値を求める。
+
+    rows.type に応じて行を決定し、各行の集計値を求める。dynamic 型は最後に「その他」行を追加する。
+    項目に開催条件が注入されている場合は、開催条件で絞り込んで集計する。
+    entry_race_code を指定した場合は、今回の出走馬が当たる行も求める。
+    hide_empty の項目でも、今回の出走馬が当たる行は隠さない。
+    hide_if_empty の項目は、集計対象にも今回の出走馬にも該当馬が1頭もいない場合は None を返す。
+
+    Args:
+        item (TrendItem): 対象の項目。
+        context (TrendContext): 対象レースと集計対象の情報。
+        entry_race_code (str | None): 今回のレースの16桁のレースコード。
+            None の場合は出走馬の判定をしない。
+
+    Returns:
+        ItemTable | None: 表の行と集計値。隠す指定により表を出さない場合は None。
+    """
+    metric_cfg = item.config
+    rows_cfg = metric_cfg["rows"]
+
+    filters: list[EntryFilter] = []
+    metric_condition = context.condition
+    if item.condition is not None:
+        metric_condition, filters = apply_trend_condition(context, item.condition)
+    stats_map = compute_stats(metric_cfg, context.manager, metric_condition, filters)
+    entry_groups: dict[int, list[str]] = {}
+    if entry_race_code is not None:
+        entry_groups = find_entry_rows(item, context, entry_race_code)
+
+    source_cfg = metric_cfg.get("source", {})
+    allowed_values: list[str] | None = source_cfg.get("allowed_values")
+
+    add_other_row = False
+    if rows_cfg["type"] == "dynamic":
+        top_n = rows_cfg.get("top_n")
+        labels = _get_dynamic_labels(stats_map, top_n, bool(rows_cfg.get("exclude_no_top3")))
+        if allowed_values is not None:
+            allowed_set = set(str(v) for v in allowed_values)
+            labels = [lb for lb in labels if lb in allowed_set]
+        always_grades = rows_cfg.get("always_include_grades")
+        if always_grades is not None:
+            juusho_names = get_juusho_race_names(context.manager, always_grades)
+            labels_set = set(labels)
+            extra = [
+                name for name in juusho_names
+                if name in stats_map and name not in labels_set
+            ]
+            extra.sort(
+                key=lambda n: stats_map[n].first + stats_map[n].second + stats_map[n].third,
+                reverse=True,
+            )
+            labels = labels + extra
+        has_top_n = rows_cfg.get("top_n") is not None
+        has_allowed = allowed_values is not None
+        add_other_row = has_top_n or has_allowed
+    elif rows_cfg["type"] in ("fixed", "boolean_multi"):
+        labels = [row_item["label"] for row_item in rows_cfg["items"]]
+    else:
+        labels = list(stats_map.keys())
+
+    entry_rows = _assign_entry_rows(
+        entry_groups, labels, add_other_row, rows_cfg["type"] == "dynamic"
+    )
+    entry_labels = {label for rows in entry_rows.values() for label in rows}
+    if (
+        metric_cfg.get("hide_if_empty")
+        and all(s.total == 0 for s in stats_map.values())
+        and not entry_labels
+    ):
+        return None
+
+    if rows_cfg.get("hide_empty"):
+        labels = [
+            label
+            for label in labels
+            if stats_map.get(label, RowStats()).total > 0 or label in entry_labels
+        ]
+
+    stats = {label: stats_map.get(label, RowStats()) for label in labels}
+    rows = list(labels)
+    if add_other_row:
+        stats[OTHER_LABEL] = _aggregate_other_stats(stats_map, set(labels))
+        rows.append(OTHER_LABEL)
+    return ItemTable(item=item, rows=rows, stats=stats, entry_rows=entry_rows)
+
+
+def build_category_section(
+    category: TrendCategory,
+    context: TrendContext,
+    tables: list[ItemTable],
+    with_entries: bool = False,
+    comparison_image: str | None = None,
+) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
 
-    ## カテゴリ名 とカテゴリの説明文から始まり、各項目の h3 テーブルと
-    ### 比較表 プレースホルダーを含む文字列を返す。
-    hide_if_empty の項目で該当馬が1頭もいないものは出力しない。
+    ## カテゴリ名 とカテゴリの説明文から始まり、各項目の h3 テーブルを含む文字列を返す。
+    with_entries が True の場合は、各テーブルの右端に今回の出走馬のうち行に当たる馬の馬番を
+    書く「該当馬」列を付ける。comparison_image がある場合は、末尾に比較表の画像を載せる。
 
     Args:
         category (TrendCategory): 出力するカテゴリ。
         context (TrendContext): 対象レースと集計対象の情報。
+        tables (list[ItemTable]): カテゴリの各項目の表（表を出さない項目は含めない）。
+        with_entries (bool): 該当馬列を付けるか。
+        comparison_image (str | None): 比較表の画像の、記事ディレクトリからの相対パス。
 
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
@@ -27,13 +172,10 @@ def build_category_section(category: TrendCategory, context: TrendContext) -> st
     description = category.description.replace("{years}", str(context.years))
     header = f"## {category.name}\n\n{description}"
 
-    metric_sections = [
-        section
-        for item in category.items
-        if (section := _build_metric_section(item, context)) is not None
-    ]
-    metric_sections.append("### 比較表\n")
-    return header + "\n\n" + "\n\n".join(metric_sections)
+    sections = [_format_item_section(table, with_entries) for table in tables]
+    if comparison_image is not None:
+        sections.append(f"### 比較表\n\n![{category.name}の比較表]({comparison_image})")
+    return header + "\n\n" + "\n\n".join(sections)
 
 
 def format_scope_note(context: TrendContext, race_label: str) -> str:
@@ -96,87 +238,71 @@ def format_condition_note(condition: TrendCondition | None) -> str:
     return "※" + "・".join(parts) + "のみ"
 
 
-def _build_metric_section(item: TrendItem, context: TrendContext) -> str | None:
-    """1項目分の h3 テーブルセクション文字列を生成する。
+def _assign_entry_rows(
+    entry_groups: dict[int, list[str]],
+    labels: list[str],
+    add_other_row: bool,
+    is_dynamic: bool,
+) -> dict[int, list[str]]:
+    """出走馬が当たる行のラベルを、表に出す行に絞り込む。
 
-    rows.type に応じてラベル一覧を決定し、各行の集計値から
-    Markdown テーブルを生成する。dynamic 型は最後に「その他」行を追加する。
-    項目に開催条件が注入されている場合は、開催条件で絞り込んで集計し、
-    表の直下に開催条件の注記を出力する。
-    項目に note がある場合は、その直下に出力する。
-    項目に hide_if_empty が指定されていて、集計対象に該当馬が1頭もいない場合は None を返す。
+    dynamic の項目で、表に出ている行のどれにも当たらない行のラベルは「その他」に置き換える。
 
     Args:
-        item (TrendItem): 出力する項目。
-        context (TrendContext): 対象レースと集計対象の情報。
+        entry_groups (dict[int, list[str]]): 馬番 -> 集計の割り当てで当たる行のラベル。
+        labels (list[str]): 表に出す行のラベル（「その他」を除く）。
+        add_other_row (bool): 「その他」行を出すか。
+        is_dynamic (bool): rows.type が dynamic か。
 
     Returns:
-        str | None: ### ヘッダーから始まる Markdown テーブル文字列。
-            hide_if_empty の項目で該当馬がいない場合は None。
+        dict[int, list[str]]: 馬番 -> 当たる行のラベル（表の行の順）。当たる行が無い馬は含まない。
     """
-    metric_cfg = item.config
-    rows_cfg = metric_cfg["rows"]
+    label_set = set(labels)
+    entry_rows: dict[int, list[str]] = {}
+    for horse_num, assigned in entry_groups.items():
+        hits: set[str] = set()
+        for label in assigned:
+            if label in label_set:
+                hits.add(label)
+            elif is_dynamic and add_other_row:
+                hits.add(OTHER_LABEL)
+        rows = [label for label in [*labels, OTHER_LABEL] if label in hits]
+        if rows:
+            entry_rows[horse_num] = rows
+    return entry_rows
 
-    filters: list[EntryFilter] = []
-    metric_condition = context.condition
-    if item.condition is not None:
-        metric_condition, filters = apply_trend_condition(context, item.condition)
-    stats_map = compute_stats(metric_cfg, context.manager, metric_condition, filters)
-    if metric_cfg.get("hide_if_empty") and all(s.total == 0 for s in stats_map.values()):
-        return None
 
-    source_cfg = metric_cfg.get("source", {})
-    allowed_values: list[str] | None = source_cfg.get("allowed_values")
+def _format_item_section(table: ItemTable, with_entries: bool) -> str:
+    """1項目分の h3 テーブルセクション文字列を生成する。
 
-    add_other_row = False
-    if rows_cfg["type"] == "dynamic":
-        top_n = rows_cfg.get("top_n")
-        labels = _get_dynamic_labels(stats_map, top_n, bool(rows_cfg.get("exclude_no_top3")))
-        if allowed_values is not None:
-            allowed_set = set(str(v) for v in allowed_values)
-            labels = [lb for lb in labels if lb in allowed_set]
-        always_grades = rows_cfg.get("always_include_grades")
-        if always_grades is not None:
-            juusho_names = get_juusho_race_names(context.manager, always_grades)
-            labels_set = set(labels)
-            extra = [
-                name for name in juusho_names
-                if name in stats_map and name not in labels_set
-            ]
-            extra.sort(
-                key=lambda n: stats_map[n].first + stats_map[n].second + stats_map[n].third,
-                reverse=True,
-            )
-            labels = labels + extra
-        has_top_n = rows_cfg.get("top_n") is not None
-        has_allowed = allowed_values is not None
-        add_other_row = has_top_n or has_allowed
-    elif rows_cfg["type"] in ("fixed", "boolean_multi"):
-        labels = [row_item["label"] for row_item in rows_cfg["items"]]
-    else:
-        labels = list(stats_map.keys())
+    各行の集計値から Markdown テーブルを生成する。
+    項目に開催条件が注入されている場合は、表の直下に開催条件の注記を出力する。
+    項目に note がある場合は、その直下に出力する。
 
-    if rows_cfg.get("hide_empty"):
-        labels = [label for label in labels if stats_map.get(label, RowStats()).total > 0]
+    Args:
+        table (ItemTable): 出力する項目の表。
+        with_entries (bool): 該当馬列を付けるか。
 
-    display_map: dict[str, str] = metric_cfg.get("display_map", {})
-
+    Returns:
+        str: ### ヘッダーから始まる Markdown テーブル文字列。
+    """
+    item = table.item
+    header_cells = [item.name, "着度数", "勝率", "複率", "単回", "複回"]
+    if with_entries:
+        header_cells.append("該当馬")
     lines = [
         f"### {item.name}",
         "",
-        f"| {item.name} | 着度数 | 勝率 | 複率 | 単回 | 複回 |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| " + " | ".join(header_cells) + " |",
+        "| " + " | ".join(["---"] * len(header_cells)) + " |",
     ]
-    for label in labels:
-        display_label = display_map.get(label, label)
-        stats = stats_map.get(label, RowStats())
-        lines.append(_format_table_row(display_label, stats))
+    for label in table.rows:
+        horses: str | None = None
+        if with_entries:
+            horses = ", ".join(str(num) for num in table.horse_nums(label))
+        lines.append(_format_table_row(table.display_name(label), table.stats[label], horses))
 
-    if add_other_row:
-        other_stats = _aggregate_other_stats(stats_map, set(labels))
-        lines.append(_format_table_row(OTHER_LABEL, other_stats))
-
-    notes = [format_condition_note(item.condition), metric_cfg.get("note", "")]
+    notes = [format_condition_note(item.condition), item.config.get("note", "")]
     for note in notes:
         if note:
             lines.append("")
@@ -252,24 +378,26 @@ def _aggregate_other_stats(
     return other
 
 
-def _format_table_row(label: str, s: RowStats) -> str:
+def _format_table_row(label: str, s: RowStats, horses: str | None = None) -> str:
     """Markdown テーブルの1行文字列を生成する。
 
     Args:
         label (str): 行ラベル（1列目に表示する文字列）。
         s (RowStats): 行の集計値。
+        horses (str | None): 該当馬列に書く馬番。None の場合は該当馬列を付けない。
 
     Returns:
         str: | label | 着度数 | 勝率 | 複率 | 単回 | 複回 | 形式の文字列。
+            horses がある場合は末尾に該当馬の列が付く。
     """
     win_str = _format_percent(s.first, s.total)
     place_str = _format_percent(s.first + s.second + s.third, s.total)
     tansho_str = f"{round(s.tansho_kaishuu)}%" if s.total > 0 else "-"
     fukusho_str = f"{round(s.fukusho_kaishuu)}%" if s.total > 0 else "-"
-    return (
-        f"| {label} | {_format_chakudo(s)}"
-        f" | {win_str} | {place_str} | {tansho_str} | {fukusho_str} |"
-    )
+    cells = [label, _format_chakudo(s), win_str, place_str, tansho_str, fukusho_str]
+    if horses is not None:
+        cells.append(horses)
+    return "| " + " | ".join(cells) + " |"
 
 
 def _format_chakudo(s: RowStats) -> str:

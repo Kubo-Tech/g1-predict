@@ -46,6 +46,10 @@ items:
     hide_if_empty: true
     source: {type: gate_number}
     rows: {type: fixed, items: [{label: "1枠", op: "==", value: 1}]}
+  脚質:
+    uses_race_result: true
+    source: {type: running_style}
+    rows: {type: fixed, items: [{label: "逃げ", op: "==", value: "1"}]}
   父実績:
     rows:
       type: boolean_multi
@@ -83,9 +87,11 @@ def test_load_trend_catalog_reads_category(trends_dir: Path) -> None:
     catalog = load_trend_catalog(str(trends_dir))
     category = catalog["基本項目"]
     assert category.description == "同じG1レースの過去{years}年における傾向"
-    assert list(category.items) == ["人気", "枠順", "父実績"]
+    assert list(category.items) == ["人気", "枠順", "脚質", "父実績"]
     assert category.items["人気"].conditionable is False
     assert category.items["枠順"].conditionable is True
+    assert category.items["人気"].uses_race_result is False
+    assert category.items["脚質"].uses_race_result is True
 
 
 def test_load_trend_catalog_ignores_non_yml_files(trends_dir: Path) -> None:
@@ -167,10 +173,11 @@ def test_build_trend_categories_does_not_modify_catalog(trends_dir: Path) -> Non
 
 
 def test_build_trend_categories_item_config_excludes_conditionable(trends_dir: Path) -> None:
-    """項目の定義には conditionable を含めず、note と hide_if_empty を含める。"""
+    """項目の定義には conditionable・uses_race_result を含めず、note と hide_if_empty を含める。"""
     catalog = load_trend_catalog(str(trends_dir))
     item = build_trend_categories({"基本項目": ["枠順"]}, catalog, "宝塚記念", 2200)[0].items[0]
     assert "conditionable" not in item.config
+    assert "uses_race_result" not in item.config
     assert item.config["note"] == "※注記"
     assert item.config["hide_if_empty"] is True
 
@@ -242,6 +249,27 @@ def test_shared_catalog_conditionable_items() -> None:
         "上がり3F順位",
         "前走上がり3F順位",
     ]
+
+
+def test_build_trend_categories_carries_uses_race_result(trends_dir: Path) -> None:
+    """今走の結果で決まる項目は TrendItem にその旨が引き継がれる。"""
+    catalog = load_trend_catalog(str(trends_dir))
+    items = build_trend_categories({"基本項目": ["人気", "脚質"]}, catalog, "宝塚記念", 2200)[
+        0
+    ].items
+    assert [item.uses_race_result for item in items] == [False, True]
+
+
+def test_shared_catalog_uses_race_result_items() -> None:
+    """今走の結果で決まる項目は脚質・4角通過順位・上がり3F順位。"""
+    catalog = load_trend_catalog(_TRENDS_DIR)
+    names = [
+        name
+        for category in catalog.values()
+        for name, item in category.items.items()
+        if item.uses_race_result
+    ]
+    assert names == ["脚質", "4角通過順位", "上がり3F順位"]
 
 
 def test_shared_catalog_rows_use_known_keys() -> None:
