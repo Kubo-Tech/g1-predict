@@ -5,9 +5,14 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
-from mykeibadb.analytics import ChakudoResult, ChakudoRow, RaceCondition
+from mykeibadb.analytics import ChakudoResult, ChakudoRow, RaceColFilter, RaceCondition
 
 from g1_predict.modules.gen_trend._trend_models import RowStats
+from g1_predict.modules.gen_trend._trend_sql_exprs import (
+    BIRTH_MONTH_EXPR,
+    CORNER4_JUNI_EXPR,
+    HORSE_WEIGHT_EXPR,
+)
 from g1_predict.modules.gen_trend._trend_stats import (
     _AGARI_3F_RANK_EXPR,
     _chakudo_row_to_stats,
@@ -139,6 +144,13 @@ def test_merge_stats_sums_chakujun_counts() -> None:
         ("1", "in", ["1", "2"], True),
         ("3", "in", ["1", "2"], False),
         ("01", "==", 1, True),
+        ("2", "between", [2, 5], True),
+        ("5", "between", [2, 5], True),
+        ("6", "between", [2, 5], False),
+        ("1", "between", [2, 5], False),
+        ("-200", "<", 0, True),
+        ("0", "==", 0, True),
+        ("None", "between", [2, 5], False),
     ],
 )
 def test_group_matches(group_str: str, op: str, threshold: object, expected: bool) -> None:
@@ -192,11 +204,21 @@ def test_group_by_rows_cfg_fixed_in_merges() -> None:
     assert "7" not in stats
 
 
-def test_group_by_rows_cfg_failed_result_returns_empty() -> None:
-    """success=False の場合は空辞書を返す。"""
-    rows_cfg = {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]}
-    result = ChakudoResult(success=False, error="DB error")
-    assert _group_by_rows_cfg(result, rows_cfg) == {}
+def test_group_by_rows_cfg_fixed_between() -> None:
+    """fixed 型の between 条件で下限・上限を含む範囲のグループが合算される。"""
+    rows_cfg = {
+        "type": "fixed",
+        "items": [{"label": "2-5番手", "op": "between", "value": [2, 5]}],
+    }
+    result = _make_chakudo_result([
+        _make_chakudo_row(group="1", wins=9, total=10),
+        _make_chakudo_row(group="2", wins=1, total=5),
+        _make_chakudo_row(group="5", wins=2, total=5),
+        _make_chakudo_row(group="6", wins=3, total=5),
+    ])
+    stats = _group_by_rows_cfg(result, rows_cfg)
+    assert stats["2-5番手"].first == 3
+    assert stats["2-5番手"].total == 10
 
 
 # --- compute_stats ---
@@ -215,7 +237,7 @@ def test_compute_stats_gate_number_calls_analyze_chakudo() -> None:
             "source": {"type": "gate_number"},
             "rows": {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]},
         }
-        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
     assert "1枠" in stats
 
 
@@ -237,7 +259,7 @@ def test_compute_stats_prev_race_col_builds_fixed_group_by() -> None:
                 "items": [{"label": "逃げ", "op": "==", "value": "1"}],
             },
         }
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert group_by.kind == "fixed"
@@ -277,7 +299,7 @@ def test_compute_stats_tokubetsu_race_finish_cumulative() -> None:
                 ],
             },
         }
-        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert group_by.kind == "history"
@@ -330,7 +352,7 @@ def test_compute_stats_chokyo_match_days_classifies_any_match_none_match_empty()
         return_value=mock_result,
     ) as mock_analyze:
         stats = compute_stats(
-            _chokyo_match_days_metric_cfg(), _make_manager(), _make_condition()
+            _chokyo_match_days_metric_cfg(), _make_manager(), _make_condition(), []
         )
 
     _, _, _, group_by = mock_analyze.call_args[0]
@@ -357,7 +379,7 @@ def test_compute_stats_chokyo_match_days_merges_rows_with_same_label() -> None:
         return_value=mock_result,
     ):
         stats = compute_stats(
-            _chokyo_match_days_metric_cfg(), _make_manager(), _make_condition()
+            _chokyo_match_days_metric_cfg(), _make_manager(), _make_condition(), []
         )
 
     assert stats["該当"].total == 6
@@ -391,7 +413,7 @@ def test_compute_stats_chokyo_match_days_unsupported_op_raises() -> None:
         return_value=mock_result,
     ):
         with pytest.raises(ValueError, match="op"):
-            compute_stats(metric_cfg, _make_manager(), _make_condition())
+            compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
 
 def test_compute_stats_prev_race_grade_groups_by_grade_code() -> None:
@@ -422,7 +444,7 @@ def test_compute_stats_prev_race_grade_groups_by_grade_code() -> None:
                 ],
             },
         }
-        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert group_by.kind == "history"
@@ -461,7 +483,7 @@ def test_compute_stats_prev_race_finish_groups_by_kakutei_chakujun() -> None:
                 ],
             },
         }
-        stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
+        stats = compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert isinstance(group_by.source, AttrSource)
@@ -490,7 +512,7 @@ def test_compute_stats_prev_race_finish_by_grade_with_grade_codes() -> None:
                 "items": [{"label": "1着", "op": "==", "value": 1}],
             },
         }
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert isinstance(group_by.source, AttrSource)
@@ -519,7 +541,7 @@ def test_compute_stats_prev_race_finish_by_grade_with_exclude_grade_codes() -> N
                 "items": [{"label": "1着", "op": "==", "value": 1}],
             },
         }
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert isinstance(group_by.source, AttrSource)
@@ -542,7 +564,7 @@ def test_compute_stats_prev_race_finish_by_grade_both_grade_codes_raises() -> No
         },
     }
     with pytest.raises(ValueError, match="grade_codes と exclude_grade_codes"):
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
 
 def test_compute_stats_past_race_top_n_count_builds_fixed_group_by() -> None:
@@ -567,7 +589,7 @@ def test_compute_stats_past_race_top_n_count_builds_fixed_group_by() -> None:
                 "items": [{"label": "0勝", "op": "==", "value": 0}],
             },
         }
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert group_by.kind == "fixed"
@@ -598,7 +620,7 @@ def test_compute_stats_past_race_top_n_count_converts_filters_field_to_column() 
                 "items": [{"label": "0回", "op": "==", "value": 0}],
             },
         }
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     _, _, _, group_by = mock_analyze.call_args[0]
     assert isinstance(group_by.source, AttrSource)
@@ -620,7 +642,7 @@ def test_compute_stats_past_race_top_n_count_unsupported_field_raises() -> None:
         },
     }
     with pytest.raises(ValueError, match="未対応フィールド"):
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
 
 def test_compute_stats_past_race_top_n_count_top_n_less_than_one_raises() -> None:
@@ -633,17 +655,17 @@ def test_compute_stats_past_race_top_n_count_top_n_less_than_one_raises() -> Non
         },
     }
     with pytest.raises(ValueError, match="top_n は 1 以上"):
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
 
-def test_compute_stats_unknown_type_returns_empty() -> None:
-    """未知の source.type は空辞書を返す。"""
+def test_compute_stats_unknown_type_raises() -> None:
+    """未知の source.type は ValueError になる。"""
     metric_cfg = {
         "source": {"type": "unknown_type"},
         "rows": {"type": "dynamic"},
     }
-    stats = compute_stats(metric_cfg, _make_manager(), _make_condition())
-    assert stats == {}
+    with pytest.raises(ValueError, match="unknown_type"):
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
 
 @pytest.mark.parametrize(
@@ -656,6 +678,9 @@ def test_compute_stats_unknown_type_returns_empty() -> None:
         ("popularity", "u.tansho_ninkijun"),
         ("running_style", "u.kyakushitsu_hantei"),
         ("agari_3f_rank", _AGARI_3F_RANK_EXPR),
+        ("corner4_juni", CORNER4_JUNI_EXPR),
+        ("horse_weight", HORSE_WEIGHT_EXPR),
+        ("birth_month", BIRTH_MONTH_EXPR),
     ],
 )
 def test_compute_stats_race_col_map(src_type: str, expected_column: str) -> None:
@@ -673,7 +698,7 @@ def test_compute_stats_race_col_map(src_type: str, expected_column: str) -> None
             "source": {"type": src_type},
             "rows": {"type": "fixed", "items": [{"label": "x", "op": "==", "value": 1}]},
         }
-        compute_stats(metric_cfg, _make_manager(), _make_condition())
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
 
     assert mock_analyze.call_count == 1
     _, _, _, group_by = mock_analyze.call_args[0]
@@ -688,10 +713,11 @@ def test_compute_stats_race_col_map(src_type: str, expected_column: str) -> None
     [
         ("<", 1600, (0, 1599)),
         (">", 1600, (1601, 9999)),
+        ("between", [2, 5], (2, 5)),
     ],
 )
-def test_yaml_rows_to_rowsdef_lt_gt(op: str, value: int, expected: tuple[int, int]) -> None:
-    """< / > op が (lo, hi) タプルに正しく変換される。"""
+def test_yaml_rows_to_rowsdef_lt_gt(op: str, value: object, expected: tuple[int, int]) -> None:
+    """< / > / between op が (lo, hi) タプルに正しく変換される。"""
     rows_cfg = {
         "type": "fixed",
         "items": [{"label": "test", "op": op, "value": value}],
@@ -730,3 +756,173 @@ def test_get_juusho_race_names_empty_when_no_races() -> None:
 
     assert result == set()
     assert manager.fetch_dataframe.call_count == 1
+
+
+# --- compute_stats: 集計対象レースの過去走から値を求める source.type ---
+
+
+def _make_past_races_manager(race_codes: list[str]) -> MagicMock:
+    """集計対象レースのレースコードを返す ConnectionManager のモックを生成する。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame({"race_code": race_codes})
+    return manager
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        {"type": "prev_corner4_juni"},
+        {"type": "prev_distance_diff"},
+        {"type": "prev_race_class"},
+        {"type": "prev_race_finish_by_class", "race_class": "オープン"},
+        {"type": "transport"},
+        {"type": "good_baba_top3_count"},
+        {"type": "soft_baba_top3_count"},
+        {"type": "debut_month"},
+    ],
+)
+def test_compute_stats_history_expr_embeds_race_codes_in_race_col(src: dict[str, Any]) -> None:
+    """過去走から値を求める source.type は、レースコードを埋め込んだ race_col で集計する。"""
+    from unittest.mock import patch
+
+    race_code = "2025092806040911"
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=5)])
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": src,
+            "rows": {"type": "fixed", "items": [{"label": "x", "op": "==", "value": 1}]},
+        }
+        compute_stats(metric_cfg, _make_past_races_manager([race_code]), _make_condition(), [])
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by.kind == "race_col"
+    assert race_code in group_by.column
+
+
+def test_compute_stats_prev_race_finish_by_class_without_race_class_raises() -> None:
+    """prev_race_finish_by_class に race_class が無い場合は ValueError になる。"""
+    metric_cfg = {
+        "source": {"type": "prev_race_finish_by_class"},
+        "rows": {"type": "dynamic"},
+    }
+    with pytest.raises(ValueError, match="race_class"):
+        compute_stats(
+            metric_cfg, _make_past_races_manager(["2025092806040911"]), _make_condition(), []
+        )
+
+
+def test_compute_stats_passes_filters_to_analyze_chakudo() -> None:
+    """追加のエントリフィルタが analyze_chakudo の第2引数に渡る。"""
+    from unittest.mock import patch
+
+    entry_filters = [RaceColFilter(column="u.race_code", values=["2025061509030411"])]
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=5)])
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {"type": "gate_number"},
+            "rows": {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]},
+        }
+        compute_stats(metric_cfg, _make_manager(), _make_condition(), entry_filters)
+
+    _, filters, _, _ = mock_analyze.call_args[0]
+    assert filters == entry_filters
+
+
+def test_compute_stats_failed_analysis_raises_runtime_error() -> None:
+    """集計に失敗した場合は RuntimeError になる。"""
+    from unittest.mock import patch
+
+    mock_result = ChakudoResult(success=False, error="DB error")
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ):
+        metric_cfg = {
+            "source": {"type": "gate_number"},
+            "rows": {"type": "fixed", "items": [{"label": "1枠", "op": "==", "value": 1}]},
+        }
+        with pytest.raises(RuntimeError, match="DB error"):
+            compute_stats(metric_cfg, _make_manager(), _make_condition(), [])
+
+
+def test_compute_stats_tokubetsu_race_finish_uses_target_race_number() -> None:
+    """tokubetsu_race_finish の特別競走番号を省略すると対象レースの特別競走番号を使う。"""
+    from unittest.mock import patch
+
+    mock_result = _make_chakudo_result([_make_chakudo_row(group="1", wins=1, total=1)])
+    condition = RaceCondition(keibajo_codes=["06"], tokubetsu_kyoso_bango="0016")
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ) as mock_analyze:
+        metric_cfg = {
+            "source": {"type": "tokubetsu_race_finish", "year_offset": 1},
+            "rows": {"type": "fixed", "items": [{"label": "3着以内", "op": "<=", "value": 3}]},
+        }
+        compute_stats(metric_cfg, _make_manager(), condition, [])
+
+    _, _, _, group_by = mock_analyze.call_args[0]
+    assert group_by.source.tokubetsu_kyoso_bango == "0016"
+
+
+def test_compute_stats_tokubetsu_race_finish_without_race_number_raises() -> None:
+    """特別競走番号が source にも condition にも無い場合は ValueError になる。"""
+    metric_cfg = {
+        "source": {"type": "tokubetsu_race_finish", "year_offset": 1},
+        "rows": {"type": "dynamic"},
+    }
+    with pytest.raises(ValueError, match="特別競走番号"):
+        compute_stats(metric_cfg, _make_manager(), RaceCondition(keibajo_codes=["06"]), [])
+
+
+def test_compute_stats_boolean_multi_uses_race_name_and_kyori_from_source() -> None:
+    """boolean_multi は source の race_name・kyori で父馬の勝ち鞍を探す。"""
+    from unittest.mock import patch
+
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame({"sire_name": ["ディープインパクト"]})
+    mock_result = _make_chakudo_result(
+        [_make_chakudo_row(group="ディープインパクト", wins=2, total=10)]
+    )
+    metric_cfg = {
+        "rows": {
+            "type": "boolean_multi",
+            "items": [
+                {
+                    "label": "父東京優駿勝ち",
+                    "source": {
+                        "type": "sire_race_condition_finisher",
+                        "race_name": "東京優駿",
+                        "years": 30,
+                    },
+                },
+                {
+                    "label": "父2400mG1勝ち",
+                    "source": {
+                        "type": "sire_race_condition_finisher",
+                        "grade_codes": ["A"],
+                        "kyori": "2400",
+                        "years": 30,
+                    },
+                },
+            ],
+        }
+    }
+    with patch(
+        "g1_predict.modules.gen_trend._trend_stats.analyze_chakudo",
+        return_value=mock_result,
+    ):
+        stats = compute_stats(metric_cfg, manager, _make_condition(), [])
+
+    sql_calls = manager.fetch_dataframe.call_args_list
+    assert "TRIM(r.kyosomei_hondai) = %s" in sql_calls[0][0][0]
+    assert "東京優駿" in sql_calls[0][1]["params"]
+    assert 2400 in sql_calls[1][1]["params"]
+    assert stats["父東京優駿勝ち"].first == 2
+    assert stats["父2400mG1勝ち"].first == 2

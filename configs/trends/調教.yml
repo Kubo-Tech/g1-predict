@@ -1,0 +1,16 @@
+name: 調教
+description: 調教の内容
+items:
+  当週/1週前坂路ラスト2F24.0秒未満:
+    source:
+      type: chokyo_match_days
+      chokyo_condition:
+        - {course: hanro, metric: gokei, furlong: 2, max_value: 239}
+      days_from: 1
+      days_to: 13
+    rows:
+      type: fixed
+      items:
+        - {label: "該当", op: any_match}
+        - {label: "非該当", op: none_match}
+        - {label: "坂路記録なし", op: empty}

@@ -1,19 +1,19 @@
 """_trend_loader の単体テスト。"""
 
-import os
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-import yaml
 from mykeibadb.analytics import RaceCondition
 
-from g1_predict.modules.gen_trend._trend_loader import build_metric_condition, build_race_context
+from g1_predict.modules.gen_trend._trend_loader import (
+    build_race_context,
+    decide_trend_years,
+    fetch_past_races,
+)
 from g1_predict.modules.gen_trend._trend_models import TREND_YEARS
 
-_CONFIGS_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "configs")
-)
+_LOADER = "g1_predict.modules.gen_trend._trend_loader"
 
 
 def _make_race_info(
@@ -22,6 +22,7 @@ def _make_race_info(
     track_code: str = "10",
     kaisai_nen: int = 2026,
     tokubetsu_kyoso_bango: str = "0008",
+    kyosomei_hondai: str = "東京優駿",
 ) -> pd.DataFrame:
     """build_race_context 用の race_info DataFrame を生成する。"""
     return pd.DataFrame({
@@ -30,201 +31,196 @@ def _make_race_info(
         "track_code": [track_code],
         "kaisai_nen": [kaisai_nen],
         "tokubetsu_kyoso_bango": [tokubetsu_kyoso_bango],
+        "kyosomei_hondai": [kyosomei_hondai],
     })
 
 
-def test_build_race_context_returns_correct_keibajo_codes() -> None:
-    """keibajo_codes が RaceCondition に正しく設定される。"""
-    race_info = _make_race_info(keibajo_code="05")
+def _make_past_races(years: list[int], grade_codes: list[str]) -> pd.DataFrame:
+    """fetch_past_races の戻り値に相当する DataFrame を生成する。"""
+    return pd.DataFrame({
+        "race_code": [f"{year}0527050212{i:02d}" for i, year in enumerate(years)],
+        "kaisai_nen": [str(year) for year in years],
+        "kaisai_gappi": ["0527"] * len(years),
+        "keibajo_code": ["05"] * len(years),
+        "grade_code": grade_codes,
+        "course_kubun": ["A"] * len(years),
+    })
+
+
+def _make_base_condition() -> RaceCondition:
+    """decide_trend_years 用の基本 RaceCondition を生成する。"""
+    return RaceCondition(
+        keibajo_codes=["05"], kyori=2400, shiba_da="芝", tokubetsu_kyoso_bango="0008"
+    )
+
+
+# --- build_race_context ---
+
+
+def _build_context(race_info: pd.DataFrame, first_year: int = 2016, years: int = 10) -> tuple:
+    """ConnectionManager と集計年数の決定をモックして build_race_context を呼ぶ。"""
+    mock_manager = MagicMock()
+    past_races = _make_past_races([2016, 2017, 2018], ["A", "A", "A"])
     with (
-        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
+        patch(f"{_LOADER}.ConfigManager"),
+        patch(f"{_LOADER}.ConnectionManager", return_value=mock_manager),
+        patch(f"{_LOADER}.decide_trend_years", return_value=(first_year, years)),
+        patch(f"{_LOADER}.fetch_past_races", return_value=past_races),
     ):
-        _, condition = build_race_context("2026050505010101", race_info)
+        return build_race_context(race_info), mock_manager
+
+
+def test_build_race_context_returns_correct_condition() -> None:
+    """RaceCondition に競馬場・距離・芝ダ・特別競走番号・年の範囲が設定される。"""
+    context, _ = _build_context(_make_race_info(), first_year=2017, years=9)
+    condition = context.condition
     assert condition.keibajo_codes == ["05"]
-
-
-def test_build_race_context_returns_correct_kyori() -> None:
-    """kyori が RaceCondition に正しく設定される。"""
-    race_info = _make_race_info(kyori=2400)
-    with (
-        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
-    ):
-        _, condition = build_race_context("2026050505010101", race_info)
     assert condition.kyori == 2400
-
-
-def test_build_race_context_shiba_track_code() -> None:
-    """芝トラックコードで shiba_da が '芝' になる。"""
-    race_info = _make_race_info(track_code="10")
-    with (
-        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
-    ):
-        _, condition = build_race_context("2026050505010101", race_info)
     assert condition.shiba_da == "芝"
+    assert condition.tokubetsu_kyoso_bango == "0008"
+    assert condition.year_from == "2017"
+    assert condition.year_to == "2025"
+
+
+def test_build_race_context_returns_scope() -> None:
+    """集計対象の初年・年数・レース数と対象レースの情報を返す。"""
+    context, mock_manager = _build_context(_make_race_info(), first_year=2017, years=9)
+    assert context.manager is mock_manager
+    assert context.race_year == 2026
+    assert context.race_name == "東京優駿"
+    assert context.kyori == 2400
+    assert context.keibajo_code == "05"
+    assert context.shiba_da == "芝"
+    assert context.first_year == 2017
+    assert context.years == 9
+    assert context.race_count == 3
 
 
 def test_build_race_context_dirt_track_code() -> None:
     """ダートトラックコードで shiba_da が 'ダ' になる。"""
-    race_info = _make_race_info(track_code="23")
-    with (
-        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
-    ):
-        _, condition = build_race_context("2026050505010101", race_info)
-    assert condition.shiba_da == "ダ"
+    context, _ = _build_context(_make_race_info(track_code="23"))
+    assert context.shiba_da == "ダ"
+    assert context.condition.shiba_da == "ダ"
 
 
-def test_build_race_context_year_range() -> None:
-    """year_from / year_to が TREND_YEARS 分遡った範囲になる。"""
-    race_info = _make_race_info(kaisai_nen=2026)
-    with (
-        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager"),
-    ):
-        _, condition = build_race_context("2026050505010101", race_info)
-    assert condition.year_from == str(2026 - TREND_YEARS)
-    assert condition.year_to == "2025"
+def test_build_race_context_zero_fills_tokubetsu_kyoso_bango() -> None:
+    """特別競走番号は4桁にゼロ埋めされる。"""
+    context, _ = _build_context(_make_race_info(tokubetsu_kyoso_bango="16"))
+    assert context.condition.tokubetsu_kyoso_bango == "0016"
 
 
-def test_build_race_context_returns_connection_manager() -> None:
-    """ConnectionManager インスタンスを返す。"""
-    race_info = _make_race_info()
-    mock_manager = MagicMock()
-    mock_cm_class = MagicMock(return_value=mock_manager)
-    with (
-        patch("g1_predict.modules.gen_trend._trend_loader.ConfigManager"),
-        patch("g1_predict.modules.gen_trend._trend_loader.ConnectionManager", mock_cm_class),
-    ):
-        manager, _ = build_race_context("2026050505010101", race_info)
-    assert manager is mock_manager
+def test_build_race_context_unknown_track_code_raises() -> None:
+    """芝ダを判定できない track_code は ValueError になる。"""
+    with pytest.raises(ValueError, match="track_code"):
+        build_race_context(_make_race_info(track_code="99"))
 
 
-# --- build_metric_condition ---
+# --- decide_trend_years ---
 
 
-def _make_base_condition() -> RaceCondition:
-    """build_metric_condition テスト用の基本 RaceCondition を生成する。"""
-    return RaceCondition(
-        keibajo_codes=["05"],
-        kyori=2400,
+def _decide(years: list[int], grades: list[str]) -> tuple[int, int]:
+    """特別競走番号の過去の開催をモックして decide_trend_years を呼ぶ。"""
+    with patch(f"{_LOADER}.fetch_past_races", return_value=_make_past_races(years, grades)):
+        return decide_trend_years(MagicMock(), 2026, _make_base_condition())
+
+
+def test_decide_trend_years_all_g1_uses_trend_years() -> None:
+    """過去 TREND_YEARS 年より前からG1なら、TREND_YEARS 年前から集計する。"""
+    years = list(range(2000, 2026))
+    assert _decide(years, ["A"] * len(years)) == (2016, TREND_YEARS)
+
+
+def test_decide_trend_years_starts_from_first_g1_year() -> None:
+    """期間内にG1になった場合は、G1になった最初の年から集計する。"""
+    years = list(range(2000, 2026))
+    grades = ["B"] * 17 + ["A"] * 9
+    assert _decide(years, grades) == (2017, 9)
+
+
+def test_decide_trend_years_new_g1_without_previous_editions() -> None:
+    """G1として新設されたレースは、最初の開催年から集計する。"""
+    assert _decide([2020, 2021, 2022, 2023, 2024, 2025], ["A"] * 6) == (2020, 6)
+
+
+def test_decide_trend_years_skips_years_without_editions() -> None:
+    """最後のG1でない開催と最初のG1の開催の間に休止の年があれば、最初のG1の年から集計する。"""
+    years = [2010, 2011, 2012, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    grades = ["B", "B", "B"] + ["A"] * 8
+    assert _decide(years, grades) == (2018, 8)
+
+
+def test_decide_trend_years_ignores_missing_years_after_g1() -> None:
+    """G1になった後に行われなかった年があっても、集計期間は縮めない。"""
+    years = [2000, 2001, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2025]
+    assert _decide(years, ["A"] * len(years)) == (2016, 10)
+
+
+def test_decide_trend_years_uses_tokubetsu_number_only() -> None:
+    """G1になった年は、競馬場・距離・芝ダによらず特別競走番号と前年までで判定する。"""
+    with patch(
+        f"{_LOADER}.fetch_past_races", return_value=_make_past_races([2025], ["A"])
+    ) as mock_fetch:
+        decide_trend_years(MagicMock(), 2026, _make_base_condition())
+    history = mock_fetch.call_args[0][1]
+    assert history.tokubetsu_kyoso_bango == "0008"
+    assert history.keibajo_codes is None
+    assert history.kyori is None
+    assert history.shiba_da is None
+    assert history.year_from is None
+    assert history.year_to == "2025"
+
+
+def test_decide_trend_years_no_g1_before_race_year_raises() -> None:
+    """前年までにG1として行われていない場合（G1になった初年）は ValueError になる。"""
+    with patch(f"{_LOADER}.fetch_past_races", return_value=_make_past_races([2025], ["B"])):
+        with pytest.raises(ValueError, match="G1"):
+            decide_trend_years(MagicMock(), 2026, _make_base_condition())
+
+
+# --- fetch_past_races ---
+
+
+def test_fetch_past_races_passes_condition_params() -> None:
+    """競馬場・距離・芝ダ・特別競走番号・年の範囲がSQLパラメータに渡る。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame()
+    condition = RaceCondition(
+        keibajo_codes=["06"],
+        kyori=1200,
         shiba_da="芝",
+        tokubetsu_kyoso_bango="0016",
         year_from="2016",
         year_to="2025",
-        tokubetsu_kyoso_bango="0008",
     )
+    fetch_past_races(manager, condition)
+
+    sql = manager.fetch_dataframe.call_args[0][0]
+    params = manager.fetch_dataframe.call_args[1]["params"]
+    assert "r.keibajo_code = ANY(%s)" in sql
+    assert params[0] == ["06"]
+    assert params[1] == 1200
+    assert "10" in params[2] and "59" in params[2] and "23" not in params[2]
+    assert params[3:] == ("0016", "2016", "2025")
 
 
-def test_build_metric_condition_none_returns_base_condition() -> None:
-    """condition_cfg が None の場合は base_condition をそのまま返す。"""
-    base_condition = _make_base_condition()
-    result = build_metric_condition(base_condition, 2026, None)
-    assert result == base_condition
+def test_fetch_past_races_filters_by_nichime_and_baba() -> None:
+    """開催日目と、芝ダに応じた馬場状態で絞り込む。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame()
+    fetch_past_races(manager, RaceCondition(kaisai_nichime=[4, 8], babajotai_codes=["1"]))
+
+    sql = manager.fetch_dataframe.call_args[0][0]
+    params = manager.fetch_dataframe.call_args[1]["params"]
+    assert "TRIM(r.kaisai_nichime)::INTEGER = ANY(%s)" in sql
+    assert "TRIM(r.dirt_babajotai_code) ELSE TRIM(r.shiba_babajotai_code)" in sql
+    assert params == ([4, 8], ["1"])
 
 
-def test_build_metric_condition_overrides_years() -> None:
-    """years 指定時に year_from / year_to が再計算される。"""
-    base_condition = _make_base_condition()
-    result = build_metric_condition(base_condition, 2026, {"years": 5})
-    assert result.year_from == "2021"
-    assert result.year_to == "2025"
+def test_fetch_past_races_without_condition_has_no_filter() -> None:
+    """条件が無い場合は絞り込まない。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame()
+    fetch_past_races(manager, RaceCondition())
 
-
-def test_build_metric_condition_default_years_is_trend_years() -> None:
-    """years 未指定時は TREND_YEARS 分遡る。"""
-    base_condition = _make_base_condition()
-    result = build_metric_condition(base_condition, 2026, {"keibajo_codes": ["09"]})
-    assert result.year_from == str(2026 - TREND_YEARS)
-    assert result.year_to == "2025"
-
-
-def test_build_metric_condition_overrides_keibajo_codes_kaisai_nichime_babajotai_codes() -> None:
-    """keibajo_codes / kaisai_nichime / babajotai_codes が condition に反映される。"""
-    base_condition = _make_base_condition()
-    result = build_metric_condition(
-        base_condition,
-        2026,
-        {"keibajo_codes": ["09"], "kaisai_nichime": [4], "babajotai_codes": ["1"]},
-    )
-    assert result.keibajo_codes == ["09"]
-    assert result.kaisai_nichime == [4]
-    assert result.babajotai_codes == ["1"]
-
-
-def test_build_metric_condition_keeps_base_fields() -> None:
-    """condition_cfg に無いフィールドは base_condition の値を維持する。"""
-    base_condition = _make_base_condition()
-    result = build_metric_condition(base_condition, 2026, {"years": 5})
-    assert result.keibajo_codes == ["05"]
-    assert result.kyori == 2400
-    assert result.shiba_da == "芝"
-    assert result.tokubetsu_kyoso_bango == "0008"
-
-
-def test_build_metric_condition_years_less_than_one_raises() -> None:
-    """years が1未満の場合は ValueError が発生する。"""
-    base_condition = _make_base_condition()
-    with pytest.raises(ValueError, match="years"):
-        build_metric_condition(base_condition, 2026, {"years": 0})
-
-
-# --- configs/宝塚記念/trends.yml ---
-
-
-def test_takarazuka_yaml_loads_all_trend_categories() -> None:
-    """宝塚記念/trends.yml が全カテゴリを欠損なく読み込める。"""
-    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念", "trends.yml")
-    with open(config_path, encoding="utf-8") as f:
-        trends = yaml.safe_load(f)
-
-    assert set(trends.keys()) == {"出走馬傾向", "騎手傾向", "生産者傾向", "血統傾向"}
-
-    metric_names = [m["name"] for m in trends["出走馬傾向"]]
-    assert metric_names == [
-        "枠順",
-        "人気",
-        "脚質",
-        "前走脚質",
-        "上がり3F順位",
-        "前走上がり3F順位",
-        "所属",
-        "馬齢",
-        "性別",
-        "前走レース",
-        "前走クラス",
-        "前走着順",
-        "前走G1着順",
-        "前走G2着順",
-        "前走G3着順",
-        "前走非重賞着順",
-        "前走距離",
-        "阪神重賞好走実績",
-    ]
-
-
-def test_takarazuka_yaml_jockey_and_breeder_use_all_entries() -> None:
-    """宝塚記念/trends.yml の騎手・生産者が all_entries で今回出走対象を全表示する。"""
-    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念", "trends.yml")
-    with open(config_path, encoding="utf-8") as f:
-        trends = yaml.safe_load(f)
-
-    assert trends["騎手傾向"][0]["rows"] == {"type": "all_entries"}
-    assert trends["生産者傾向"][0]["rows"] == {"type": "all_entries"}
-
-
-def test_takarazuka_yaml_gate_number_condition_is_hanshin_4th_day_good_track() -> None:
-    """枠順は阪神4日目良馬場のみのconditionを持つ。"""
-    config_path = os.path.join(_CONFIGS_DIR, "宝塚記念", "trends.yml")
-    with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
-    gate_number_cfg = config["出走馬傾向"][0]
-    assert gate_number_cfg["name"] == "枠順"
-    assert gate_number_cfg["condition"] == {
-        "years": 10,
-        "keibajo_codes": ["09"],
-        "kaisai_nichime": [4],
-        "babajotai_codes": ["1"],
-    }
+    assert "WHERE TRUE" in manager.fetch_dataframe.call_args[0][0]
+    assert manager.fetch_dataframe.call_args[1]["params"] == ()

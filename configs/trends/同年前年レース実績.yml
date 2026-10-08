@@ -1,0 +1,17 @@
+name: 同年/前年レース実績
+description: 同年/前年の指定したレースでの実績
+items:
+  同年高松宮記念着順:
+    source:
+      type: tokubetsu_race_finish
+      tokubetsu_kyoso_bango: "0019"
+      year_offset: 0
+      absent_label: 出走無し
+    rows:
+      type: fixed
+      items:
+        - {label: "3着以内", op: "<=", value: 3}
+        - {label: "4着以内", op: "<=", value: 4}
+        - {label: "5着以内", op: "<=", value: 5}
+        - {label: "6着以下", op: ">=", value: 6}
+        - {label: "出走無し", op: "==", value: "出走無し"}

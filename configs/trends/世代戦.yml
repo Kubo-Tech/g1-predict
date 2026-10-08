@@ -1,0 +1,66 @@
+name: 世代戦
+description: 世代戦で有効となる傾向
+items:
+  デビュー競馬場:
+    source:
+      type: debut_venue
+      allowed_values: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]
+    display_map:
+      "01": 札幌
+      "02": 函館
+      "03": 福島
+      "04": 新潟
+      "05": 東京
+      "06": 中山
+      "07": 中京
+      "08": 京都
+      "09": 阪神
+      "10": 小倉
+    rows:
+      type: dynamic
+  デビュー月:
+    source: {type: debut_month}
+    rows:
+      type: fixed
+      items:
+        - {label: "1月", op: "==", value: 1}
+        - {label: "2月", op: "==", value: 2}
+        - {label: "3月", op: "==", value: 3}
+        - {label: "4月", op: "==", value: 4}
+        - {label: "5月", op: "==", value: 5}
+        - {label: "6月", op: "==", value: 6}
+        - {label: "7月", op: "==", value: 7}
+        - {label: "8月", op: "==", value: 8}
+        - {label: "9月", op: "==", value: 9}
+        - {label: "10月", op: "==", value: 10}
+        - {label: "11月", op: "==", value: 11}
+        - {label: "12月", op: "==", value: 12}
+  キャリア:
+    source: {type: career_count}
+    rows:
+      type: fixed
+      items:
+        - {label: "2戦以下", op: "<=", value: 2}
+        - {label: "3戦", op: "==", value: 3}
+        - {label: "4戦", op: "==", value: 4}
+        - {label: "5戦", op: "==", value: 5}
+        - {label: "6戦", op: "==", value: 6}
+        - {label: "7戦以上", op: ">=", value: 7}
+  誕生月:
+    source: {type: birth_month}
+    rows:
+      type: fixed
+      hide_empty: true
+      items:
+        - {label: "1月", op: "==", value: 1}
+        - {label: "2月", op: "==", value: 2}
+        - {label: "3月", op: "==", value: 3}
+        - {label: "4月", op: "==", value: 4}
+        - {label: "5月", op: "==", value: 5}
+        - {label: "6月", op: "==", value: 6}
+        - {label: "7月", op: "==", value: 7}
+        - {label: "8月", op: "==", value: 8}
+        - {label: "9月", op: "==", value: 9}
+        - {label: "10月", op: "==", value: 10}
+        - {label: "11月", op: "==", value: 11}
+        - {label: "12月", op: "==", value: 12}

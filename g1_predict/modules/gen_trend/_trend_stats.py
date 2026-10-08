@@ -1,12 +1,14 @@
 """過去レースの統計値を analytics 経由で計算するモジュール。"""
 
 import json
+from collections.abc import Callable
 from typing import Any
 
 from mykeibadb.analytics import (
     AttrSource,
     ChakudoResult,
     ChakudoRow,
+    EntryFilter,
     GroupBy,
     RaceCondition,
     Subject,
@@ -15,7 +17,21 @@ from mykeibadb.analytics import (
 )
 from mykeibadb.connection import ConnectionManager
 
+from ._trend_loader import fetch_past_races
 from ._trend_models import SIRE_YEARS, RowStats
+from ._trend_sql_exprs import (
+    BIRTH_MONTH_EXPR,
+    CORNER4_JUNI_EXPR,
+    HORSE_WEIGHT_EXPR,
+    build_debut_month_expr,
+    build_good_baba_top3_count_expr,
+    build_prev_corner4_juni_expr,
+    build_prev_distance_diff_expr,
+    build_prev_race_class_expr,
+    build_prev_race_finish_by_class_expr,
+    build_soft_baba_top3_count_expr,
+    build_transport_expr,
+)
 
 SUBJECT_MAP: dict[str, Subject] = {
     "jockey_name": Subject.KISHU,
@@ -39,6 +55,20 @@ _RACE_COL_MAP: dict[str, str] = {
     "horse_age": "u.barei",
     "sex": "u.seibetsu_code",
     "agari_3f_rank": _AGARI_3F_RANK_EXPR,
+    "corner4_juni": CORNER4_JUNI_EXPR,
+    "horse_weight": HORSE_WEIGHT_EXPR,
+    "birth_month": BIRTH_MONTH_EXPR,
+}
+
+# 集計対象レースの出走馬の過去走から値を求める source.type -> SQL 式の組み立て関数
+_HISTORY_EXPR_BUILDERS: dict[str, Callable[[list[str]], str]] = {
+    "prev_corner4_juni": build_prev_corner4_juni_expr,
+    "prev_distance_diff": build_prev_distance_diff_expr,
+    "prev_race_class": build_prev_race_class_expr,
+    "transport": build_transport_expr,
+    "good_baba_top3_count": build_good_baba_top3_count_expr,
+    "soft_baba_top3_count": build_soft_baba_top3_count_expr,
+    "debut_month": build_debut_month_expr,
 }
 
 # prev_race_grade / prev_race_finish / prev_race_finish_by_grade -> prev_race_col の column名
@@ -66,6 +96,7 @@ def compute_stats(
     metric_cfg: dict[str, Any],
     manager: ConnectionManager,
     condition: RaceCondition,
+    filters: list[EntryFilter],
 ) -> dict[str, RowStats]:
     """metric 設定に従って analytics からデータを取得し RowStats を返す。
 
@@ -76,30 +107,32 @@ def compute_stats(
         metric_cfg (dict[str, Any]): metric の YAML 設定dict。
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
+        filters (list[EntryFilter]): 追加のエントリフィルタ。
 
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
 
+    Raises:
+        ValueError: tokubetsu_race_finish の特別競走番号が condition にも source にも無い場合。
     """
     rows_cfg = metric_cfg["rows"]
 
     if rows_cfg.get("type") == "boolean_multi":
-        return _compute_sire_condition_stats(rows_cfg, manager, condition)
+        return _compute_sire_condition_stats(rows_cfg, manager, condition, filters)
 
     src = metric_cfg["source"]
     src_type = src.get("type", "")
 
-    if src_type in _RACE_COL_MAP:
-        result = analyze_chakudo(
-            manager, [], condition, GroupBy(kind="race_col", column=_RACE_COL_MAP[src_type])
+    race_col_expr = _build_race_col_expr(src, manager, condition)
+    if race_col_expr is not None:
+        result = _analyze(
+            manager, filters, condition, GroupBy(kind="race_col", column=race_col_expr)
         )
         return _group_by_rows_cfg(result, rows_cfg)
 
     if src_type in SUBJECT_MAP:
         subject = SUBJECT_MAP[src_type]
-        result = analyze_chakudo(
-            manager, [], condition, GroupBy(kind="subject", subject=subject)
-        )
+        result = _analyze(manager, filters, condition, GroupBy(kind="subject", subject=subject))
         return _chakudo_to_stats_map(result)
 
     if src_type in (
@@ -111,26 +144,32 @@ def compute_stats(
         "prev_race_col",
     ):
         group_by = _build_group_by(src, rows_cfg)
-        result = analyze_chakudo(manager, [], condition, group_by)
+        result = _analyze(manager, filters, condition, group_by)
         return _chakudo_to_stats_map(result)
 
     if src_type == "tokubetsu_race_finish":
+        if "tokubetsu_kyoso_bango" not in src:
+            if condition.tokubetsu_kyoso_bango is None:
+                raise ValueError(
+                    "tokubetsu_race_finish の特別競走番号が source にも condition にもありません。"
+                )
+            src = {**src, "tokubetsu_kyoso_bango": condition.tokubetsu_kyoso_bango}
         group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
-        result = analyze_chakudo(manager, [], condition, group_by)
+        result = _analyze(manager, filters, condition, group_by)
         return _group_by_rows_cfg(result, rows_cfg)
 
     if src_type == "chokyo_match_days":
         group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
-        result = analyze_chakudo(manager, [], condition, group_by)
+        result = _analyze(manager, filters, condition, group_by)
         return _group_by_chokyo_match_days_rows_cfg(result, rows_cfg)
 
     if src_type in _PREV_RACE_COL_TYPES:
         attr_source = AttrSource.from_dict(_convert_prev_race_source(src))
         group_by = GroupBy(kind="history", source=attr_source)
-        result = analyze_chakudo(manager, [], condition, group_by)
+        result = _analyze(manager, filters, condition, group_by)
         return _group_by_rows_cfg(result, rows_cfg)
 
-    return {}
+    raise ValueError(f"未対応の source.type です: {src_type!r}")
 
 
 def get_juusho_race_names(
@@ -159,6 +198,65 @@ def get_juusho_race_names(
         return set()
     race_codes = df["race_code"].astype(str).str.strip().tolist()
     return set(get_race_display_names(manager, race_codes).values())
+
+
+def _analyze(
+    manager: ConnectionManager,
+    filters: list[EntryFilter],
+    condition: RaceCondition,
+    group_by: GroupBy,
+) -> ChakudoResult:
+    """analyze_chakudo を実行し、集計に失敗した場合は例外を送出する。
+
+    Args:
+        manager (ConnectionManager): DB接続マネージャ。
+        filters (list[EntryFilter]): エントリフィルタ。
+        condition (RaceCondition): レース絞り込み条件。
+        group_by (GroupBy): グループ分け軸。
+
+    Returns:
+        ChakudoResult: 集計結果（success=True）。
+
+    Raises:
+        RuntimeError: 集計に失敗した場合。
+    """
+    result = analyze_chakudo(manager, filters, condition, group_by)
+    if not result.success:
+        raise RuntimeError(f"着度数の集計に失敗しました: {result.error}")
+    return result
+
+
+def _build_race_col_expr(
+    src: dict[str, Any],
+    manager: ConnectionManager,
+    condition: RaceCondition,
+) -> str | None:
+    """source から GroupBy(kind="race_col") に渡す SQL 式を組み立てる。
+
+    Args:
+        src (dict[str, Any]): source の YAML 設定dict。
+        manager (ConnectionManager): DB接続マネージャ。
+        condition (RaceCondition): レース絞り込み条件。
+
+    Returns:
+        str | None: SQL 式。race_col で集計しない source.type の場合は None。
+
+    Raises:
+        ValueError: prev_race_finish_by_class に race_class が無い場合。
+    """
+    src_type = src.get("type", "")
+    if src_type in _RACE_COL_MAP:
+        return _RACE_COL_MAP[src_type]
+    if src_type not in _HISTORY_EXPR_BUILDERS and src_type != "prev_race_finish_by_class":
+        return None
+
+    past_races = fetch_past_races(manager, condition)
+    race_codes = past_races["race_code"].tolist()
+    if src_type == "prev_race_finish_by_class":
+        if "race_class" not in src:
+            raise ValueError("prev_race_finish_by_class には race_class が必要です。")
+        return build_prev_race_finish_by_class_expr(race_codes, src["race_class"])
+    return _HISTORY_EXPR_BUILDERS[src_type](race_codes)
 
 
 def _src_cache_key(src: dict[str, Any]) -> tuple[Any, ...]:
@@ -264,6 +362,7 @@ def _compute_sire_condition_stats(
     rows_cfg: dict[str, Any],
     manager: ConnectionManager,
     condition: RaceCondition,
+    filters: list[EntryFilter],
 ) -> dict[str, RowStats]:
     """boolean_multi (sire_race_condition_finisher) の RowStats を返す。
 
@@ -274,6 +373,7 @@ def _compute_sire_condition_stats(
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
+        filters (list[EntryFilter]): 追加のエントリフィルタ。
 
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
@@ -284,12 +384,10 @@ def _compute_sire_condition_stats(
     if condition.year_to is None:
         raise ValueError("condition.year_to は必須です。")
     race_year = int(condition.year_to) + 1
-    sire_result = analyze_chakudo(
-        manager, [], condition, GroupBy(kind="subject", subject=Subject.SIRE)
+    sire_result = _analyze(
+        manager, filters, condition, GroupBy(kind="subject", subject=Subject.SIRE)
     )
-    sire_stats: dict[str, ChakudoRow] = {
-        row.group: row for row in (sire_result.rows if sire_result.success else [])
-    }
+    sire_stats: dict[str, ChakudoRow] = {row.group: row for row in sire_result.rows}
 
     winner_set_cache: dict[tuple[Any, ...], set[str]] = {}
     stats_map: dict[str, RowStats] = {}
@@ -340,7 +438,7 @@ def _get_sire_winner_set(
         "CAST(u.kakutei_chakujun AS INTEGER) BETWEEN 1 AND %s",
     ]
     if "race_name" in src:
-        where_parts.append("r.kyosomei_hondai = %s")
+        where_parts.append("TRIM(r.kyosomei_hondai) = %s")
         params.append(src["race_name"])
     if "grade_codes" in src:
         where_parts.append("r.grade_code = ANY(%s)")
@@ -368,7 +466,8 @@ def _yaml_rows_to_rowsdef(
     """YAML rows 設定を RowsDef 形式に変換する。
 
     op: "==" は int/str、op: ">=" は (value, 9999)、op: "<=" は (0, value)、
-    op: ">" は (value+1, 9999)、op: "<" は (0, value-1) に変換する。
+    op: ">" は (value+1, 9999)、op: "<" は (0, value-1)、
+    op: "between" は (value[0], value[1]) に変換する。
 
     Args:
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
@@ -377,7 +476,8 @@ def _yaml_rows_to_rowsdef(
         dict[str, tuple[int, int] | int | str]: RowsDef 形式の辞書。
 
     Raises:
-        ValueError: op が "in" の場合（GroupBy(kind="fixed") では非対応）。
+        ValueError: op が "in" の場合（GroupBy(kind="fixed") では非対応）、
+            または op が "between" で value が [下限, 上限] でない場合。
     """
     if rows_cfg.get("type") == "dynamic":
         return {}
@@ -396,9 +496,29 @@ def _yaml_rows_to_rowsdef(
             result[label] = (0, int(value) - 1)
         elif op == ">":
             result[label] = (int(value) + 1, 9999)
+        elif op == "between":
+            lower, upper = _between_bounds(value)
+            result[label] = (lower, upper)
         elif op == "in":
             raise ValueError(f"op 'in' は fixed rows では使用できません。label={label!r}")
     return result
+
+
+def _between_bounds(value: Any) -> tuple[int, int]:
+    """op: between の value を (下限, 上限) に変換する。
+
+    Args:
+        value (Any): [下限, 上限] 形式の値。
+
+    Returns:
+        tuple[int, int]: (下限, 上限)。
+
+    Raises:
+        ValueError: value が整数2要素のリストでない場合。
+    """
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        raise ValueError(f"op 'between' の value は [下限, 上限] で指定してください: {value!r}")
+    return int(value[0]), int(value[1])
 
 
 def _chakudo_to_stats_map(result: ChakudoResult) -> dict[str, RowStats]:
@@ -410,8 +530,6 @@ def _chakudo_to_stats_map(result: ChakudoResult) -> dict[str, RowStats]:
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
     """
-    if not result.success:
-        return {}
     return {row.group: _chakudo_row_to_stats(row) for row in result.rows}
 
 
@@ -451,9 +569,6 @@ def _group_by_rows_cfg(
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
     """
-    if not result.success:
-        return {}
-
     rows_type = rows_cfg.get("type", "dynamic")
     if rows_type == "dynamic":
         return _chakudo_to_stats_map(result)
@@ -480,12 +595,20 @@ def _group_matches(group_str: str, op: str, threshold: Any) -> bool:
 
     Args:
         group_str (str): ChakudoRow.group の値。
-        op (str): 演算子文字列（"==" / ">=" / "<=" / ">" / "<" / "!=" / "in" / "not_in"）。
-        threshold (Any): 比較の基準値。
+        op (str): 演算子文字列
+            （"==" / ">=" / "<=" / ">" / "<" / "!=" / "in" / "not_in" / "between"）。
+        threshold (Any): 比較の基準値。between は [下限, 上限]（両端を含む）。
 
     Returns:
         bool: 比較結果。
     """
+    if op == "between":
+        lower, upper = _between_bounds(threshold)
+        try:
+            return lower <= int(group_str) <= upper
+        except (ValueError, TypeError):
+            return False
+
     if op in ("in", "not_in"):
         threshold_list = list(threshold) if not isinstance(threshold, list) else threshold
         int_set: set[int] = set()
@@ -544,9 +667,6 @@ def _group_by_chokyo_match_days_rows_cfg(
     Raises:
         ValueError: item の op が any_match / none_match / empty 以外の場合。
     """
-    if not result.success:
-        return {}
-
     stats_map: dict[str, RowStats] = {}
     for item in rows_cfg.get("items", []):
         label = item["label"]
