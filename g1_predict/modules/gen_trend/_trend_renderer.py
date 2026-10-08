@@ -131,7 +131,7 @@ def _build_metric_section(item: TrendItem, context: TrendContext) -> str | None:
     add_other_row = False
     if rows_cfg["type"] == "dynamic":
         top_n = rows_cfg.get("top_n")
-        labels = _get_dynamic_labels(stats_map, top_n)
+        labels = _get_dynamic_labels(stats_map, top_n, bool(rows_cfg.get("exclude_no_top3")))
         if allowed_values is not None:
             allowed_set = set(str(v) for v in allowed_values)
             labels = [lb for lb in labels if lb in allowed_set]
@@ -188,15 +188,18 @@ def _build_metric_section(item: TrendItem, context: TrendContext) -> str | None:
 def _get_dynamic_labels(
     stats_map: dict[str, RowStats],
     top_n: int | None,
+    exclude_no_top3: bool = False,
 ) -> list[str]:
     """3着内数の多い順にラベルを返す。
 
     「その他」ラベルは集計対象から除外する。
     top_n が None の場合は全件返す。
+    exclude_no_top3 が True の場合は、3着内数が0のラベルを上位に入れない。
 
     Args:
         stats_map (dict[str, RowStats]): 行ラベル -> RowStats。
         top_n (int | None): 返す上位件数。None の場合は全件。
+        exclude_no_top3 (bool): 3着内数が0のラベルを除くか。
 
     Returns:
         list[str]: 3着内数降順で並べたラベルのリスト。
@@ -206,6 +209,8 @@ def _get_dynamic_labels(
         for label, s in stats_map.items()
         if label != OTHER_LABEL
     ]
+    if exclude_no_top3:
+        items = [(label, score) for label, score in items if score > 0]
     items.sort(key=lambda x: x[1], reverse=True)
     if top_n is None or len(items) <= top_n:
         return [label for label, _ in items]

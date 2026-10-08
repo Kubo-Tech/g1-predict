@@ -6,6 +6,7 @@ items:
     rows: &top10_rows
       type: dynamic
       top_n: 10
+      exclude_no_top3: true
   生産者:
     source: {type: breeder_name}
     rows: *top10_rows

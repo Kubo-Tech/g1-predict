@@ -86,6 +86,17 @@ def test_get_dynamic_labels_sorted_by_top3() -> None:
     assert labels[2] == "B"
 
 
+def test_get_dynamic_labels_exclude_no_top3() -> None:
+    """exclude_no_top3 指定時、3着内数が0のラベルは上位に入れない。"""
+    stats_map = {
+        "A": RowStats(first=1, total=3),
+        "B": RowStats(fourth_plus=5, total=5),
+        "C": RowStats(fourth_plus=2, total=2),
+    }
+    assert _get_dynamic_labels(stats_map, top_n=2, exclude_no_top3=True) == ["A"]
+    assert _get_dynamic_labels(stats_map, top_n=2) == ["A", "B", "C"]
+
+
 def test_get_dynamic_labels_top_n() -> None:
     """top_n 件のみ返す（タイなし）。"""
     stats_map = {

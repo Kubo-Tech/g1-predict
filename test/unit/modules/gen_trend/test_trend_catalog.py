@@ -23,7 +23,9 @@ _CONFIGS_DIR = os.path.abspath(
 )
 _TRENDS_DIR = os.path.join(_CONFIGS_DIR, "trends")
 _RACE_NAMES = ["東京優駿", "安田記念", "宝塚記念", "スプリンターズS"]
-_ROW_KEYS = frozenset({"type", "items", "top_n", "always_include_grades", "hide_empty"})
+_ROW_KEYS = frozenset(
+    {"type", "items", "top_n", "always_include_grades", "hide_empty", "exclude_no_top3"}
+)
 
 
 def _write_category(trends_dir: Path, file_name: str, content: str) -> None:

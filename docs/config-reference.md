@@ -151,6 +151,7 @@ rows:
   type: dynamic
   top_n: 10                             # 任意。上位N件（同数は同順位扱いで全件残る）
   always_include_grades: ["A", "B", "C"] # 任意。重賞は上位外でも必ず表示する
+  exclude_no_top3: true                 # 任意。3着内数が0の要素は上位に入れず、その他にまとめる
 ```
 
 - `top_n` または `source.allowed_values` を指定した場合、表の最後に残りをまとめた `その他` 行が付く。
@@ -227,7 +228,7 @@ rows:
 | `sire_name` | 父馬名 |
 | `breeder_name` | 生産者名 |
 
-集計対象（対象G1の過去の出走馬）の騎手・種牡馬・生産者を行にする。`rows: {type: dynamic, top_n: 10}` で3着内数の多い上位10件と `その他` を並べる。
+集計対象（対象G1の過去の出走馬）の騎手・種牡馬・生産者を行にする。`rows: {type: dynamic, top_n: 10, exclude_no_top3: true}` で3着内数の多い上位10件と `その他` を並べる。3着内数が0の要素は上位10件に入れない。
 
 ### 過去走・履歴系
 
