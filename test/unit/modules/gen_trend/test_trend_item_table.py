@@ -121,8 +121,8 @@ def test_build_item_table_dynamic_other_row_aggregates_stats() -> None:
     assert table.stats[OTHER_LABEL] == RowStats(fourth_plus=5, total=5)
 
 
-def test_build_item_table_dynamic_without_other_row_ignores_unlisted_value() -> None:
-    """「その他」行が無い dynamic の項目では、表に出ていない行に当たる馬は行に入れない。"""
+def test_build_item_table_dynamic_without_top_n_adds_other_row_for_unlisted_value() -> None:
+    """top_n などの指定が無い dynamic の項目でも、表に出ていない値の馬は「その他」行に入れる。"""
     item = TrendItem(
         name="騎手",
         config={"source": {"type": "jockey_name"}, "rows": {"type": "dynamic"}},
@@ -130,7 +130,21 @@ def test_build_item_table_dynamic_without_other_row_ignores_unlisted_value() -> 
     )
     table = _build(item, {"A": RowStats(first=1, total=1)}, {1: ["A"], 2: ["未登場の騎手"]})
     assert table is not None
-    assert table.entry_rows == {1: ["A"]}
+    assert table.entry_rows == {1: ["A"], 2: ["その他"]}
+    assert table.rows == ["A", "その他"]
+    assert table.stats["その他"].total == 0
+
+
+def test_build_item_table_dynamic_without_top_n_and_unlisted_value_has_no_other_row() -> None:
+    """top_n などの指定が無く、表に出ていない値の馬もいなければ「その他」行は出さない。"""
+    item = TrendItem(
+        name="騎手",
+        config={"source": {"type": "jockey_name"}, "rows": {"type": "dynamic"}},
+        condition=None,
+    )
+    table = _build(item, {"A": RowStats(first=1, total=1)}, {1: ["A"]})
+    assert table is not None
+    assert table.rows == ["A"]
 
 
 def test_build_item_table_horse_can_hit_multiple_rows_in_table_order() -> None:

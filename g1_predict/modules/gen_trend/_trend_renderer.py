@@ -62,7 +62,8 @@ def build_item_table(
 ) -> ItemTable | None:
     """1項目分の表の行と集計値を求める。
 
-    rows.type に応じて行を決定し、各行の集計値を求める。dynamic 型は最後に「その他」行を追加する。
+    rows.type に応じて行を決定し、各行の集計値を求める。dynamic 型は、top_n などで表に出ない値が
+    ある場合と、表に出ていない値の出走馬がいる場合に、最後に「その他」行を追加する。
     項目に開催条件が注入されている場合は、開催条件で絞り込んで集計する。
     entry_race_code を指定した場合は、今回の出走馬が当たる行も求める。
     hide_empty の項目でも、今回の出走馬が当たる行は隠さない。
@@ -120,10 +121,10 @@ def build_item_table(
     else:
         labels = list(stats_map.keys())
 
-    entry_rows = _assign_entry_rows(
-        entry_groups, labels, add_other_row, rows_cfg["type"] == "dynamic"
-    )
+    entry_rows = _assign_entry_rows(entry_groups, labels, rows_cfg["type"] == "dynamic")
     entry_labels = {label for rows in entry_rows.values() for label in rows}
+    # 表に出ていない値の出走馬がいれば、top_n などの指定が無い項目でも「その他」行を出す
+    add_other_row = add_other_row or OTHER_LABEL in entry_labels
     if (
         metric_cfg.get("hide_if_empty")
         and all(s.total == 0 for s in stats_map.values())
@@ -241,7 +242,6 @@ def format_condition_note(condition: TrendCondition | None) -> str:
 def _assign_entry_rows(
     entry_groups: dict[int, list[str]],
     labels: list[str],
-    add_other_row: bool,
     is_dynamic: bool,
 ) -> dict[int, list[str]]:
     """出走馬が当たる行のラベルを、表に出す行に絞り込む。
@@ -251,7 +251,6 @@ def _assign_entry_rows(
     Args:
         entry_groups (dict[int, list[str]]): 馬番 -> 集計の割り当てで当たる行のラベル。
         labels (list[str]): 表に出す行のラベル（「その他」を除く）。
-        add_other_row (bool): 「その他」行を出すか。
         is_dynamic (bool): rows.type が dynamic か。
 
     Returns:
@@ -264,7 +263,7 @@ def _assign_entry_rows(
         for label in assigned:
             if label in label_set:
                 hits.add(label)
-            elif is_dynamic and add_other_row:
+            elif is_dynamic:
                 hits.add(OTHER_LABEL)
         rows = [label for label in [*labels, OTHER_LABEL] if label in hits]
         if rows:
