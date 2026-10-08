@@ -423,6 +423,37 @@ def test_build_metric_section_without_hide_empty_keeps_zero_rows() -> None:
     assert "| 5-8枠 | 0-0-0-0 | - | - | - | - |" in result
 
 
+# --- hide_if_empty ---
+
+
+def test_build_metric_section_hide_if_empty_returns_none_without_horses() -> None:
+    """hide_if_empty 指定時、該当馬が1頭もいなければ表を出力しない。"""
+    stats_map = {"1-4枠": RowStats(), "5-8枠": RowStats()}
+    with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
+        assert _build_metric_section(_make_item(hide_if_empty=True), _make_context()) is None
+
+
+def test_build_metric_section_hide_if_empty_keeps_table_with_horses() -> None:
+    """hide_if_empty 指定時でも、該当馬がいれば0頭の行を含めて表を出力する。"""
+    stats_map = {"1-4枠": RowStats(first=1, fourth_plus=3, total=4)}
+    with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
+        result = _build_metric_section(_make_item(hide_if_empty=True), _make_context())
+
+    assert result is not None
+    assert "| 5-8枠 | 0-0-0-0 | - | - | - | - |" in result
+
+
+def test_build_category_section_omits_hidden_item() -> None:
+    """該当馬がいない hide_if_empty の項目は、カテゴリのセクションから見出しごと除く。"""
+    items = [_make_item(name="前走新馬着順", hide_if_empty=True), _make_item(name="枠番")]
+    stats_map = {"1-4枠": RowStats()}
+    with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
+        result = build_category_section(_make_category(items), _make_context())
+
+    assert "### 前走新馬着順" not in result
+    assert "### 枠番" in result
+
+
 # --- format_scope_note ---
 
 

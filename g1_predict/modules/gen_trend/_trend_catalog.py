@@ -10,7 +10,9 @@ from ._trend_condition import parse_trend_condition
 from ._trend_models import TrendCondition
 
 _CATEGORY_KEYS = frozenset({"name", "description", "items"})
-_ITEM_KEYS = frozenset({"conditionable", "note", "source", "rows", "display_map"})
+_ITEM_KEYS = frozenset(
+    {"conditionable", "note", "source", "rows", "display_map", "hide_if_empty"}
+)
 
 
 @dataclass(frozen=True)
@@ -18,7 +20,7 @@ class CatalogItem:
     """共有定義の1項目。
 
     Attributes:
-        config (dict[str, Any]): source・rows・display_map・note の定義。
+        config (dict[str, Any]): source・rows・display_map・note・hide_if_empty の定義。
         conditionable (bool): 開催条件を注入できる項目か。
     """
 

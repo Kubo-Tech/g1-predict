@@ -15,6 +15,7 @@ def build_category_section(category: TrendCategory, context: TrendContext) -> st
 
     ## カテゴリ名 とカテゴリの説明文から始まり、各項目の h3 テーブルと
     ### 比較表 プレースホルダーを含む文字列を返す。
+    hide_if_empty の項目で該当馬が1頭もいないものは出力しない。
 
     Args:
         category (TrendCategory): 出力するカテゴリ。
@@ -26,7 +27,11 @@ def build_category_section(category: TrendCategory, context: TrendContext) -> st
     description = category.description.replace("{years}", str(context.years))
     header = f"## {category.name}\n\n{description}"
 
-    metric_sections = [_build_metric_section(item, context) for item in category.items]
+    metric_sections = [
+        section
+        for item in category.items
+        if (section := _build_metric_section(item, context)) is not None
+    ]
     metric_sections.append("### 比較表\n")
     return header + "\n\n" + "\n\n".join(metric_sections)
 
@@ -91,7 +96,7 @@ def format_condition_note(condition: TrendCondition | None) -> str:
     return "※" + "・".join(parts) + "のみ"
 
 
-def _build_metric_section(item: TrendItem, context: TrendContext) -> str:
+def _build_metric_section(item: TrendItem, context: TrendContext) -> str | None:
     """1項目分の h3 テーブルセクション文字列を生成する。
 
     rows.type に応じてラベル一覧を決定し、各行の集計値から
@@ -99,13 +104,15 @@ def _build_metric_section(item: TrendItem, context: TrendContext) -> str:
     項目に開催条件が注入されている場合は、開催条件で絞り込んで集計し、
     表の直下に開催条件の注記を出力する。
     項目に note がある場合は、その直下に出力する。
+    項目に hide_if_empty が指定されていて、集計対象に該当馬が1頭もいない場合は None を返す。
 
     Args:
         item (TrendItem): 出力する項目。
         context (TrendContext): 対象レースと集計対象の情報。
 
     Returns:
-        str: ### ヘッダーから始まる Markdown テーブル文字列。
+        str | None: ### ヘッダーから始まる Markdown テーブル文字列。
+            hide_if_empty の項目で該当馬がいない場合は None。
     """
     metric_cfg = item.config
     rows_cfg = metric_cfg["rows"]
@@ -115,6 +122,8 @@ def _build_metric_section(item: TrendItem, context: TrendContext) -> str:
     if item.condition is not None:
         metric_condition, filters = apply_trend_condition(context, item.condition)
     stats_map = compute_stats(metric_cfg, context.manager, metric_condition, filters)
+    if metric_cfg.get("hide_if_empty") and all(s.total == 0 for s in stats_map.values()):
+        return None
 
     source_cfg = metric_cfg.get("source", {})
     allowed_values: list[str] | None = source_cfg.get("allowed_values")

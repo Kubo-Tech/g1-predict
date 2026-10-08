@@ -46,35 +46,46 @@ items:
         - {label: "地方", op: "==", value: "地方"}
         - {label: "海外", op: "==", value: "海外"}
   前走G1着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_grade, grade_codes: ["A"]}
     rows: *prev_finish_rows
   前走G2着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_grade, grade_codes: ["B"]}
     rows: *prev_finish_rows
   前走G3着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_grade, grade_codes: ["C"]}
     rows: *prev_finish_rows
   前走リステッド着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: リステッド}
     rows: *prev_finish_rows
   前走オープン着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: オープン}
     rows: *prev_finish_rows
   前走3勝クラス着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 3勝クラス}
     rows: *prev_finish_rows
   前走2勝クラス着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 2勝クラス}
     rows: *prev_finish_rows
   前走1勝クラス着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 1勝クラス}
     rows: *prev_finish_rows
   前走未勝利着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 未勝利}
     rows: *prev_finish_rows
   前走新馬着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 新馬}
     rows: *prev_finish_rows
   前走非重賞着順:
+    hide_if_empty: true
     source: {type: prev_race_finish_by_grade, exclude_grade_codes: ["A", "B", "C"]}
     rows: *prev_finish_rows

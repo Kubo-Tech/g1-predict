@@ -41,6 +41,7 @@ items:
   枠順:
     conditionable: true
     note: ※注記
+    hide_if_empty: true
     source: {type: gate_number}
     rows: {type: fixed, items: [{label: "1枠", op: "==", value: 1}]}
   父実績:
@@ -164,11 +165,12 @@ def test_build_trend_categories_does_not_modify_catalog(trends_dir: Path) -> Non
 
 
 def test_build_trend_categories_item_config_excludes_conditionable(trends_dir: Path) -> None:
-    """項目の定義には conditionable を含めず、note を含める。"""
+    """項目の定義には conditionable を含めず、note と hide_if_empty を含める。"""
     catalog = load_trend_catalog(str(trends_dir))
     item = build_trend_categories({"基本項目": ["枠順"]}, catalog, "宝塚記念", 2200)[0].items[0]
     assert "conditionable" not in item.config
     assert item.config["note"] == "※注記"
+    assert item.config["hide_if_empty"] is True
 
 
 # 準正常系

@@ -50,9 +50,10 @@ items:
     rows: {...}
 ```
 
-- 項目に書けるキーは `source` / `rows` / `display_map` / `conditionable` / `note` で、`rows` は必須。
+- 項目に書けるキーは `source` / `rows` / `display_map` / `conditionable` / `note` / `hide_if_empty` で、`rows` は必須。
 - `conditionable: true` の項目だけが、レースの `trends.yml` から開催条件を注入できる。
 - `note` を書くと、表の直下にその文字列を出す。
+- `hide_if_empty: true` を書くと、集計対象に該当馬が1頭もいない場合は表を見出しごと出さない（前走{クラス}着順で使う）。
 - ファイル名はカテゴリ名から `/` を除いたもの（`同年/前年レース実績` → `同年前年レース実績.yml`）にする。
 - 項目の定義にある `{race_name}`・`{kyori}` は、対象レースの競走名本題・距離（m）に置き換えて使う（例: 父実績の `父{race_name}勝ち`）。
 
