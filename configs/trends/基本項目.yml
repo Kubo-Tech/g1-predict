@@ -72,6 +72,7 @@ items:
     source: {type: affiliation}
     rows:
       type: fixed
+      hide_empty: true
       items:
         - {label: "美浦", op: "==", value: 1}
         - {label: "栗東", op: "==", value: 2}
