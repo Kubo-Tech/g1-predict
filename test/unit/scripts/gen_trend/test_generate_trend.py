@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 from matplotlib.figure import Figure
+from mykeibadb.exceptions import MykeibaDBError
 
 from g1_predict.modules.gen_trend.trend_section import EntrySettings, TrendSections
 from scripts.gen_trend import _build_trend_sections, generate_trend
@@ -250,12 +251,14 @@ def test_build_trend_sections_with_entries_reads_table_yml(configs_dir: Path) ->
     (configs_dir / "天皇賞春" / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
     with (
         patch("scripts.gen_trend._CONFIGS_DIR", str(configs_dir)),
+        patch("scripts.gen_trend.check_race_entries") as mock_check,
         patch(
             "scripts.gen_trend.build_trend_sections",
             return_value=TrendSections(scope_note="", sections={}),
         ) as mock_build,
     ):
         _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)
+    mock_check.assert_called_once_with("2026013105010110")
     assert mock_build.call_args[0][4] == EntrySettings(
         race_code="2026013105010110", table_config={"基本項目": ["人気"]}
     )
@@ -271,5 +274,39 @@ def test_build_trend_sections_with_entries_without_table_yml_raises(configs_dir:
         patch("scripts.gen_trend._CONFIGS_DIR", str(configs_dir)),
         patch("scripts.gen_trend.build_trend_sections"),
         pytest.raises(FileNotFoundError),
+    ):
+        _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)
+
+
+def test_build_trend_sections_with_entries_checks_before_trends_yml(tmp_path: Path) -> None:
+    """--with-entries では、trends.yml が無いレースでも table.yml が無ければ例外になる。
+
+    Args:
+        tmp_path (Path): pytest が提供する一時ディレクトリ。
+    """
+    (tmp_path / "天皇賞春").mkdir()
+    with (
+        patch("scripts.gen_trend._CONFIGS_DIR", str(tmp_path)),
+        pytest.raises(FileNotFoundError),
+    ):
+        _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)
+
+
+def test_build_trend_sections_with_entries_without_entries_raises(tmp_path: Path) -> None:
+    """--with-entries では、trends.yml が無いレースでも出走馬が DB に無ければ例外になる。
+
+    Args:
+        tmp_path (Path): pytest が提供する一時ディレクトリ。
+    """
+    race_dir = tmp_path / "天皇賞春"
+    race_dir.mkdir()
+    (race_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
+    with (
+        patch("scripts.gen_trend._CONFIGS_DIR", str(tmp_path)),
+        patch(
+            "scripts.gen_trend.check_race_entries",
+            side_effect=MykeibaDBError("出走馬が見つかりません"),
+        ),
+        pytest.raises(MykeibaDBError),
     ):
         _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)

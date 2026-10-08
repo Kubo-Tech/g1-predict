@@ -5,6 +5,8 @@ from typing import Any
 
 import pandas as pd
 from matplotlib.figure import Figure
+from mykeibadb.config import ConfigManager
+from mykeibadb.connection import ConnectionManager
 
 from ._trend_catalog import build_trend_categories, load_trend_catalog
 from ._trend_entries import fetch_entry_horses
@@ -15,6 +17,18 @@ from ._trend_table_image import make_comparison_table
 
 # 比較表の画像の、記事ディレクトリからの相対ディレクトリ
 _TABLE_IMAGE_DIR = "img/trend_table"
+
+
+def check_race_entries(race_code: str) -> None:
+    """今回のレースの出走馬が DB にあることを確認する。
+
+    Args:
+        race_code (str): 今回のレースの16桁のレースコード。
+
+    Raises:
+        MykeibaDBError: 出走馬が DB に無い場合。
+    """
+    fetch_entry_horses(ConnectionManager(ConfigManager.from_env()), race_code)
 
 
 @dataclass(frozen=True)

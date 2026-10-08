@@ -17,6 +17,7 @@ from g1_predict.modules.gen_trend.trend_section import (
     EntrySettings,
     TrendSections,
     build_trend_sections,
+    check_race_entries,
 )
 from g1_predict.modules.utils.image_output import save_images
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
@@ -89,7 +90,18 @@ def _build_trend_sections(
     Returns:
         TrendSections: 集計対象の注記と、カテゴリ名 -> Markdownセクション文字列、比較表の画像。
             trends.yml が無い、または空の場合は注記もセクションも空。
+
+    Raises:
+        FileNotFoundError: with_entries が True で table.yml が無い場合。
+        MykeibaDBError: with_entries が True で出走馬が DB に無い場合。
     """
+    # 出走馬の確定後の情報に必要な table.yml と出走馬は、trends.yml の有無によらず先に確かめる
+    entries: EntrySettings | None = None
+    if with_entries:
+        table_path = os.path.join(_CONFIGS_DIR, race_label, "table.yml")
+        with open(table_path, encoding="utf-8") as f:
+            entries = EntrySettings(race_code=race_code, table_config=yaml.safe_load(f))
+        check_race_entries(race_code)
     config_path = os.path.join(_CONFIGS_DIR, race_label, "trends.yml")
     if not os.path.isfile(config_path):
         return TrendSections(scope_note="", sections={})
@@ -97,11 +109,6 @@ def _build_trend_sections(
         trends_config = yaml.safe_load(f)
     if not trends_config:
         return TrendSections(scope_note="", sections={})
-    entries: EntrySettings | None = None
-    if with_entries:
-        table_path = os.path.join(_CONFIGS_DIR, race_label, "table.yml")
-        with open(table_path, encoding="utf-8") as f:
-            entries = EntrySettings(race_code=race_code, table_config=yaml.safe_load(f))
     return build_trend_sections(race_info, race_label, trends_config, _TRENDS_DIR, entries)
 
 
