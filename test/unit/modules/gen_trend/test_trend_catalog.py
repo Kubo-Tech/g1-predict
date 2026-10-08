@@ -358,10 +358,32 @@ def test_takarazuka_trends_yml_injects_condition_into_conditionable_items_only()
                 assert item.condition == expected
 
 
-def test_trends_yml_has_all_basic_and_prev_items() -> None:
-    """4レースとも基本項目と前走の全項目を持つ。"""
+_LOWER_CLASSES = ("リステッド", "オープン", "3勝クラス", "2勝クラス", "1勝クラス", "未勝利", "新馬")
+_LOWER_CLASS_FINISH_ITEMS = [f"前走{race_class}着順" for race_class in _LOWER_CLASSES]
+
+
+def test_trends_yml_has_all_basic_items() -> None:
+    """4レースとも基本項目の全項目を持つ。"""
     catalog = load_trend_catalog(_TRENDS_DIR)
     for race_name in _RACE_NAMES:
         categories = build_trend_categories(_load_race_config(race_name), catalog, race_name, 2000)
         assert _item_names(categories, "基本項目") == list(catalog["基本項目"].items)
-        assert _item_names(categories, "前走") == list(catalog["前走"].items)
+
+
+@pytest.mark.parametrize("race_name", ["安田記念", "宝塚記念", "スプリンターズS"])
+def test_trends_yml_older_g1_uses_non_graded_finish(race_name: str) -> None:
+    """古馬G1は、重賞以外の前走をクラス別に分けず前走非重賞着順だけで見る。"""
+    catalog = load_trend_catalog(_TRENDS_DIR)
+    categories = build_trend_categories(_load_race_config(race_name), catalog, race_name, 2000)
+    expected = [
+        name for name in catalog["前走"].items if name not in _LOWER_CLASS_FINISH_ITEMS
+    ]
+    assert _item_names(categories, "前走") == expected
+
+
+def test_trends_yml_derby_uses_finish_by_class() -> None:
+    """東京優駿は、重賞以外の前走をクラス別の着順で見て、前走非重賞着順は使わない。"""
+    catalog = load_trend_catalog(_TRENDS_DIR)
+    categories = build_trend_categories(_load_race_config("東京優駿"), catalog, "東京優駿", 2400)
+    expected = [name for name in catalog["前走"].items if name != "前走非重賞着順"]
+    assert _item_names(categories, "前走") == expected
