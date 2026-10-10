@@ -380,8 +380,22 @@ def test_sprinters_trends_yml_has_training_and_same_year_categories() -> None:
         "中山勝利数",
         "中山重賞好走実績",
         "リピーター",
-        "良馬場好走実績",
-        "稍重以上好走実績",
+    ]
+
+
+def test_sprinters_trends_yml_drops_transport_and_previous_finish() -> None:
+    """スプリンターズSは、基本項目の輸送と前走の前走着順を使わない。"""
+    catalog = load_trend_catalog(_TRENDS_DIR)
+    categories = build_trend_categories(
+        _load_race_config("スプリンターズS"), catalog, "スプリンターズステークス", 1200
+    )
+    assert _item_names(categories, "基本項目") == [
+        name for name in catalog["基本項目"].items if name != "輸送"
+    ]
+    assert _item_names(categories, "前走") == [
+        name
+        for name in catalog["前走"].items
+        if name not in [*_LOWER_CLASS_FINISH_ITEMS, "前走着順"]
     ]
 
 
@@ -414,7 +428,7 @@ _LOWER_CLASSES = ("リステッド", "オープン", "3勝クラス", "2勝ク�
 _LOWER_CLASS_FINISH_ITEMS = [f"前走{race_class}着順" for race_class in _LOWER_CLASSES]
 
 
-@pytest.mark.parametrize("race_name", ["安田記念", "宝塚記念", "スプリンターズS"])
+@pytest.mark.parametrize("race_name", ["安田記念", "宝塚記念"])
 def test_trends_yml_older_g1_has_all_basic_items(race_name: str) -> None:
     """古馬G1は基本項目の全項目を持つ。"""
     catalog = load_trend_catalog(_TRENDS_DIR)
@@ -430,7 +444,7 @@ def test_trends_yml_derby_has_basic_items_except_age() -> None:
     assert _item_names(categories, "基本項目") == expected
 
 
-@pytest.mark.parametrize("race_name", ["安田記念", "宝塚記念", "スプリンターズS"])
+@pytest.mark.parametrize("race_name", ["安田記念", "宝塚記念"])
 def test_trends_yml_older_g1_uses_non_graded_finish(race_name: str) -> None:
     """古馬G1は、重賞以外の前走をクラス別に分けず前走非重賞着順だけで見る。"""
     catalog = load_trend_catalog(_TRENDS_DIR)

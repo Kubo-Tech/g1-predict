@@ -8,7 +8,7 @@
   - 前走4角通過順位:
       color_rules:
         - {labels: [1番手, 2-5番手], color: yellow}
-        - {labels: [10番手以下	], color: gray}
+        - {labels: [10番手以下], color: gray}
   - 所属:
       color_rules:
         - {labels: [美浦], color: yellow}
