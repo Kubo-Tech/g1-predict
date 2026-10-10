@@ -158,7 +158,8 @@ def build_category_section(
 
     ## カテゴリ名 とカテゴリの説明文から始まり、各項目の h3 テーブルを含む文字列を返す。
     with_entries が True の場合は、各テーブルの右端に今回の出走馬のうち行に当たる馬の馬番を
-    書く「該当馬」列を付ける。comparison_image がある場合は、末尾に比較表の画像を載せる。
+    書く「該当馬」列を付ける。ただし、今走の結果で値が決まる項目と hide_entry_column の項目には
+    付けない。comparison_image がある場合は、末尾に比較表の画像を載せる。
 
     Args:
         category (TrendCategory): 出力するカテゴリ。
@@ -173,7 +174,10 @@ def build_category_section(
     description = category.description.replace("{years}", str(context.years))
     header = f"## {category.name}\n\n{description}"
 
-    sections = [_format_item_section(table, with_entries) for table in tables]
+    sections = [
+        _format_item_section(table, with_entries and table.item.shows_entry_column)
+        for table in tables
+    ]
     if comparison_image is not None:
         sections.append(f"### 比較表\n\n![{category.name}の比較表]({comparison_image})")
     return header + "\n\n" + "\n\n".join(sections)

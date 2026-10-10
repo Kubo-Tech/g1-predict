@@ -272,6 +272,28 @@ def test_shared_catalog_uses_race_result_items() -> None:
     assert names == ["脚質", "4角通過順位", "上がり3F順位"]
 
 
+def test_shared_catalog_hide_entry_column_items() -> None:
+    """記事の表に該当馬列を付けない項目は人気・枠順。"""
+    catalog = load_trend_catalog(_TRENDS_DIR)
+    names = [
+        name
+        for category in catalog.values()
+        for name, item in category.items.items()
+        if item.hide_entry_column
+    ]
+    assert names == ["人気", "枠順"]
+
+
+def test_build_trend_categories_carries_hide_entry_column() -> None:
+    """hide_entry_column は TrendItem に引き継がれ、該当馬列を付けない扱いになる。"""
+    catalog = load_trend_catalog(_TRENDS_DIR)
+    items = build_trend_categories(
+        {"基本項目": ["人気", "脚質", "所属"]}, catalog, "宝塚記念", 2200
+    )[0].items
+    assert [item.hide_entry_column for item in items] == [True, False, False]
+    assert [item.shows_entry_column for item in items] == [False, False, True]
+
+
 def test_shared_catalog_rows_use_known_keys() -> None:
     """共有定義の rows は既知のキーだけを使う。"""
     catalog = load_trend_catalog(_TRENDS_DIR)

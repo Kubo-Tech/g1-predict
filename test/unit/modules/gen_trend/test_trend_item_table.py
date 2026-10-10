@@ -3,6 +3,7 @@
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from mykeibadb.analytics import RaceCondition
 
 from g1_predict.modules.gen_trend._trend_catalog import TrendCategory, TrendItem
@@ -247,8 +248,24 @@ def test_format_item_section_uses_display_map_for_row_label() -> None:
 
 
 def test_build_category_section_with_entries_has_horse_column_in_every_table() -> None:
-    """with_entries が True なら、カテゴリの全ての表に該当馬列が付く。"""
+    """with_entries が True なら、該当馬列を付けない項目以外の表に該当馬列が付く。"""
     category = TrendCategory(name="基本項目", description="d", items=[_make_fixed_item()])
     table = _table_with_entries()
     result = build_category_section(category, _make_context(), [table], with_entries=True)
     assert "| 枠順 | 着度数 | 勝率 | 複率 | 単回 | 複回 | 該当馬 |" in result
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [{"hide_entry_column": True}, {"uses_race_result": True}],
+)
+def test_build_category_section_omits_horse_column_for_hidden_items(flags: dict[str, bool]) -> None:
+    """hide_entry_column の項目と今走の結果で決まる項目の表には、該当馬列を付けない。"""
+    base = _make_fixed_item()
+    item = TrendItem(name=base.name, config=base.config, condition=None, **flags)
+    category = TrendCategory(name="基本項目", description="d", items=[item])
+    table = _build(item, _STATS, {1: ["1-4枠"]})
+    assert table is not None
+    result = build_category_section(category, _make_context(), [table], with_entries=True)
+    assert "| 枠順 | 着度数 | 勝率 | 複率 | 単回 | 複回 |\n" in result
+    assert "該当馬" not in result

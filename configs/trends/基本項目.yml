@@ -2,6 +2,7 @@ name: 基本項目
 description: 同じG1レースの過去{years}年における傾向
 items:
   人気:
+    hide_entry_column: true
     source: {type: popularity}
     rows:
       type: fixed
@@ -14,6 +15,7 @@ items:
         - {label: "10人気以下", op: ">=", value: 10}
   枠順:
     conditionable: true
+    hide_entry_column: true
     source: {type: gate_number}
     rows:
       type: fixed

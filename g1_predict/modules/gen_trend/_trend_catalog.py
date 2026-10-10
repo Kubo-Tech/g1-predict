@@ -14,6 +14,7 @@ _ITEM_KEYS = frozenset(
     {
         "conditionable",
         "uses_race_result",
+        "hide_entry_column",
         "note",
         "source",
         "rows",
@@ -22,7 +23,7 @@ _ITEM_KEYS = frozenset(
     }
 )
 # 項目の設定そのものではなく、項目の扱いを指定するキー
-_ITEM_FLAG_KEYS = frozenset({"conditionable", "uses_race_result"})
+_ITEM_FLAG_KEYS = frozenset({"conditionable", "uses_race_result", "hide_entry_column"})
 
 
 @dataclass(frozen=True)
@@ -33,11 +34,13 @@ class CatalogItem:
         config (dict[str, Any]): source・rows・display_map・note・hide_if_empty の定義。
         conditionable (bool): 開催条件を注入できる項目か。
         uses_race_result (bool): 今走の結果で値が決まる項目か。
+        hide_entry_column (bool): 記事の表に該当馬列を付けない項目か。
     """
 
     config: dict[str, Any]
     conditionable: bool
     uses_race_result: bool = False
+    hide_entry_column: bool = False
 
 
 @dataclass(frozen=True)
@@ -64,12 +67,25 @@ class TrendItem:
         config (dict[str, Any]): 対象レースの値を埋め込み済みの source・rows・display_map・note。
         condition (TrendCondition | None): 注入された開催条件。
         uses_race_result (bool): 今走の結果で値が決まる項目か。
+        hide_entry_column (bool): 記事の表に該当馬列を付けない項目か。
     """
 
     name: str
     config: dict[str, Any]
     condition: TrendCondition | None
     uses_race_result: bool = False
+    hide_entry_column: bool = False
+
+    @property
+    def shows_entry_column(self) -> bool:
+        """記事の表に該当馬列を付けるか。
+
+        今走の結果で値が決まる項目と、hide_entry_column の項目には付けない。
+
+        Returns:
+            bool: 該当馬列を付ける場合 True。
+        """
+        return not (self.uses_race_result or self.hide_entry_column)
 
 
 @dataclass(frozen=True)
@@ -189,6 +205,7 @@ def _parse_category(raw: Any, file_name: str) -> CatalogCategory:
             config=config,
             conditionable=bool(raw_item.get("conditionable", False)),
             uses_race_result=bool(raw_item.get("uses_race_result", False)),
+            hide_entry_column=bool(raw_item.get("hide_entry_column", False)),
         )
     return CatalogCategory(name=raw["name"], description=raw["description"], items=items)
 
@@ -238,6 +255,7 @@ def _build_item(
         config=_embed_placeholders(catalog_item.config, placeholders),
         condition=condition,
         uses_race_result=catalog_item.uses_race_result,
+        hide_entry_column=catalog_item.hide_entry_column,
     )
 
 
