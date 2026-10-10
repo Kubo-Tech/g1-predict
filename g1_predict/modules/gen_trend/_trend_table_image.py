@@ -31,6 +31,9 @@ _DARK_TEXT_WAKU = (1, 5, 7, 8)
 _NO_ROW_TEXT = "-"
 _ROW_SEPARATOR = "・"
 _FIXED_HEADERS = ("枠", "馬番", "馬名")
+# 右端に置く、黄色で塗ったセルの数を書く列
+_GOOD_HEADER = "好データ"
+_GOOD_COLOR = "yellow"
 _FONT = FontProperties(family="Noto Sans CJK JP", size=10)
 _BOLD_FONT = FontProperties(family="Noto Sans CJK JP", size=10, weight="bold")
 # セルの寸法（インチ）
@@ -74,6 +77,7 @@ def make_comparison_table(
     「前走クラス着順」の列は、まとめた項目の値の前にクラスの略称を付けて「G1 1着」のように書く。
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
+    右端には「好データ」の列を置き、その馬の項目の列のうち黄色で塗ったセルの数を書く。
 
     Args:
         horses (pd.DataFrame): 馬番順の出走馬。
@@ -87,6 +91,7 @@ def make_comparison_table(
     header = [_Cell(text, _HEADER_COLOR, bold=True, centered=True) for text in _FIXED_HEADERS]
     for column, _ in shown:
         header.append(_Cell(column.item_name, _HEADER_COLOR, bold=True, centered=True))
+    header.append(_Cell(_GOOD_HEADER, _HEADER_COLOR, bold=True, centered=True))
     body: list[list[_Cell]] = []
     for horse in horses.to_dict("records"):
         waku = int(horse["waku"])
@@ -97,12 +102,17 @@ def make_comparison_table(
             _Cell(str(umaban), _BODY_COLOR, centered=True),
             _Cell(str(horse["bamei"]), _BODY_COLOR),
         ]
+        good_count = 0
         for column, tables in shown:
             entries = [
                 entry for table in tables for entry in _cell_entries(column, table, umaban)
             ]
             names = _ROW_SEPARATOR.join(text for text, _ in entries)
-            row.append(_Cell(names or _NO_ROW_TEXT, _find_fill_color(column, entries)))
+            fill = _find_fill_color(column, entries)
+            if fill == _FILL_COLORS[_GOOD_COLOR]:
+                good_count += 1
+            row.append(_Cell(names or _NO_ROW_TEXT, fill))
+        row.append(_Cell(str(good_count), _BODY_COLOR, centered=True))
         body.append(row)
     return _draw_table(header, body)
 
