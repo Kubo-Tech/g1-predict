@@ -1,7 +1,7 @@
 基本項目:
   - 枠順:
       color_rules:
-        - {metric: 複勝率, op: ">=", value: 20, color: yellow}
+        - {labels: [1枠, 2枠, 3枠, 4枠], color: yellow}
   - 前走脚質:
       color_rules:
         - {labels: [逃げ, 先行], color: yellow}
@@ -39,7 +39,7 @@
 馬以外の属性:
   - 騎手:
       color_rules:
-        - {metric: 複勝率, op: ">=", value: 30, color: yellow}
+        - {metric: 3着内数, op: ">=", value: 2, color: yellow}
   - 生産者:
       color_rules:
         - {labels: [ノーザンファーム], color: yellow}
