@@ -15,7 +15,7 @@ from ._trend_renderer import (
     build_category_section,
     build_item_table,
     format_scope_note,
-    has_entry_horses,
+    is_entry_table_informative,
 )
 from ._trend_table_config import TableColumn, parse_table_config
 from ._trend_table_image import make_comparison_table
@@ -75,7 +75,7 @@ def build_trend_sections(
 
     entries を指定した場合は、各表に今回の出走馬が当たる行を「該当馬」列として書き、
     table.yml に項目があるカテゴリには出走馬の比較表の画像を載せる。今回の出走馬が1頭も当たらない
-    表は、記事にも比較表にも載せない。
+    表と、全頭が同じ1つの行だけに当たる表は、記事にも比較表にも載せない。
 
     Args:
         race_info (pd.DataFrame): レース基本情報DataFrame（raw英語カラム名）。
@@ -107,7 +107,7 @@ def build_trend_sections(
             table
             for item in category.items
             if (table := build_item_table(item, context, entry_race_code)) is not None
-            and (entries is None or has_entry_horses(table))
+            and (entries is None or is_entry_table_informative(table, len(horses)))
         ]
         image_path: str | None = None
         if category.name in table_columns:

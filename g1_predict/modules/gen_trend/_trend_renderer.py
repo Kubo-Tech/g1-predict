@@ -147,18 +147,25 @@ def build_item_table(
     return ItemTable(item=item, rows=rows, stats=stats, entry_rows=entry_rows)
 
 
-def has_entry_horses(table: ItemTable) -> bool:
+def is_entry_table_informative(table: ItemTable, horse_count: int) -> bool:
     """出走馬の確定後に、項目の表を記事に載せるか判定する。
 
-    該当馬列を付ける項目で、今回の出走馬が1頭もどの行にも当たらない表は載せない。
+    該当馬列を付ける項目で、今回の出走馬が1頭もどの行にも当たらない表と、
+    今回の出走馬の全頭が同じ1つの行だけに当たる表は載せない。
 
     Args:
         table (ItemTable): 項目の表。
+        horse_count (int): 今回の出走馬の頭数。
 
     Returns:
         bool: 表を載せる場合 True。
     """
-    return not table.item.shows_entry_column or bool(table.entry_rows)
+    if not table.item.shows_entry_column:
+        return True
+    hit_rows = [label for label in table.rows if table.horse_nums(label)]
+    if not hit_rows:
+        return False
+    return not (len(hit_rows) == 1 and len(table.horse_nums(hit_rows[0])) == horse_count)
 
 
 def build_category_section(

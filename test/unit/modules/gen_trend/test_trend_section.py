@@ -143,8 +143,8 @@ def test_build_trend_sections_without_comparison_columns_has_no_image() -> None:
     assert mock_section.call_args_list[0][0][3:] == (True, None)
 
 
-def test_build_trend_sections_with_entries_drops_tables_without_entry_horses() -> None:
-    """出走馬が1頭も当たらない表は、記事にも比較表にも載せない。"""
+def test_build_trend_sections_with_entries_drops_uninformative_tables() -> None:
+    """出走馬の当たり方から載せないと判定した表は、記事にも比較表にも載せない。"""
     context = MagicMock(race_name="スプリンターズステークス", kyori=1200)
     horses = pd.DataFrame({"waku": [1], "umaban": [1], "bamei": ["A"]})
     kept, dropped = MagicMock(name="kept"), MagicMock(name="dropped")
@@ -155,7 +155,10 @@ def test_build_trend_sections_with_entries_drops_tables_without_entry_horses() -
         patch(f"{_SECTION}.format_scope_note", return_value="※注記"),
         patch(f"{_SECTION}.fetch_entry_horses", return_value=horses),
         patch(f"{_SECTION}.build_item_table", side_effect=[kept, dropped]),
-        patch(f"{_SECTION}.has_entry_horses", side_effect=lambda table: table is kept),
+        patch(
+            f"{_SECTION}.is_entry_table_informative",
+            side_effect=lambda table, horse_count: table is kept and horse_count == 1,
+        ),
         patch(f"{_SECTION}.build_category_section", return_value="## s") as mock_section,
         patch(f"{_SECTION}.make_comparison_table", return_value=None) as mock_table,
     ):

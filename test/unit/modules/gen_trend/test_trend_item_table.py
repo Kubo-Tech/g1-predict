@@ -14,7 +14,7 @@ from g1_predict.modules.gen_trend._trend_renderer import (
     _format_item_section,
     build_category_section,
     build_item_table,
-    has_entry_horses,
+    is_entry_table_informative,
 )
 
 _RENDERER = "g1_predict.modules.gen_trend._trend_renderer"
@@ -323,27 +323,35 @@ def test_build_category_section_omits_horse_column_for_hidden_items(flags: dict[
     assert "該当馬" not in result
 
 
-# --- has_entry_horses ---
+# --- is_entry_table_informative ---
 
 
-def test_has_entry_horses_true_when_a_horse_hits_a_row() -> None:
-    """出走馬が当たる行がある表は載せる。"""
-    table = _build(_make_fixed_item(), _STATS, {1: ["1-4枠"]})
+@pytest.mark.parametrize(
+    "entry_rows, horse_count, expected",
+    [
+        # 出走馬が複数の行に分かれる
+        ({1: ["1-4枠"], 2: ["5-8枠"]}, 2, True),
+        # 出走馬が1頭も当たらない
+        ({}, 2, False),
+        # 全頭が同じ1つの行に当たる
+        ({1: ["1-4枠"], 2: ["1-4枠"]}, 2, False),
+        # 当たる行は1つだが、どの行にも当たらない馬がいる
+        ({1: ["1-4枠"]}, 2, True),
+    ],
+)
+def test_is_entry_table_informative(
+    entry_rows: dict[int, list[str]], horse_count: int, expected: bool
+) -> None:
+    """出走馬が1頭も当たらない表と、全頭が同じ1つの行だけに当たる表は載せない。"""
+    table = _build(_make_fixed_item(), _STATS, entry_rows)
     assert table is not None
-    assert has_entry_horses(table) is True
+    assert is_entry_table_informative(table, horse_count) is expected
 
 
-def test_has_entry_horses_false_without_hit_horses() -> None:
-    """出走馬が1頭も当たらない表は載せない。"""
-    table = _build(_make_fixed_item(), _STATS, {})
-    assert table is not None
-    assert has_entry_horses(table) is False
-
-
-def test_has_entry_horses_keeps_table_without_entry_column() -> None:
-    """該当馬列を付けない項目の表は、出走馬が当たらなくても載せる。"""
+def test_is_entry_table_informative_keeps_table_without_entry_column() -> None:
+    """該当馬列を付けない項目の表は、出走馬の当たり方によらず載せる。"""
     base = _make_fixed_item()
     item = TrendItem(name=base.name, config=base.config, condition=None, uses_race_result=True)
     table = _build(item, _STATS, {})
     assert table is not None
-    assert has_entry_horses(table) is True
+    assert is_entry_table_informative(table, 2) is True
