@@ -279,6 +279,7 @@ def _format_item_section(table: ItemTable, with_entries: bool) -> str:
     """1項目分の h3 テーブルセクション文字列を生成する。
 
     各行の集計値から Markdown テーブルを生成する。
+    該当馬が他の行より抜けて多い行は、該当馬列に馬番を並べず「その他」と書く。
     項目に開催条件が注入されている場合は、表の直下に開催条件の注記を出力する。
     項目に note がある場合は、その直下に出力する。
 
@@ -299,9 +300,12 @@ def _format_item_section(table: ItemTable, with_entries: bool) -> str:
         "| " + " | ".join(header_cells) + " |",
         "| " + " | ".join(["---"] * len(header_cells)) + " |",
     ]
+    crowded_row = _find_crowded_row(table) if with_entries else None
     for label in table.rows:
         horses: str | None = None
-        if with_entries:
+        if label == crowded_row:
+            horses = OTHER_LABEL
+        elif with_entries:
             horses = ", ".join(str(num) for num in table.horse_nums(label))
         lines.append(_format_table_row(table.display_name(label), table.stats[label], horses))
 
@@ -312,6 +316,29 @@ def _format_item_section(table: ItemTable, with_entries: bool) -> str:
             lines.append(note)
 
     return "\n".join(lines)
+
+
+def _find_crowded_row(table: ItemTable) -> str | None:
+    """該当馬が他の行より抜けて多い行を返す。
+
+    該当馬のいる行が2行以上あり、該当馬が1番多い行の頭数が2番目に多い行の頭数の2倍以上の場合に、
+    1番多い行を返す。
+
+    Args:
+        table (ItemTable): 項目の表。
+
+    Returns:
+        str | None: 該当馬が抜けて多い行のラベル。無い場合は None。
+    """
+    counts = sorted(
+        ((len(table.horse_nums(label)), label) for label in table.rows),
+        key=lambda count_label: count_label[0],
+        reverse=True,
+    )
+    if len(counts) < 2 or counts[1][0] == 0:
+        return None
+    (top_count, top_label), (second_count, _) = counts[0], counts[1]
+    return top_label if top_count >= 2 * second_count else None
 
 
 def _get_dynamic_labels(
