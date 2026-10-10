@@ -229,6 +229,22 @@ def test_format_table_row_zero_total() -> None:
     assert "- |" in row
 
 
+@pytest.mark.parametrize(
+    "tansho, fukusho, expected",
+    [
+        (100.4, 99.0, "| 100% | 99% |"),
+        (100.6, 250.0, "| **101%** | **250%** |"),
+        (180.0, 60.0, "| **180%** | 60% |"),
+    ],
+)
+def test_format_table_row_bolds_kaishuu_over_100(
+    tansho: float, fukusho: float, expected: str
+) -> None:
+    """単回・複回は、四捨五入した値が100%を超える場合に太字にする。"""
+    s = RowStats(first=1, fourth_plus=1, total=2, tansho_kaishuu=tansho, fukusho_kaishuu=fukusho)
+    assert _format_table_row("A", s).endswith(expected)
+
+
 # --- _format_chakudo ---
 
 

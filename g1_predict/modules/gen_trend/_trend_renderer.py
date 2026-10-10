@@ -439,12 +439,12 @@ def _format_table_row(label: str, s: RowStats, horses: str | None = None) -> str
 
     Returns:
         str: | label | 着度数 | 勝率 | 複率 | 単回 | 複回 | 形式の文字列。
-            horses がある場合は末尾に該当馬の列が付く。
+            horses がある場合は末尾に該当馬の列が付く。単回・複回は100%を超えると太字にする。
     """
     win_str = _format_percent(s.first, s.total)
     place_str = _format_percent(s.first + s.second + s.third, s.total)
-    tansho_str = f"{round(s.tansho_kaishuu)}%" if s.total > 0 else "-"
-    fukusho_str = f"{round(s.fukusho_kaishuu)}%" if s.total > 0 else "-"
+    tansho_str = _format_kaishuu(s.tansho_kaishuu, s.total)
+    fukusho_str = _format_kaishuu(s.fukusho_kaishuu, s.total)
     cells = [label, _format_chakudo(s), win_str, place_str, tansho_str, fukusho_str]
     if horses is not None:
         cells.append(horses)
@@ -479,3 +479,22 @@ def _format_percent(count: int, total: int) -> str:
     if total == 0:
         return "-"
     return f"{round(count / total * 100)}%"
+
+
+def _format_kaishuu(kaishuu: float, total: int) -> str:
+    """回収率を百分率文字列に変換する。
+
+    total が 0 の場合はデータなしを示す "-" を返す。
+    四捨五入した値が100%を超える場合は太字にする。
+
+    Args:
+        kaishuu (float): 回収率（%）。
+        total (int): 行の頭数。
+
+    Returns:
+        str: "N%" 形式の文字列。100%を超える場合は "**N%**"、total が 0 の場合は "-"。
+    """
+    if total == 0:
+        return "-"
+    rounded = round(kaishuu)
+    return f"**{rounded}%**" if rounded > 100 else f"{rounded}%"
