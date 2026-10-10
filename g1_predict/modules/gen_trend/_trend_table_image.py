@@ -68,7 +68,8 @@ def make_comparison_table(
 
     行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名の列を置き、続けて columns の順に
     項目の列を置く。各セルには、その馬が当たる行の名前（display_map があれば表示名）を書く。
-    複数の行に当たる場合は「・」でつなぎ、当たる行が無い場合は「-」と書く。
+    複数の行に当たる場合は「・」でつなぎ、当たる行が無い場合は「-」と書く。ただし fixed の項目
+    （前年3着以内・前年5着以内のように行の範囲が重なる項目）は、当たる行のうち表の先頭に近い行だけを書く。
     セルは、当たった行のうち先に色付けのルールに当てはまった行の色で塗る。
     記事に表が出ない項目は載せない。
 
@@ -104,11 +105,29 @@ def make_comparison_table(
             _Cell(str(horse["bamei"]), _BODY_COLOR),
         ]
         for column, table in shown:
-            labels = table.entry_rows.get(umaban, [])
+            labels = _cell_labels(table, umaban)
             names = _ROW_SEPARATOR.join(table.display_name(label) for label in labels)
             row.append(_Cell(names or _NO_ROW_TEXT, _find_fill_color(column, table, labels)))
         body.append(row)
     return _draw_table(header, body)
+
+
+def _cell_labels(table: ItemTable, umaban: int) -> list[str]:
+    """出走馬のセルに書く行のラベルを返す。
+
+    fixed の項目は、当たる行のうち表の先頭に近い行だけにする。
+
+    Args:
+        table (ItemTable): 列の項目の表。
+        umaban (int): 出走馬の馬番。
+
+    Returns:
+        list[str]: セルに書く行のラベル（表の行の順）。当たる行が無い場合は空。
+    """
+    labels = table.entry_rows.get(umaban, [])
+    if table.item.config.get("rows", {}).get("type") == "fixed":
+        return labels[:1]
+    return labels
 
 
 def _find_fill_color(column: TableColumn, table: ItemTable, labels: list[str]) -> str:

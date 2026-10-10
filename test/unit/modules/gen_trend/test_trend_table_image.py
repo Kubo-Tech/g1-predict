@@ -1,5 +1,7 @@
 """_trend_table_image の単体テスト。"""
 
+from typing import Any
+
 import pandas as pd
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
@@ -24,9 +26,12 @@ def _make_table(
     stats: dict[str, RowStats],
     entry_rows: dict[int, list[str]],
     display_map: dict[str, str] | None = None,
+    rows_type: str | None = None,
 ) -> ItemTable:
     """テスト用 ItemTable を生成する。"""
-    config = {"display_map": display_map} if display_map else {}
+    config: dict[str, Any] = {"display_map": display_map} if display_map else {}
+    if rows_type is not None:
+        config["rows"] = {"type": rows_type}
     item = TrendItem(name=name, config=config, condition=None)
     return ItemTable(item=item, rows=list(stats), stats=stats, entry_rows=entry_rows)
 
@@ -79,6 +84,22 @@ def test_make_comparison_table_cell_text_uses_display_name_and_joins_rows() -> N
     assert figure is not None
     texts, _ = _cells(figure)
     assert texts[7] == "同じ騎手・乗り戻り"
+
+
+def test_make_comparison_table_fixed_item_shows_first_hit_row_only() -> None:
+    """fixed の項目で複数の行に当たる馬は、表の先頭に近い行だけを書き、その行の色で塗る。"""
+    stats = {"前年3着以内": _BAD, "前年5着以内": _GOOD}
+    rule = MetricRule(color="green", metric="複勝率", op=">=", value=30)
+    tables = [
+        _make_table(
+            "リピーター", stats, {1: ["前年3着以内", "前年5着以内"]}, rows_type="fixed"
+        )
+    ]
+    figure = make_comparison_table(_HORSES, tables, [TableColumn("リピーター", (rule,))])
+    assert figure is not None
+    texts, fills = _cells(figure)
+    assert texts[7] == "前年3着以内"
+    assert fills[7] == "#FFFFFF"
 
 
 def test_make_comparison_table_horse_without_row_shows_hyphen() -> None:
