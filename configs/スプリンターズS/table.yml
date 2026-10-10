@@ -1,26 +1,24 @@
 基本項目:
   - 枠順:
       color_rules:
-        - {metric: 複勝率, op: ">=", value: 30, color: yellow}
+        - {metric: 複勝率, op: ">=", value: 20, color: yellow}
   - 前走脚質:
       color_rules:
         - {labels: [逃げ, 先行], color: yellow}
-  - 前走上がり3F順位:
+  - 前走4角通過順位:
       color_rules:
-        - {labels: [1位], color: yellow}
+        - {labels: [1番手, 2-5番手], color: yellow}
+        - {labels: [10番手以下	], color: gray}
   - 所属:
       color_rules:
         - {labels: [美浦], color: yellow}
   - 馬齢:
       color_rules:
         - {labels: [4歳], color: yellow}
-  - 性別:
-      color_rules:
-        - {labels: [牡], color: yellow}
 前走:
   - 前走レース:
       color_rules:
-        - {labels: [産経賞セントウルステークス, キーンランドカップ, テレビ西日本賞北九州記念, 安田記念], color: yellow}
+        - {labels: [産経賞セントウルステークス, キーンランドカップ, テレビ西日本賞北九州記念, 安田記念, ＣＢＣ賞], color: yellow}
         - {labels: [アイビスサマーダッシュ], color: gray}
   - 前走距離:
       color_rules:
@@ -28,12 +26,16 @@
         - {labels: [距離延長], color: gray}
   - 前走G1着順:
       color_rules:
-        - {labels: [1着, 2着, 3着, 4着, 5着, 6-9着, 10着以下], color: yellow}
+        - {labels: [1着, 2着, 3着], color: yellow}
   - 前走G2着順:
       color_rules:
-        - {labels: [1着], color: yellow}
-実績:
-  - リピーター
+        - {labels: [3着, 4着, 5着, 6-9着, 10着以下], color: gray}
+  - 前走G3着順:
+      color_rules:
+        - {labels: [6-9着, 10着以下], color: gray}
+  - 前走非重賞着順:
+      color_rules:
+        - {labels: [1着, 2着, 3着, 4着, 5着, 6-9着, 10着以下], color: gray}
 調教:
   - 当週/1週前坂路ラスト2F24.0秒未満:
       color_rules:
@@ -48,7 +50,4 @@
         - {metric: 複勝率, op: ">=", value: 30, color: yellow}
   - 生産者:
       color_rules:
-        - {metric: 複勝率, op: ">=", value: 30, color: yellow}
-  - 種牡馬:
-      color_rules:
-        - {metric: 複勝率, op: ">=", value: 30, color: yellow}
+        - {labels: [ノーザンファーム], color: yellow}
