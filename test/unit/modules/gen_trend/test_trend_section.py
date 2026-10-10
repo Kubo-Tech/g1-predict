@@ -32,7 +32,7 @@ def test_build_trend_sections_returns_scope_note_and_sections_in_race_config_ord
         patch(f"{_SECTION}.format_scope_note", return_value="※注記") as mock_note,
         patch(
             f"{_SECTION}.build_category_section",
-            side_effect=lambda category, *_args: f"## {category.name}",
+            side_effect=lambda category, *_args, **_kwargs: f"## {category.name}",
         ),
     ):
         race_config = {"基本項目": ["人気"], "前走": ["前走着順"]}
@@ -123,6 +123,7 @@ def test_build_trend_sections_with_entries_adds_comparison_image() -> None:
     )
     assert result.images == {"img/trend_table/基本項目.png": figure}
     assert mock_section.call_args_list[0][0][3:] == (True, "img/trend_table/基本項目.png")
+    assert mock_section.call_args_list[0][1] == {"horse_count": 1}
     # table.yml に項目が無いカテゴリには比較表を出さない
     assert mock_section.call_args_list[1][0][3:] == (True, None)
     assert mock_table.call_count == 1

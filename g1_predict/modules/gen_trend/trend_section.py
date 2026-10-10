@@ -116,7 +116,7 @@ def build_trend_sections(
                 image_path = f"{_TABLE_IMAGE_DIR}/{category.name.replace('/', '')}.png"
                 images[image_path] = figure
         sections[category.name] = build_category_section(
-            category, context, tables, entries is not None, image_path
+            category, context, tables, entries is not None, image_path, horse_count=len(horses)
         )
     return TrendSections(
         scope_note=format_scope_note(context, race_label),

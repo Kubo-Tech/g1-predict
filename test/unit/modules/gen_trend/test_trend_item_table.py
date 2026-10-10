@@ -257,32 +257,37 @@ def _make_three_row_item() -> TrendItem:
 _THREE_ROW_STATS = {"1位": RowStats(), "2位": RowStats(), "3位以下": RowStats()}
 
 
+_CROWDED_ENTRY_ROWS = {
+    1: ["1位"], 2: ["2位"], 3: ["2位"],
+    4: ["3位以下"], 5: ["3位以下"], 6: ["3位以下"], 7: ["3位以下"],
+}
+
+
 @pytest.mark.parametrize(
-    "entry_rows, expected",
+    "entry_rows, horse_count, expected",
     [
-        # 1番多い行（4頭）が2番目（2頭）の2倍以上
-        (
-            {1: ["1位"], 2: ["2位"], 3: ["2位"], 4: ["3位以下"], 5: ["3位以下"],
-             6: ["3位以下"], 7: ["3位以下"]},
-            ["1", "2, 3", "その他"],
-        ),
-        # 1番多い行（3頭）が2番目（2頭）の2倍未満
+        # 全頭が当たり、1番多い行（4頭）が2番目（2頭）の2倍以上
+        (_CROWDED_ENTRY_ROWS, 7, ["1", "2, 3", "その他"]),
+        # 1番多い行は2番目の2倍以上だが、どの行にも当たらない馬がいる
+        (_CROWDED_ENTRY_ROWS, 8, ["1", "2, 3", "4, 5, 6, 7"]),
+        # 全頭が当たり、1番多い行（3頭）が2番目（2頭）の2倍未満
         (
             {1: ["1位"], 2: ["2位"], 3: ["2位"], 4: ["3位以下"], 5: ["3位以下"],
              6: ["3位以下"]},
+            6,
             ["1", "2, 3", "4, 5, 6"],
         ),
         # 該当馬のいる行が1行だけ
-        ({1: ["3位以下"], 2: ["3位以下"]}, ["", "", "1, 2"]),
+        ({1: ["3位以下"], 2: ["3位以下"]}, 2, ["", "", "1, 2"]),
     ],
 )
 def test_format_item_section_writes_other_for_crowded_row(
-    entry_rows: dict[int, list[str]], expected: list[str]
+    entry_rows: dict[int, list[str]], horse_count: int, expected: list[str]
 ) -> None:
-    """該当馬が1番多い行の頭数が2番目の行の2倍以上なら、その行の該当馬列は「その他」と書く。"""
+    """全頭が当たる表で、1番多い行の頭数が2番目の2倍以上なら「その他」と書く。"""
     table = _build(_make_three_row_item(), _THREE_ROW_STATS, entry_rows)
     assert table is not None
-    lines = _format_item_section(table, with_entries=True).split("\n")
+    lines = _format_item_section(table, with_entries=True, horse_count=horse_count).split("\n")
     assert [line.rsplit("|", 2)[1].strip() for line in lines[4:7]] == expected
 
 

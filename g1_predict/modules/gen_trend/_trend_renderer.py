@@ -174,6 +174,7 @@ def build_category_section(
     tables: list[ItemTable],
     with_entries: bool = False,
     comparison_image: str | None = None,
+    horse_count: int = 0,
 ) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
 
@@ -188,6 +189,7 @@ def build_category_section(
         tables (list[ItemTable]): カテゴリの各項目の表（表を出さない項目は含めない）。
         with_entries (bool): 該当馬列を付けるか。
         comparison_image (str | None): 比較表の画像の、記事ディレクトリからの相対パス。
+        horse_count (int): 今回の出走馬の頭数。
 
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
@@ -196,7 +198,9 @@ def build_category_section(
     header = f"## {category.name}\n\n{description}"
 
     sections = [
-        _format_item_section(table, with_entries and table.item.shows_entry_column)
+        _format_item_section(
+            table, with_entries and table.item.shows_entry_column, horse_count
+        )
         for table in tables
     ]
     if comparison_image is not None:
@@ -296,17 +300,19 @@ def _assign_entry_rows(
     return entry_rows
 
 
-def _format_item_section(table: ItemTable, with_entries: bool) -> str:
+def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int = 0) -> str:
     """1項目分の h3 テーブルセクション文字列を生成する。
 
     各行の集計値から Markdown テーブルを生成する。
-    該当馬が他の行より抜けて多い行は、該当馬列に馬番を並べず「その他」と書く。
+    出走馬の全頭がいずれかの行に当たる表で、該当馬が他の行より抜けて多い行は、該当馬列に馬番を
+    並べず「その他」と書く。
     項目に開催条件が注入されている場合は、表の直下に開催条件の注記を出力する。
     項目に note がある場合は、その直下に出力する。
 
     Args:
         table (ItemTable): 出力する項目の表。
         with_entries (bool): 該当馬列を付けるか。
+        horse_count (int): 今回の出走馬の頭数。
 
     Returns:
         str: ### ヘッダーから始まる Markdown テーブル文字列。
@@ -321,7 +327,7 @@ def _format_item_section(table: ItemTable, with_entries: bool) -> str:
         "| " + " | ".join(header_cells) + " |",
         "| " + " | ".join(["---"] * len(header_cells)) + " |",
     ]
-    crowded_row = _find_crowded_row(table) if with_entries else None
+    crowded_row = _find_crowded_row(table, horse_count) if with_entries else None
     for label in table.rows:
         horses: str | None = None
         if label == crowded_row:
@@ -339,18 +345,22 @@ def _format_item_section(table: ItemTable, with_entries: bool) -> str:
     return "\n".join(lines)
 
 
-def _find_crowded_row(table: ItemTable) -> str | None:
+def _find_crowded_row(table: ItemTable, horse_count: int) -> str | None:
     """該当馬が他の行より抜けて多い行を返す。
 
-    該当馬のいる行が2行以上あり、該当馬が1番多い行の頭数が2番目に多い行の頭数の2倍以上の場合に、
+    「その他」は表に書いた該当馬以外の出走馬すべてを指すため、出走馬の全頭がいずれかの行に当たる
+    表に限る。そのうえで該当馬のいる行が2行以上あり、該当馬が1番多い行の頭数が2番目に多い行の頭数の2倍以上の場合に、
     1番多い行を返す。
 
     Args:
         table (ItemTable): 項目の表。
+        horse_count (int): 今回の出走馬の頭数。
 
     Returns:
         str | None: 該当馬が抜けて多い行のラベル。無い場合は None。
     """
+    if len(table.entry_rows) < horse_count:
+        return None
     counts = sorted(
         ((len(table.horse_nums(label)), label) for label in table.rows),
         key=lambda count_label: count_label[0],
