@@ -95,6 +95,7 @@ def test_build_item_table_maps_entries_to_fixed_rows() -> None:
     assert table.entry_rows == {1: ["1-4枠"], 2: ["1-4枠"], 9: ["5-8枠"]}
     assert table.horse_nums("1-4枠") == [1, 2]
     assert table.horse_nums("5-8枠") == [9]
+    assert table.entry_values == table.entry_rows
 
 
 def test_build_item_table_dynamic_entry_outside_rows_goes_to_other() -> None:
@@ -109,6 +110,13 @@ def test_build_item_table_dynamic_entry_outside_rows_goes_to_other() -> None:
     assert table.rows == ["A", "B", OTHER_LABEL]
     assert table.entry_rows == {1: ["A"], 2: [OTHER_LABEL], 3: [OTHER_LABEL]}
     assert table.horse_nums(OTHER_LABEL) == [2, 3]
+    # 「その他」にまとめる前の値も残す
+    assert table.entry_values == {1: ["A"], 2: ["C"], 3: ["未登場の騎手"]}
+    assert [table.row_of_value(v) for v in ["A", "C", "未登場の騎手"]] == [
+        "A",
+        OTHER_LABEL,
+        OTHER_LABEL,
+    ]
 
 
 def test_build_item_table_dynamic_other_row_aggregates_stats() -> None:

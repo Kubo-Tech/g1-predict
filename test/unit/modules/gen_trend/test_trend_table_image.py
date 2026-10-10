@@ -27,13 +27,20 @@ def _make_table(
     entry_rows: dict[int, list[str]],
     display_map: dict[str, str] | None = None,
     rows_type: str | None = None,
+    entry_values: dict[int, list[str]] | None = None,
 ) -> ItemTable:
     """テスト用 ItemTable を生成する。"""
     config: dict[str, Any] = {"display_map": display_map} if display_map else {}
     if rows_type is not None:
         config["rows"] = {"type": rows_type}
     item = TrendItem(name=name, config=config, condition=None)
-    return ItemTable(item=item, rows=list(stats), stats=stats, entry_rows=entry_rows)
+    return ItemTable(
+        item=item,
+        rows=list(stats),
+        stats=stats,
+        entry_rows=entry_rows,
+        entry_values=entry_rows if entry_values is None else entry_values,
+    )
 
 
 def _cells(figure: Figure) -> tuple[list[str], list[str]]:
@@ -111,16 +118,34 @@ def test_make_comparison_table_horse_without_row_shows_hyphen() -> None:
     assert [texts[7], texts[11], texts[15]] == ["安田記念", "-", "-"]
 
 
-def test_make_comparison_table_other_row_is_written_as_other() -> None:
-    """dynamic の項目で表に出ていない行に当たる馬のセルは「その他」と書く。"""
-    tables = [_make_table("騎手", {"武豊": _GOOD, OTHER_LABEL: _BAD}, {3: [OTHER_LABEL]})]
-    figure = make_comparison_table(_HORSES, tables, [TableColumn("騎手", ())])
+def test_make_comparison_table_dynamic_writes_value_instead_of_other() -> None:
+    """dynamic の項目で記事の表では「その他」にまとめた馬も、セルには値そのものを書く。"""
+    stats = {"武豊": _GOOD, OTHER_LABEL: _BAD}
+    tables = [
+        _make_table(
+            "騎手",
+            stats,
+            {1: ["武豊"], 3: [OTHER_LABEL]},
+            rows_type="dynamic",
+            entry_values={1: ["武豊"], 3: ["坂井瑠星"]},
+        )
+    ]
+    gray = MetricRule(color="gray", metric="複勝率", op="==", value=0)
+    yellow = LabelsRule(color="yellow", labels=("坂井瑠星",))
+    figure = make_comparison_table(_HORSES, tables, [TableColumn("騎手", (gray, yellow))])
     assert figure is not None
-    texts, _ = _cells(figure)
-    assert texts[11] == "その他"
+    texts, fills = _cells(figure)
+    assert [texts[7], texts[11]] == ["武豊", "坂井瑠星"]
+    # 指標のルールは「その他」行の集計値で判定する
+    assert fills[11] == "#BFBFBF"
+
+    figure = make_comparison_table(_HORSES, tables, [TableColumn("騎手", (yellow,))])
+    assert figure is not None
+    _, fills = _cells(figure)
+    # 行の名前のルールはセルに書く値で判定する
+    assert fills[11] == "#FFEB9C"
 
 
-# 色付け
 def test_make_comparison_table_fills_by_metric_rule() -> None:
     """指標のルールは、馬が当たる行の集計値で塗る。"""
     rule = MetricRule(color="yellow", metric="複勝率", op=">=", value=30)

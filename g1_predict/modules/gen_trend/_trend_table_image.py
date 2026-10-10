@@ -67,10 +67,12 @@ def make_comparison_table(
     """今回の出走馬を項目ごとに見比べる表を、画像にするためのFigureとして生成する。
 
     行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名の列を置き、続けて columns の順に
-    項目の列を置く。各セルには、その馬が当たる行の名前（display_map があれば表示名）を書く。
+    項目の列を置く。各セルには、その馬の値（display_map があれば表示名）を書く。dynamic の項目で
+    記事の表では「その他」にまとめた値も、騎手名などの値そのものを書く。
     複数の行に当たる場合は「・」でつなぎ、当たる行が無い場合は「-」と書く。ただし fixed の項目
     （前年3着以内・前年5着以内のように行の範囲が重なる項目）は、当たる行のうち表の先頭に近い行だけを書く。
-    セルは、当たった行のうち先に色付けのルールに当てはまった行の色で塗る。
+    セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
+    指標のルールは値が当たる記事の表の行の集計値で判定する。
     記事に表が出ない項目は載せない。
 
     Args:
@@ -105,15 +107,15 @@ def make_comparison_table(
             _Cell(str(horse["bamei"]), _BODY_COLOR),
         ]
         for column, table in shown:
-            labels = _cell_labels(table, umaban)
-            names = _ROW_SEPARATOR.join(table.display_name(label) for label in labels)
-            row.append(_Cell(names or _NO_ROW_TEXT, _find_fill_color(column, table, labels)))
+            values = _cell_values(table, umaban)
+            names = _ROW_SEPARATOR.join(table.display_name(value) for value in values)
+            row.append(_Cell(names or _NO_ROW_TEXT, _find_fill_color(column, table, values)))
         body.append(row)
     return _draw_table(header, body)
 
 
-def _cell_labels(table: ItemTable, umaban: int) -> list[str]:
-    """出走馬のセルに書く行のラベルを返す。
+def _cell_values(table: ItemTable, umaban: int) -> list[str]:
+    """出走馬のセルに書く値を返す。
 
     fixed の項目は、当たる行のうち表の先頭に近い行だけにする。
 
@@ -122,31 +124,32 @@ def _cell_labels(table: ItemTable, umaban: int) -> list[str]:
         umaban (int): 出走馬の馬番。
 
     Returns:
-        list[str]: セルに書く行のラベル（表の行の順）。当たる行が無い場合は空。
+        list[str]: セルに書く値。当たる行が無い場合は空。
     """
-    labels = table.entry_rows.get(umaban, [])
+    values = table.entry_values.get(umaban, [])
     if table.item.config.get("rows", {}).get("type") == "fixed":
-        return labels[:1]
-    return labels
+        return values[:1]
+    return values
 
 
-def _find_fill_color(column: TableColumn, table: ItemTable, labels: list[str]) -> str:
+def _find_fill_color(column: TableColumn, table: ItemTable, values: list[str]) -> str:
     """セルを塗る色を返す。
 
-    出走馬が当たる行を表の順に見て、先に色付けのルールに当てはまった行の、
-    最初に当てはまったルールの色にする。
+    セルの値を順に見て、先に色付けのルールに当てはまった値の、最初に当てはまったルールの色にする。
+    行の名前のルールは値の表示名で、指標のルールは値が当たる記事の表の行の集計値で判定する。
 
     Args:
         column (TableColumn): 比較表の列。
         table (ItemTable): 列の項目の表。
-        labels (list[str]): 出走馬が当たる行のラベル。
+        values (list[str]): セルに書く値。
 
     Returns:
         str: 塗る色。当てはまるルールが無い場合は背景色。
     """
-    for label in labels:
+    for value in values:
+        stats = table.stats[table.row_of_value(value)]
         for rule in column.color_rules:
-            if rule.matches(table.display_name(label), table.stats[label]):
+            if rule.matches(table.display_name(value), stats):
                 return _FILL_COLORS[rule.color]
     return _BODY_COLOR
 

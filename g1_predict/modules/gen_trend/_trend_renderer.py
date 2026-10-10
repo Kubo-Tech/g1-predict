@@ -24,12 +24,16 @@ class ItemTable:
         stats (dict[str, RowStats]): 行のラベル -> 過去の集計値。
         entry_rows (dict[int, list[str]]): 馬番 -> 当たる行のラベル（表の行の順）。
             当たる行が無い馬は含まない。
+        entry_values (dict[int, list[str]]): 馬番 -> 出走馬の値。dynamic の項目は「その他」に
+            まとめる前の値（騎手名など）、それ以外の項目は entry_rows と同じ。
+            当たる行が無い馬は含まない。
     """
 
     item: TrendItem
     rows: list[str]
     stats: dict[str, RowStats]
     entry_rows: dict[int, list[str]]
+    entry_values: dict[int, list[str]]
 
     def display_name(self, label: str) -> str:
         """行のラベルの表示名を返す。
@@ -42,6 +46,17 @@ class ItemTable:
         """
         display_map: dict[str, str] = self.item.config.get("display_map", {})
         return display_map.get(label, label)
+
+    def row_of_value(self, value: str) -> str:
+        """出走馬の値が当たる表の行のラベルを返す。
+
+        Args:
+            value (str): entry_values の値。
+
+        Returns:
+            str: 表に行があればその行、無ければ「その他」。
+        """
+        return value if value in self.stats else OTHER_LABEL
 
     def horse_nums(self, label: str) -> list[int]:
         """行に当たる出走馬の馬番を昇順で返す。
@@ -121,7 +136,11 @@ def build_item_table(
     else:
         labels = list(stats_map.keys())
 
-    entry_rows = _assign_entry_rows(entry_groups, labels, rows_cfg["type"] == "dynamic")
+    is_dynamic = rows_cfg["type"] == "dynamic"
+    entry_rows = _assign_entry_rows(entry_groups, labels, is_dynamic)
+    entry_values = (
+        {num: entry_groups[num] for num in entry_rows} if is_dynamic else entry_rows
+    )
     entry_labels = {label for rows in entry_rows.values() for label in rows}
     # 表に出ていない値の出走馬がいれば、top_n などの指定が無い項目でも「その他」行を出す
     add_other_row = add_other_row or OTHER_LABEL in entry_labels
@@ -144,7 +163,9 @@ def build_item_table(
     if add_other_row:
         stats[OTHER_LABEL] = _aggregate_other_stats(stats_map, set(labels))
         rows.append(OTHER_LABEL)
-    return ItemTable(item=item, rows=rows, stats=stats, entry_rows=entry_rows)
+    return ItemTable(
+        item=item, rows=rows, stats=stats, entry_rows=entry_rows, entry_values=entry_values
+    )
 
 
 def is_entry_table_informative(table: ItemTable, horse_count: int) -> bool:
