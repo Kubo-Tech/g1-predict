@@ -1,17 +1,16 @@
 # スクリプトリファレンス
 
-すべてリポジトリルートから `python -m scripts.{名前} --race-code {16桁}` で実行する。引数は `--race-code` のみ。
+すべてリポジトリルートから `python -m scripts.{名前} --race-code {16桁}` で実行する。引数は `--race-code` のみ（`gen_trend` だけ `--with-entries` と `--tokubetsu-kyoso-bango` も指定できる）。
 
 **共通の注意**
 
 - 記事生成系はいずれも出力ファイルを**上書き**する。手で書き足した後に再実行すると編集内容は失われる。
 - `race_code` は16桁の数字であることを検証する。出力先のディレクトリ名にはレース名（DB の値）が入るため、パス区切り文字などが混ざっていないこと、組み立てたパスが `public/` 配下に収まることも確認してから書き込む。いずれかに反する場合は `ValueError` で停止する。
-- 出力先ディレクトリ・ファイル名、`configs/{レース名}/` / `templates/points/{レース名}.md` の参照、記事タイトルで使う「レース名」は、`g1_predict/modules/utils/race_name.py` の `to_race_label()` で競走名本題（`kyosomei_hondai`）を変換した値。`RACE_NAME_ABBREVIATIONS` に登録されているレースは略称になる（例: 「スプリンターズステークス」→「スプリンターズS」）。登録が無いレースは競走名本題がそのまま使われる。DB照合が必要な箇所（`gen_table` の `TableContext` など）には競走名本題（変換前の値）を渡す。
+- 出力先ディレクトリ・ファイル名、`configs/{レース名}/` / `templates/points/{レース名}.md` の参照、記事タイトルで使う「レース名」は、`g1_predict/modules/utils/race_name.py` の `to_race_label()` で競走名本題（`kyosomei_hondai`）を変換した値。`RACE_NAME_ABBREVIATIONS` に登録されているレースは略称になる（例: 「スプリンターズステークス」→「スプリンターズS」）。登録が無いレースは競走名本題がそのまま使われる。DB照合が必要な箇所には競走名本題（変換前の値）を渡す。
 
 | スクリプト | DB | TFJV | configs | templates | 出力 |
 | --- | --- | --- | --- | --- | --- |
-| `gen_trend` | ○ | − | `trends.yml`, `configs/trends/` | − | `過去の傾向.md` |
-| `gen_table` | ○ | − | `table.yml` | − | `table/*.xlsx` |
+| `gen_trend` | ○ | − | `trends.yml`, `configs/trends/`, `table.yml`（`--with-entries` のみ） | − | `過去の傾向.md`, `img/trend_table/比較表.png`（`--with-entries` のみ） |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
 | `gen_past_race_dynamics` | ○ | − | − | − | `出走馬の過去走の展開評価.md`, `img/past_dynamics/*.png` |
@@ -25,18 +24,23 @@
 ## gen_trend — 傾向分析記事
 
 ```bash
-python -m scripts.gen_trend --race-code 2026061409030411
+python -m scripts.gen_trend --race-code 2026061409030411                 # 出走馬の確定前
+python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出走馬の確定後
+python -m scripts.gen_trend --race-code 2026101808040711 --tokubetsu-kyoso-bango 0018  # レースが DB に入る前
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/過去の傾向.md`
+出力: `public/{開催年}/{race_code}_{レース名}/過去の傾向.md`（どちらも上書きする）、`--with-entries` の場合は `public/{開催年}/{race_code}_{レース名}/img/trend_table/比較表.png` も出力する。
 
 処理:
 
-1. `RaceGetter.get_race_shosai()` でレース名（`kyosomei_hondai`）と開催年を取得する。
+1. `RaceGetter.get_race_shosai()` でレース名（`kyosomei_hondai`）と開催年を取得する。レースが DB に無い場合は `ValueError` で停止する。`--tokubetsu-kyoso-bango` を付けた場合は DB からは引かず、同じ特別競走番号のレースのうち今回の開催年より前の直近の開催から競走名本題・距離・トラックを取り、`race_code` から開催年・開催月日・競馬場を取る。
 2. `configs/{レース名}/trends.yml` を読み込む。**ファイルが無い場合や中身が空の場合は、見出し行だけの `過去の傾向.md` を出力する**（エラーにはならない）。
 3. `build_trend_sections()` が、`configs/trends/` の共有定義から `trends.yml` に書かれた項目の定義を取り出し、カテゴリ（`基本項目` / `前走` など YAML のキー）ごとに項目を集計して Markdown テーブルへ整形する。
 4. 集計年数（過去10年。G1になってから10年に満たないレースはG1になった年から前年まで）を決める。
 5. `# 【{レース名}{年}】傾向分析` を先頭に、集計対象の注記、カテゴリセクションを連結して書き出す。
+6. `--with-entries` を付けた場合は、手順2の後に `configs/{レース名}/table.yml` も読み込み、各表に該当馬列を付け、記事の最後に `## 比較表` を足し、比較表の画像を作って `save_images()` で保存する。
+
+`--tokubetsu-kyoso-bango` は、出馬表が出る前でレースがまだ DB に無いときに使う。距離・芝ダは直近の開催と同じとみなすため、今年から距離や芝ダが変わるレースには使えない。特別競走番号が4桁の数字でない場合と、今回の開催年より前に同じ特別競走番号のレースが無い場合は `ValueError` で停止する。出走馬が要る `--with-entries` とは同時に指定できない。
 
 出力される表は次の形式（着度数は `1着-2着-3着-着外`）。
 
@@ -45,45 +49,49 @@ python -m scripts.gen_trend --race-code 2026061409030411
 
 | 枠順 | 着度数 | 勝率 | 複率 | 単回 | 複回 |
 | --- | --- | --- | --- | --- | --- |
-| 1枠 | 0-1-0-1 | 0% | 50% | 0% | 175% |
+| 1枠 | 0-1-0-1 | 0% | 50% | 0% | **175%** |
 
 ※阪神・4日目・良のみ
 ```
 
+- 単回・複回は、四捨五入した値が100%を超える場合に太字にする。
 - 末尾の `※...` は項目に `condition` を注入したときだけ出る（[config-reference.md](config-reference.md#condition--開催条件の注入)）。
 - タイトルの直後に、集計対象の年・競馬場・芝ダ・距離・レース数の注記が出る（例: `※集計対象は、過去10年（2016〜2025年）に中山芝1200mで行われたスプリンターズS（10回）。`）。
-- 各カテゴリの最後に空の `### 比較表` が挿入される。ここは手で埋めるためのプレースホルダ。
-- 集計対象は既定で「対象レースと同じ特別競走番号・同一コースの過去10年」。今回の出馬表が無くても出力できる。
+- 集計対象は既定で「対象レースと同じ特別競走番号・同一コースの過去10年」。`--with-entries` を付けなければ、今回の出馬表が無くても出力できる。
 
-生成後は、各表の下に `> 一言コメント` を足したり、不要な表を削ったりして記事に仕上げる。
+### --with-entries — 出走馬の確定後に載せる情報
 
----
+| | 確定前（引数なし） | 確定後（`--with-entries`） |
+| --- | --- | --- |
+| 各表の「該当馬」列 | なし | あり |
+| `## 比較表` | なし | 記事の最後に、`table.yml` の全項目を並べた画像を1枚載せる |
+| 出馬表が DB に無い場合 | 影響なし | 例外で止める |
+| `table.yml` が無い場合 | 影響なし | 例外で止める |
 
-## gen_table — 出走馬分析表（Excel）
+該当馬列には、今回の出走馬のうちその行に当たる馬の馬番を昇順にカンマ区切りで書く。当たる馬がいない行は空にする。全頭がいずれかの行に当たる表（前走距離など）で、当たる馬のいる行が2行以上あり、当たる馬が1番多い行の頭数が2番目に多い行の頭数の2倍以上の場合は、その行には馬番を並べず「その他」と書く。前走G1着順のように当たらない馬がいる表では、「その他」と書かない。対象の出走馬は出馬表の馬のうち、出走取消・発走除外・競走除外でない馬。人気・枠順と、今走の結果で決まる項目（脚質・4角通過順位・上がり3F順位）の表には該当馬列を付けない。該当馬列を付ける表のうち、今回の出走馬が1頭も当たらない表と、全頭が同じ1つの行だけに当たる表は見出しごと出さない。
 
-```bash
-python -m scripts.gen_table --race-code 2026061409030411
+```markdown
+| 所属 | 着度数 | 勝率 | 複率 | 単回 | 複回 | 該当馬 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 美浦 | 4-3-5-60 | 6% | 17% | 52% | 71% | 2, 5, 9 |
+| 栗東 | 6-7-5-73 | 7% | 20% | 88% | 76% | 1, 3, 4, 6, 7, 8 |
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/table/{race_code}_{レース名}.xlsx`
+比較表は、記事の最後に次の形式で載せる。出走馬が当たる行の判定、色付け、画像の見た目は [config-reference.md](config-reference.md#tableyml--出走馬の比較表) を参照。
 
-処理:
+```markdown
+## 比較表
 
-1. `DataInterface.get_race_basic_info()` でレース名・開催年を取得する。
-2. `configs/{レース名}/table.yml` を読み込む。**ファイルが無い場合は `FileNotFoundError` になる**（`trends.yml` と違い、未定義は許容されない）。
-3. `table.yml` の最上位のキーがシート名（例: `出走馬` / `騎手` / `生産者` / `種牡馬`）。
-4. 各シートは、固定列（`枠` / `馬番` / `馬名`）＋ YAML で定義した列で構成される。
-5. 出走各馬について `TableContext.get_value()` が `source.type` に従い値を取得する。
-6. `openpyxl` で xlsx に書き出す。
+複勝率に差が出る項目を並べて比較した表。
+黄色はプラスデータ、灰色はマイナスデータ。
+「好データ」はプラスデータの該当数を数えたもの。
 
-書式:
+![比較表](img/trend_table/比較表.png)
+```
 
-- ヘッダー行は灰色塗り＋太字、`A2` で固定（`freeze_panes`）。
-- `枠` 列は枠番に応じた JRA の枠色で塗る（`color_rules` は無視される）。
-- それ以外の列は `color_rules` の先頭から評価し、最初に一致したルールの色で塗る。
-- `display_map` があれば表示だけ変換する（色判定は変換前の値に対して行われる）。
+出走馬の判定は `mykeibadb.analytics.get_race_entry_groups` で、集計と同じ `GroupBy` の値を出走馬について求めて行う。`g1_predict/modules/gen_trend/_trend_stats.py` の `build_item_grouping()` が集計と出走馬の判定で共通のグループ分けと行の割り当てを組み立て、`_trend_entries.py` が出走馬の判定、`_trend_table_config.py` が `table.yml` の検証、`_trend_table_image.py` が画像の生成を担う。
 
-分析表は記事にそのまま貼らず、スクリーンショットを `img/table/*.png` として貼る運用になっている。
+生成後は、各表の下に `> 一言コメント` を足したり、不要な表を削ったりして記事に仕上げる。
 
 ---
 

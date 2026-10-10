@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
     A[configs/レース名/<br/>templates/points/] --> B[gen_trend<br/>過去の傾向.md]
-    B --> C[gen_table<br/>xlsx → img/table]
+    B --> C[gen_trend --with-entries<br/>該当馬列・比較表]
     C --> D[TARGET で印を付ける]
     D --> P[gen_prev_day_trend<br/>前日の傾向.md]
     P --> Q[gen_past_race_dynamics<br/>出走馬の過去走の展開評価.md]
@@ -19,7 +19,7 @@ flowchart LR
 
 ## 0. 事前準備（そのレースを初めて扱うとき）
 
-- `configs/{レース名}/trends.yml`（`configs/trends/` の項目名を並べる）と `table.yml` を用意する → [config-reference.md](config-reference.md)
+- `configs/{レース名}/trends.yml`（`configs/trends/` の項目名を並べる）と `table.yml`（比較表に載せる項目と色付けの基準）を用意する → [config-reference.md](config-reference.md)
 - `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書く（`gen_predict` の `## ポイント` 見出しの下に流し込まれる）
 
 ## 1. 傾向分析（週の前半）
@@ -30,16 +30,24 @@ python -m scripts.gen_trend --race-code 2026061409030411
 
 `public/2026/2026061409030411_宝塚記念/過去の傾向.md` が生成される。ここから手で仕上げる。
 
-- 各表の下に `> 一言コメント` を足す（引用記法で書くのが既存記事のスタイル）。
-- 使わない表は削る。`### 比較表` プレースホルダは手で埋めるか削除する。
-
-## 2. 分析表（Excel）
+レースがまだ DB に入っていない場合は、特別競走番号を指定して生成する（例: 秋華賞は `0018`）。
 
 ```bash
-python -m scripts.gen_table --race-code 2026061409030411
+python -m scripts.gen_trend --race-code 2026101808040711 --tokubetsu-kyoso-bango 0018
 ```
 
-`table/{race_code}_{レース名}.xlsx` が生成される。色が付いたセルが多い馬＝条件に合う馬という見方をする。記事には Excel をそのまま貼らず、スクリーンショットを `img/table/01.png` のように保存して貼る。
+- 各表の下に `> 一言コメント` を足す（引用記法で書くのが既存記事のスタイル）。
+- 使わない表は削る。
+
+## 2. 出走馬の比較表（出馬表の確定後）
+
+```bash
+python -m scripts.gen_trend --race-code 2026061409030411 --with-entries
+```
+
+同じ `過去の傾向.md` が上書きされ、各表の右端に今回の出走馬のうちその行に当たる馬の馬番（「該当馬」列）が入る。記事の最後には `## 比較表` として、`table.yml` の全項目を並べた出走馬の比較表の画像（`img/trend_table/比較表.png`）が付く。色が付いたセルが多い馬＝条件に合う馬という見方をする。
+
+手で足した一言コメントは再実行で失われるため、出馬表の確定を待ってから `--with-entries` で生成し直し、その後にコメントを書くとよい。
 
 ## 3. 印を付ける
 

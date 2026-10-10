@@ -5,7 +5,7 @@
 JRA の G1 レースについて、
 
 - **傾向分析記事**（過去10年の着度数・回収率の表）
-- **出走馬分析表**（色付き Excel）
+- **出走馬の比較表**（傾向分析記事に載せる、出走馬を項目ごとに見比べる画像）
 - **予想記事**（印と見解）
 - **結果記事**（着順と回顧）
 
@@ -27,7 +27,7 @@ JRA の G1 レースについて、
 同じ DB を2つのライブラリ経由で参照している点に注意が必要。
 
 - `mykeibadb` 直叩き … カラム名は英字スネークケース（`kakutei_chakujun`、`kohan_3f` など）。集計 SQL（`analytics.analyze_chakudo`）を使う傾向分析側で主に利用する。
-- `keiba_data_interface` … カラム名は日本語（`確定着順`、`後3ハロン` など）。分析表・結果記事側で主に利用する。
+- `keiba_data_interface` … カラム名は日本語（`確定着順`、`後3ハロン` など）。結果記事側で主に利用する。
 
 コード（競馬場コード、馬場状態コード）から名称への変換は、どちらのライブラリにも同等の関数があるが、**`keiba-domain` に一本化している**。定義が3箇所に散らばると不整合に気づけないため。表示名も `keiba-domain` の値をそのまま使う（馬場状態は「良」「稍」「重」「不」）。
 
@@ -46,7 +46,6 @@ flowchart TD
     TPL[templates/]
 
     DB --> GT[gen_trend]
-    DB --> GTB[gen_table]
     DB --> GP[gen_predict]
     DB --> GR[gen_result]
     DB --> GRC[gen_result_comment]
@@ -56,12 +55,11 @@ flowchart TD
     GRC -- 定型文を追記 --> TFJV
 
     CFG --> GT
-    CFG --> GTB
     TPL --> GP
     TPL --> GR
 
     GT --> MD1[public/年/race/過去の傾向.md]
-    GTB --> XLSX[public/年/race/table/*.xlsx]
+    GT --> IMG[public/年/race/img/trend_table/*.png]
     GP --> MD2[public/年/race/予想.md]
     GR --> MD3[public/年/race/回顧.md]
 
@@ -81,7 +79,7 @@ g1-predict/
 │   ├── trends/                     # 傾向表の項目の共有定義（カテゴリごとに1ファイル）
 │   └── {レース名}/
 │       ├── trends.yml              # 傾向表に使う項目名と開催条件
-│       └── table.yml               # 分析表の定義
+│       └── table.yml               # 出走馬の比較表に載せる項目と色付けの基準
 ├── g1_predict/modules/
 │   ├── constants.py                # 複数機能で共有する定数（トラックコード → 芝/ダ、グレード表示）
 │   ├── gen_trend/                  # 傾向分析の生成ロジック
@@ -91,18 +89,16 @@ g1-predict/
 │   │   ├── _course_days.py         # 開催日がコース区分の何日目かを求める
 │   │   ├── _trend_loader.py        # 集計対象レースと集計年数（G1として行われた年数）の決定
 │   │   ├── _trend_sql_exprs.py     # 過去走などから値を求める集計項目の SQL 式
-│   │   ├── _trend_stats.py         # source.type → analytics 呼び出しと集計
-│   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル、注記
+│   │   ├── _trend_stats.py         # source.type → GroupBy と行の割り当て（集計と出走馬の判定で共有）、集計
+│   │   ├── _trend_entries.py       # 今回の出走馬が各項目のどの行に当たるか
+│   │   ├── _trend_table_config.py  # table.yml の読み込みと検証
+│   │   ├── _trend_table_image.py   # 出走馬の比較表の画像
+│   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル、該当馬列、注記
 │   │   └── trend_section.py        # 傾向セクション群の公開 API
 │   ├── gen_day_trend/              # 前日・当日の傾向の生成ロジック
 │   │   └── day_trend.py            # 前日または当日の同競馬場・同芝ダの結果集計
 │   ├── gen_past_race_dynamics/     # 出走馬の過去走の展開評価の生成ロジック
 │   │   └── past_race_dynamics.py   # 過去5走の選定、展開評価、折りたたみ形式の本文と画像
-│   ├── gen_table/                  # 分析表（Excel）の生成ロジック
-│   │   ├── table_context.py        # source.type → 値取得のディスパッチ
-│   │   ├── table_data_cache.py     # DB アクセスとキャッシュ
-│   │   ├── table_stat.py           # 枠・騎手・生産者・種牡馬などの統計計算
-│   │   └── table_utils.py          # フィルタ、色ルール、セル変換
 │   └── utils/
 │       ├── hatena_links.py         # 関連記事のはてなブログ記事リンク取得
 │       ├── image_output.py         # 記事に貼る画像の保存（指定した色を残して256色に減色したPNG）
@@ -120,8 +116,7 @@ g1-predict/
 │   └── points/{レース名}.md         # レース固有の「ポイント」原稿（手書き）
 ├── public/{年}/{race_code}_{レース名}/
 │   ├── 過去の傾向.md / 前日の傾向.md / 当日の傾向.md / 出走馬の過去走の展開評価.md / 予想.md / 回顧.md
-│   ├── table/{race_code}_{レース名}.xlsx
-│   ├── img/                        # 記事に貼る画像（table/ patrol/ result/ race_result/ など任意）
+│   ├── img/                        # 記事に貼る画像（trend_table/ past_dynamics/ prev_day/ race_day/ race_result/ など）
 │   └── ../.hatena_entry_ids.json   # 投稿済みエントリ ID と画像 URL の記録
 └── test/unit/                      # scripts / modules の単体テスト
 ```
@@ -144,11 +139,11 @@ JRA-VAN のレースコード。すべてのスクリプトが `--race-code` で
 
 競馬場コード: `01` 札幌 / `02` 函館 / `03` 福島 / `04` 新潟 / `05` 東京 / `06` 中山 / `07` 中京 / `08` 京都 / `09` 阪神 / `10` 小倉。
 
-`public/` の出力先ディレクトリ名は `{race_code}_{レース名}` で固定されており、レース名は DB の `kyosomei_hondai` から取得する。`configs/{レース名}/` のディレクトリ名もこのレース名と一致している必要がある。ここでのレース名は競走名本題そのものが基本だが、`g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録されているレースは略称を使う（例: 「スプリンターズステークス」→「スプリンターズS」）。DB照合には競走名本題（変換前の値）が必要なので、`TableContext` など DB を引く箇所には略称ではなく競走名本題を渡す。
+`public/` の出力先ディレクトリ名は `{race_code}_{レース名}` で固定されており、レース名は DB の `kyosomei_hondai` から取得する。`configs/{レース名}/` のディレクトリ名もこのレース名と一致している必要がある。ここでのレース名は競走名本題そのものが基本だが、`g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録されているレースは略称を使う（例: 「スプリンターズステークス」→「スプリンターズS」）。DB照合には競走名本題（変換前の値）が必要なので、DB を引く箇所には略称ではなく競走名本題を渡す。
 
 ## 設計方針
 
-- **YAML 駆動**: 傾向表の項目も分析表の列も、Python を変更せず `configs/{レース名}/` の YAML の追加・修正で表現できることを優先する。表現できない集計が出てきたときだけ `source.type` を新設する。
+- **YAML 駆動**: 傾向表の項目も比較表の列も、Python を変更せず `configs/{レース名}/` の YAML の追加・修正で表現できることを優先する。表現できない集計が出てきたときだけ `source.type` を新設する。
 - **フォールバックしない**: 未対応の `source.type` / `rows.type` / `op` は握りつぶさず `ValueError` を送出する。設定ミスに気づけることを、動き続けることより優先する。
 - **後方互換より整理**: レースが変わるたびに要件が変わるため、破壊的変更を許容する。旧 `source.type` の互換分岐は残さず、既存 YAML の側を修正して追従させる（例: `past_finish_count` / `past_count` → `past_race_top_n_count` への統合）。
-- **DB アクセスはキャッシュ前提**: 1レースあたり十数頭 × 数十列の集計になるため、`TableDataCache` が馬・レース単位で取得結果を保持する。新しい統計を追加するときも `TableDataCache` 経由で取得する。
+- **集計と出走馬の判定で定義を共有する**: 出走馬が表のどの行に当たるかは、過去の集計と同じ `GroupBy` と行の割り当てで決める（`_trend_stats.py` の `build_item_grouping()`）。判定ごとに別の求め方を書くと、前走の定義などが集計とずれるため。

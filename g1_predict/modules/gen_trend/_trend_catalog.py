@@ -11,7 +11,21 @@ from ._trend_models import TrendCondition
 
 _CATEGORY_KEYS = frozenset({"name", "description", "items"})
 _ITEM_KEYS = frozenset(
-    {"conditionable", "note", "source", "rows", "display_map", "hide_if_empty"}
+    {
+        "conditionable",
+        "uses_race_result",
+        "hide_entry_column",
+        "class_label",
+        "note",
+        "source",
+        "rows",
+        "display_map",
+        "hide_if_empty",
+    }
+)
+# 項目の設定そのものではなく、項目の扱いを指定するキー
+_ITEM_FLAG_KEYS = frozenset(
+    {"conditionable", "uses_race_result", "hide_entry_column", "class_label"}
 )
 
 
@@ -22,10 +36,17 @@ class CatalogItem:
     Attributes:
         config (dict[str, Any]): source・rows・display_map・note・hide_if_empty の定義。
         conditionable (bool): 開催条件を注入できる項目か。
+        uses_race_result (bool): 今走の結果で値が決まる項目か。
+        hide_entry_column (bool): 記事の表に該当馬列を付けない項目か。
+        class_label (str | None): 前走のクラス別の着順の項目で、比較表の「前走クラス着順」列に
+            書くクラスの略称（G1・OP・1勝など）。それ以外の項目は None。
     """
 
     config: dict[str, Any]
     conditionable: bool
+    uses_race_result: bool = False
+    hide_entry_column: bool = False
+    class_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -51,11 +72,29 @@ class TrendItem:
         name (str): 項目名。
         config (dict[str, Any]): 対象レースの値を埋め込み済みの source・rows・display_map・note。
         condition (TrendCondition | None): 注入された開催条件。
+        uses_race_result (bool): 今走の結果で値が決まる項目か。
+        hide_entry_column (bool): 記事の表に該当馬列を付けない項目か。
+        class_label (str | None): 前走のクラス別の着順の項目で、比較表の「前走クラス着順」列に
+            書くクラスの略称。それ以外の項目は None。
     """
 
     name: str
     config: dict[str, Any]
     condition: TrendCondition | None
+    uses_race_result: bool = False
+    hide_entry_column: bool = False
+    class_label: str | None = None
+
+    @property
+    def shows_entry_column(self) -> bool:
+        """記事の表に該当馬列を付けるか。
+
+        今走の結果で値が決まる項目と、hide_entry_column の項目には付けない。
+
+        Returns:
+            bool: 該当馬列を付ける場合 True。
+        """
+        return not (self.uses_race_result or self.hide_entry_column)
 
 
 @dataclass(frozen=True)
@@ -170,11 +209,38 @@ def _parse_category(raw: Any, file_name: str) -> CatalogCategory:
             )
         if "rows" not in raw_item:
             raise ValueError(f"{file_name}: {item_name} に rows がありません。")
-        config = {key: value for key, value in raw_item.items() if key != "conditionable"}
+        config = {key: value for key, value in raw_item.items() if key not in _ITEM_FLAG_KEYS}
         items[item_name] = CatalogItem(
-            config=config, conditionable=bool(raw_item.get("conditionable", False))
+            config=config,
+            conditionable=bool(raw_item.get("conditionable", False)),
+            uses_race_result=bool(raw_item.get("uses_race_result", False)),
+            hide_entry_column=bool(raw_item.get("hide_entry_column", False)),
+            class_label=_parse_class_label(raw_item.get("class_label"), file_name, item_name),
         )
     return CatalogCategory(name=raw["name"], description=raw["description"], items=items)
+
+
+def _parse_class_label(raw: Any, file_name: str, item_name: str) -> str | None:
+    """項目の class_label を検証して返す。
+
+    Args:
+        raw (Any): class_label に書かれた値。書かれていない場合は None。
+        file_name (str): ファイル名（エラーメッセージ用）。
+        item_name (str): 項目名（エラーメッセージ用）。
+
+    Returns:
+        str | None: クラスの略称。書かれていない場合は None。
+
+    Raises:
+        ValueError: 空でない文字列でない場合。
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw:
+        raise ValueError(
+            f"{file_name}: {item_name} の class_label は空でない文字列で指定してください。"
+        )
+    return raw
 
 
 def _build_item(
@@ -221,6 +287,9 @@ def _build_item(
         name=item_name,
         config=_embed_placeholders(catalog_item.config, placeholders),
         condition=condition,
+        uses_race_result=catalog_item.uses_race_result,
+        hide_entry_column=catalog_item.hide_entry_column,
+        class_label=catalog_item.class_label,
     )
 
 

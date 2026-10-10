@@ -6,9 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from matplotlib.figure import Figure
+from mykeibadb.exceptions import MykeibaDBError
 
-from g1_predict.modules.gen_trend.trend_section import TrendSections
-from scripts.gen_trend import generate_trend
+from g1_predict.modules.gen_trend.trend_section import EntrySettings, TrendSections
+from scripts.gen_trend import _build_trend_sections, generate_trend
 
 
 def _make_mock_race_getter(
@@ -164,3 +166,200 @@ def test_generate_trend_without_sections_has_title_only(public_dir: str) -> None
     _run(_make_mock_race_getter(), public_dir)
     content = _read_output(public_dir, "2026", "2026013105010110", "天皇賞春")
     assert content == "# 【天皇賞春2026】傾向分析\n"
+
+
+def test_generate_trend_passes_with_entries_to_section_builder(public_dir: str) -> None:
+    """--with-entries の指定を傾向セクションの生成に渡す。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    mock_race_getter = _make_mock_race_getter()
+    with (
+        patch("scripts.gen_trend.RaceGetter", return_value=mock_race_getter),
+        patch("scripts.gen_trend._PUBLIC_DIR", public_dir),
+        patch(
+            "scripts.gen_trend._build_trend_sections",
+            return_value=TrendSections(scope_note="", sections={}),
+        ) as mock_build,
+    ):
+        generate_trend("2026013105010110", with_entries=True)
+    assert mock_build.call_args[0][2:] == ("2026013105010110", True)
+
+
+def test_generate_trend_saves_comparison_images(public_dir: str) -> None:
+    """比較表の画像を記事ディレクトリに保存する。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    figure = Figure(figsize=(1.0, 1.0))
+    figure.add_axes((0.0, 0.0, 1.0, 1.0)).text(0.5, 0.5, "A")
+    sections = TrendSections(
+        scope_note="※注記",
+        sections={"基本項目": "## 基本項目\n\n説明"},
+        images={"img/trend_table/基本項目.png": figure},
+    )
+    _run(_make_mock_race_getter(), public_dir, trend_sections=sections)
+    image_path = os.path.join(
+        public_dir, "2026", "2026013105010110_天皇賞春", "img", "trend_table", "基本項目.png"
+    )
+    assert os.path.exists(image_path)
+
+
+def test_generate_trend_with_tokubetsu_builds_race_info_from_history(public_dir: str) -> None:
+    """特別競走番号を指定した場合は、今回のレースを DB から引かずに直近の開催から組み立てる。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    race_info = pd.DataFrame({"kyosomei_hondai": ["秋華賞"], "kaisai_nen": ["2026"]})
+    with (
+        patch("scripts.gen_trend.RaceGetter") as mock_race_getter,
+        patch(
+            "scripts.gen_trend.build_race_info_from_history", return_value=race_info
+        ) as mock_history,
+        patch("scripts.gen_trend._PUBLIC_DIR", public_dir),
+        patch(
+            "scripts.gen_trend._build_trend_sections",
+            return_value=TrendSections(scope_note="", sections={}),
+        ) as mock_build,
+    ):
+        generate_trend("2026101808040711", tokubetsu_kyoso_bango="0018")
+    mock_race_getter.assert_not_called()
+    mock_history.assert_called_once_with("2026101808040711", "0018")
+    assert mock_build.call_args[0][1] is race_info
+    assert _read_output(public_dir, "2026", "2026101808040711", "秋華賞") == (
+        "# 【秋華賞2026】傾向分析\n"
+    )
+
+
+# 異常系
+def test_generate_trend_with_entries_and_tokubetsu_raises(public_dir: str) -> None:
+    """--with-entries と特別競走番号を同時に指定した場合は ValueError。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    with pytest.raises(ValueError, match="同時に指定できません"):
+        generate_trend("2026101808040711", with_entries=True, tokubetsu_kyoso_bango="0018")
+
+
+def test_generate_trend_race_not_in_db_raises(public_dir: str) -> None:
+    """特別競走番号を指定せず、今回のレースが DB に無い場合は ValueError。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    mock_race_getter = MagicMock()
+    mock_race_getter.get_race_shosai.return_value = pd.DataFrame()
+    with (
+        patch("scripts.gen_trend.RaceGetter", return_value=mock_race_getter),
+        pytest.raises(ValueError, match="--tokubetsu-kyoso-bango"),
+    ):
+        generate_trend("2026101808040711")
+
+
+# --- _build_trend_sections ---
+
+
+@pytest.fixture
+def configs_dir(tmp_path: Path) -> Path:
+    """trends.yml だけを持つレースの configs ディレクトリ。
+
+    Args:
+        tmp_path (Path): pytest が提供する一時ディレクトリ。
+
+    Returns:
+        Path: configs ディレクトリ。
+    """
+    race_dir = tmp_path / "configs" / "天皇賞春"
+    race_dir.mkdir(parents=True)
+    (race_dir / "trends.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
+    return tmp_path / "configs"
+
+
+def test_build_trend_sections_without_entries_does_not_read_table_yml(configs_dir: Path) -> None:
+    """--with-entries が無い場合は、table.yml が無くても生成できる。
+
+    Args:
+        configs_dir (Path): configs ディレクトリ。
+    """
+    expected = TrendSections(scope_note="※", sections={})
+    with (
+        patch("scripts.gen_trend._CONFIGS_DIR", str(configs_dir)),
+        patch("scripts.gen_trend.build_trend_sections", return_value=expected) as mock_build,
+    ):
+        result = _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", False)
+    assert result is expected
+    assert mock_build.call_args[0][4] is None
+
+
+def test_build_trend_sections_with_entries_reads_table_yml(configs_dir: Path) -> None:
+    """--with-entries の場合は、table.yml を読み込んで出走馬の設定を渡す。
+
+    Args:
+        configs_dir (Path): configs ディレクトリ。
+    """
+    (configs_dir / "天皇賞春" / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
+    with (
+        patch("scripts.gen_trend._CONFIGS_DIR", str(configs_dir)),
+        patch("scripts.gen_trend.check_race_entries") as mock_check,
+        patch(
+            "scripts.gen_trend.build_trend_sections",
+            return_value=TrendSections(scope_note="", sections={}),
+        ) as mock_build,
+    ):
+        _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)
+    mock_check.assert_called_once_with("2026013105010110")
+    assert mock_build.call_args[0][4] == EntrySettings(
+        race_code="2026013105010110", table_config={"基本項目": ["人気"]}
+    )
+
+
+def test_build_trend_sections_with_entries_without_table_yml_raises(configs_dir: Path) -> None:
+    """--with-entries で table.yml が無い場合は FileNotFoundError になる。
+
+    Args:
+        configs_dir (Path): configs ディレクトリ。
+    """
+    with (
+        patch("scripts.gen_trend._CONFIGS_DIR", str(configs_dir)),
+        patch("scripts.gen_trend.build_trend_sections"),
+        pytest.raises(FileNotFoundError),
+    ):
+        _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)
+
+
+def test_build_trend_sections_with_entries_checks_before_trends_yml(tmp_path: Path) -> None:
+    """--with-entries では、trends.yml が無いレースでも table.yml が無ければ例外になる。
+
+    Args:
+        tmp_path (Path): pytest が提供する一時ディレクトリ。
+    """
+    (tmp_path / "天皇賞春").mkdir()
+    with (
+        patch("scripts.gen_trend._CONFIGS_DIR", str(tmp_path)),
+        pytest.raises(FileNotFoundError),
+    ):
+        _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)
+
+
+def test_build_trend_sections_with_entries_without_entries_raises(tmp_path: Path) -> None:
+    """--with-entries では、trends.yml が無いレースでも出走馬が DB に無ければ例外になる。
+
+    Args:
+        tmp_path (Path): pytest が提供する一時ディレクトリ。
+    """
+    race_dir = tmp_path / "天皇賞春"
+    race_dir.mkdir()
+    (race_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
+    with (
+        patch("scripts.gen_trend._CONFIGS_DIR", str(tmp_path)),
+        patch(
+            "scripts.gen_trend.check_race_entries",
+            side_effect=MykeibaDBError("出走馬が見つかりません"),
+        ),
+        pytest.raises(MykeibaDBError),
+    ):
+        _build_trend_sections("天皇賞春", pd.DataFrame(), "2026013105010110", True)
