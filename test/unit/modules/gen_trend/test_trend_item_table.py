@@ -14,6 +14,7 @@ from g1_predict.modules.gen_trend._trend_renderer import (
     _format_item_section,
     build_category_section,
     build_item_table,
+    has_entry_horses,
 )
 
 _RENDERER = "g1_predict.modules.gen_trend._trend_renderer"
@@ -320,3 +321,29 @@ def test_build_category_section_omits_horse_column_for_hidden_items(flags: dict[
     result = build_category_section(category, _make_context(), [table], with_entries=True)
     assert "| 枠順 | 着度数 | 勝率 | 複率 | 単回 | 複回 |\n" in result
     assert "該当馬" not in result
+
+
+# --- has_entry_horses ---
+
+
+def test_has_entry_horses_true_when_a_horse_hits_a_row() -> None:
+    """出走馬が当たる行がある表は載せる。"""
+    table = _build(_make_fixed_item(), _STATS, {1: ["1-4枠"]})
+    assert table is not None
+    assert has_entry_horses(table) is True
+
+
+def test_has_entry_horses_false_without_hit_horses() -> None:
+    """出走馬が1頭も当たらない表は載せない。"""
+    table = _build(_make_fixed_item(), _STATS, {})
+    assert table is not None
+    assert has_entry_horses(table) is False
+
+
+def test_has_entry_horses_keeps_table_without_entry_column() -> None:
+    """該当馬列を付けない項目の表は、出走馬が当たらなくても載せる。"""
+    base = _make_fixed_item()
+    item = TrendItem(name=base.name, config=base.config, condition=None, uses_race_result=True)
+    table = _build(item, _STATS, {})
+    assert table is not None
+    assert has_entry_horses(table) is True

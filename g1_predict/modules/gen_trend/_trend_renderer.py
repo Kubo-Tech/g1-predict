@@ -147,6 +147,20 @@ def build_item_table(
     return ItemTable(item=item, rows=rows, stats=stats, entry_rows=entry_rows)
 
 
+def has_entry_horses(table: ItemTable) -> bool:
+    """出走馬の確定後に、項目の表を記事に載せるか判定する。
+
+    該当馬列を付ける項目で、今回の出走馬が1頭もどの行にも当たらない表は載せない。
+
+    Args:
+        table (ItemTable): 項目の表。
+
+    Returns:
+        bool: 表を載せる場合 True。
+    """
+    return not table.item.shows_entry_column or bool(table.entry_rows)
+
+
 def build_category_section(
     category: TrendCategory,
     context: TrendContext,
