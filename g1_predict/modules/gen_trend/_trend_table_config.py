@@ -23,6 +23,7 @@ _METRICS: dict[str, Callable[[RowStats], float]] = {
     "複回": lambda s: round(s.fukusho_kaishuu),
 }
 _METRIC_RULE_KEYS = frozenset({"metric", "op", "value", "color"})
+_METRIC_RULE_OPTIONAL_KEYS = frozenset({"min_total"})
 _LABELS_RULE_KEYS = frozenset({"labels", "color"})
 
 
@@ -35,17 +36,19 @@ class MetricRule:
         metric (str): 指標（勝率・複勝率・単回・複回）。
         op (str): 指標と基準値の比較演算子。
         value (float): 基準値（%の数値）。
+        min_total (int | None): 行の頭数の下限。行の頭数がこれに満たない場合は当てはまらない。
     """
 
     color: str
     metric: str
     op: str
     value: float
+    min_total: int | None = None
 
     def matches(self, label: str, stats: RowStats) -> bool:
         """出走馬が当たる行がこのルールに当てはまるか判定する。
 
-        行の頭数が0の場合は当てはまらない。
+        行の頭数が0の場合と、min_total に満たない場合は当てはまらない。
         勝率・複勝率・単回・複回は、記事の表に出ている整数の%で比べる。
 
         Args:
@@ -55,7 +58,7 @@ class MetricRule:
         Returns:
             bool: 当てはまる場合 True。
         """
-        if stats.total == 0:
+        if stats.total == 0 or (self.min_total is not None and stats.total < self.min_total):
             return False
         return _OPERATORS[self.op](_METRICS[self.metric](stats), self.value)
 
@@ -177,22 +180,25 @@ def _parse_rule(raw: Any, item_name: str) -> ColorRule:
     """色付けのルール1件を ColorRule に変換する。
 
     Args:
-        raw (Any): `{metric, op, value, color}` または `{labels, color}`。
+        raw (Any): `{metric, op, value, color}`（任意で min_total）または `{labels, color}`。
         item_name (str): 項目名（エラーメッセージ用）。
 
     Returns:
         ColorRule: 変換したルール。
 
     Raises:
-        ValueError: キーの過不足、または metric・op・value・labels・color の値が不正な場合。
+        ValueError: キーの過不足、または metric・op・value・min_total・labels・color の値が
+            不正な場合。
     """
     if not isinstance(raw, dict):
         raise ValueError(f"{item_name}: color_rules の要素はマッピングで指定してください: {raw!r}")
     keys = set(raw)
-    if keys != _METRIC_RULE_KEYS and keys != _LABELS_RULE_KEYS:
+    is_metric_rule = _METRIC_RULE_KEYS <= keys <= _METRIC_RULE_KEYS | _METRIC_RULE_OPTIONAL_KEYS
+    if not is_metric_rule and keys != _LABELS_RULE_KEYS:
         raise ValueError(
-            f"{item_name}: color_rules のキーは {sorted(_METRIC_RULE_KEYS)} または "
-            f"{sorted(_LABELS_RULE_KEYS)} で指定してください: {sorted(keys)}"
+            f"{item_name}: color_rules のキーは {sorted(_METRIC_RULE_KEYS)}（任意で "
+            f"{sorted(_METRIC_RULE_OPTIONAL_KEYS)}）または {sorted(_LABELS_RULE_KEYS)} で"
+            f"指定してください: {sorted(keys)}"
         )
     color = raw["color"]
     if not isinstance(color, str) or color not in COLOR_NAMES:
@@ -215,4 +221,11 @@ def _parse_rule(raw: Any, item_name: str) -> ColorRule:
     value = raw["value"]
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise ValueError(f"{item_name}: value は数値で指定してください: {value!r}")
-    return MetricRule(color=color, metric=raw["metric"], op=raw["op"], value=value)
+    min_total = raw.get("min_total")
+    if min_total is not None and (
+        not isinstance(min_total, int) or isinstance(min_total, bool) or min_total < 1
+    ):
+        raise ValueError(f"{item_name}: min_total は1以上の整数で指定してください: {min_total!r}")
+    return MetricRule(
+        color=color, metric=raw["metric"], op=raw["op"], value=value, min_total=min_total
+    )

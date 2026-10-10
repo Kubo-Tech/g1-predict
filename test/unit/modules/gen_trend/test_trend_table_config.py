@@ -75,6 +75,15 @@ def test_parse_table_config_reads_metric_and_labels_rules_mixed() -> None:
     )
 
 
+def test_parse_table_config_reads_min_total() -> None:
+    """指標のルールには、行の頭数の下限 min_total を任意で書ける。"""
+    raw = {"基本項目": [{"枠順": {"color_rules": [_rule(min_total=10)]}}]}
+    columns = parse_table_config(raw, _make_categories())
+    assert columns["基本項目"][0].color_rules == (
+        MetricRule(color="yellow", metric="複勝率", op=">=", value=30, min_total=10),
+    )
+
+
 # 準正常系
 @pytest.mark.parametrize(
     "raw",
@@ -121,6 +130,11 @@ def test_parse_table_config_invalid_structure_raises(raw: Any) -> None:
         {"labels": ["栗東"], "color": ["yellow"]},
         _rule(value="30"),
         _rule(value=True),
+        _rule(min_total=0),
+        _rule(min_total=10.5),
+        _rule(min_total="10"),
+        _rule(min_total=True),
+        {"labels": ["栗東"], "color": "yellow", "min_total": 10},
         {"labels": [], "color": "yellow"},
         {"labels": "栗東", "color": "yellow"},
         {"labels": [1], "color": "yellow"},
@@ -172,6 +186,14 @@ def test_metric_rule_matches_zero_percent_row_with_horses() -> None:
     """頭数があって複勝率が0%の行は == 0 に当てはまる。"""
     rule = MetricRule(color="gray", metric="複勝率", op="==", value=0)
     assert rule.matches("A", RowStats(fourth_plus=5, total=5)) is True
+
+
+@pytest.mark.parametrize("total, expected", [(9, False), (10, True)])
+def test_metric_rule_with_min_total_skips_small_rows(total: int, expected: bool) -> None:
+    """min_total がある指標のルールは、行の頭数が min_total に満たない場合は当てはまらない。"""
+    stats = RowStats(first=total, total=total)
+    rule = MetricRule(color="yellow", metric="複勝率", op=">=", value=30, min_total=10)
+    assert rule.matches("A", stats) is expected
 
 
 def test_labels_rule_matches_by_label_regardless_of_stats() -> None:
