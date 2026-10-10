@@ -61,38 +61,26 @@ class _Cell:
 
 def make_comparison_table(
     horses: pd.DataFrame,
-    tables: list[ItemTable],
-    columns: list[TableColumn],
-) -> Figure | None:
+    shown: list[tuple[TableColumn, ItemTable]],
+) -> Figure:
     """今回の出走馬を項目ごとに見比べる表を、画像にするためのFigureとして生成する。
 
-    行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名の列を置き、続けて columns の順に
+    行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名の列を置き、続けて shown の順に
     項目の列を置く。各セルには、その馬の値（display_map があれば表示名）を書く。dynamic の項目で
     記事の表では「その他」にまとめた値も、騎手名などの値そのものを書く。
     複数の行に当たる場合は「・」でつなぎ、当たる行が無い場合は「-」と書く。ただし fixed の項目
     （前年3着以内・前年5着以内のように行の範囲が重なる項目）は、当たる行のうち表の先頭に近い行だけを書く。
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
-    記事に表が出ない項目は載せない。
 
     Args:
         horses (pd.DataFrame): 馬番順の出走馬。
             waku（枠番）・umaban（馬番）・bamei（馬名）の列を持つ。
-        tables (list[ItemTable]): カテゴリの各項目の表。
-        columns (list[TableColumn]): 比較表に載せる項目と色付けのルール。
+        shown (list[tuple[TableColumn, ItemTable]]): 比較表に載せる列と、その項目の記事の表。
 
     Returns:
-        Figure | None: 比較表。載せる項目が1つも無い場合は None。
+        Figure: 比較表。
     """
-    table_map = {table.item.name: table for table in tables}
-    shown = [
-        (column, table_map[column.item_name])
-        for column in columns
-        if column.item_name in table_map
-    ]
-    if not shown:
-        return None
-
     header = [_Cell(text, _HEADER_COLOR, bold=True, centered=True) for text in _FIXED_HEADERS]
     for column, _ in shown:
         header.append(_Cell(column.item_name, _HEADER_COLOR, bold=True, centered=True))

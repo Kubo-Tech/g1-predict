@@ -10,7 +10,7 @@
 
 | スクリプト | DB | TFJV | configs | templates | 出力 |
 | --- | --- | --- | --- | --- | --- |
-| `gen_trend` | ○ | − | `trends.yml`, `configs/trends/`, `table.yml`（`--with-entries` のみ） | − | `過去の傾向.md`, `img/trend_table/*.png`（`--with-entries` のみ） |
+| `gen_trend` | ○ | − | `trends.yml`, `configs/trends/`, `table.yml`（`--with-entries` のみ） | − | `過去の傾向.md`, `img/trend_table/比較表.png`（`--with-entries` のみ） |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
 | `gen_past_race_dynamics` | ○ | − | − | − | `出走馬の過去走の展開評価.md`, `img/past_dynamics/*.png` |
@@ -28,7 +28,7 @@ python -m scripts.gen_trend --race-code 2026061409030411                 # 出�
 python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出走馬の確定後
 ```
 
-出力: `public/{開催年}/{race_code}_{レース名}/過去の傾向.md`（どちらも上書きする）、`--with-entries` の場合は `public/{開催年}/{race_code}_{レース名}/img/trend_table/{カテゴリ名}.png`（カテゴリ名の `/` は除く）も出力する。
+出力: `public/{開催年}/{race_code}_{レース名}/過去の傾向.md`（どちらも上書きする）、`--with-entries` の場合は `public/{開催年}/{race_code}_{レース名}/img/trend_table/比較表.png` も出力する。
 
 処理:
 
@@ -37,7 +37,7 @@ python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出�
 3. `build_trend_sections()` が、`configs/trends/` の共有定義から `trends.yml` に書かれた項目の定義を取り出し、カテゴリ（`基本項目` / `前走` など YAML のキー）ごとに項目を集計して Markdown テーブルへ整形する。
 4. 集計年数（過去10年。G1になってから10年に満たないレースはG1になった年から前年まで）を決める。
 5. `# 【{レース名}{年}】傾向分析` を先頭に、集計対象の注記、カテゴリセクションを連結して書き出す。
-6. `--with-entries` を付けた場合は、手順2の後に `configs/{レース名}/table.yml` も読み込み、各表に該当馬列を付け、比較表の画像を作って `save_images()` で保存する。
+6. `--with-entries` を付けた場合は、手順2の後に `configs/{レース名}/table.yml` も読み込み、各表に該当馬列を付け、記事の最後に `## 比較表` を足し、比較表の画像を作って `save_images()` で保存する。
 
 出力される表は次の形式（着度数は `1着-2着-3着-着外`）。
 
@@ -61,7 +61,7 @@ python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出�
 | | 確定前（引数なし） | 確定後（`--with-entries`） |
 | --- | --- | --- |
 | 各表の「該当馬」列 | なし | あり |
-| `### 比較表` | なし | `table.yml` に項目があるカテゴリの末尾に画像を載せる |
+| `## 比較表` | なし | 記事の最後に、`table.yml` の全項目を並べた画像を1枚載せる |
 | 出馬表が DB に無い場合 | 影響なし | 例外で止める |
 | `table.yml` が無い場合 | 影響なし | 例外で止める |
 
@@ -74,12 +74,14 @@ python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出�
 | 栗東 | 6-7-5-73 | 7% | 20% | 88% | 76% | 1, 3, 4, 6, 7, 8 |
 ```
 
-比較表の画像は、カテゴリごとに1枚、次の形式で載せる。出走馬が当たる行の判定、色付け、画像の見た目は [config-reference.md](config-reference.md#tableyml--出走馬の比較表) を参照。
+比較表は、記事の最後に次の形式で載せる。出走馬が当たる行の判定、色付け、画像の見た目は [config-reference.md](config-reference.md#tableyml--出走馬の比較表) を参照。
 
 ```markdown
-### 比較表
+## 比較表
 
-![基本項目の比較表](img/trend_table/基本項目.png)
+今回の出走馬を項目ごとに見比べる表
+
+![比較表](img/trend_table/比較表.png)
 ```
 
 出走馬の判定は `mykeibadb.analytics.get_race_entry_groups` で、集計と同じ `GroupBy` の値を出走馬について求めて行う。`g1_predict/modules/gen_trend/_trend_stats.py` の `build_item_grouping()` が集計と出走馬の判定で共通のグループ分けと行の割り当てを組み立て、`_trend_entries.py` が出走馬の判定、`_trend_table_config.py` が `table.yml` の検証、`_trend_table_image.py` が画像の生成を担う。

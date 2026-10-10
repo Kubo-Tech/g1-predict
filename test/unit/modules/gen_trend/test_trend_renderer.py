@@ -18,6 +18,7 @@ from g1_predict.modules.gen_trend._trend_renderer import (
     _format_table_row,
     _get_dynamic_labels,
     build_category_section,
+    build_comparison_section,
     build_item_table,
     format_condition_note,
     format_scope_note,
@@ -315,26 +316,11 @@ def test_build_category_section_description_without_years() -> None:
     assert result.startswith("## 基本項目\n\n調教の内容\n\n")
 
 
-def test_build_category_section_without_comparison_image_has_no_comparison_heading() -> None:
-    """比較表の画像が無い場合は ### 比較表 を出力しない。"""
-    with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = _render_category(_make_category(), _make_context())
-    assert "### 比較表" not in result
-
-
-def test_build_category_section_with_comparison_image_appends_image_at_end() -> None:
-    """比較表の画像がある場合は、末尾に ### 比較表 と画像を出力する。"""
-    category = _make_category()
-    context = _make_context()
-    with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        tables = [build_item_table(item, context) for item in category.items]
-    result = build_category_section(
-        category,
-        context,
-        [table for table in tables if table is not None],
-        comparison_image="img/trend_table/基本項目.png",
+def test_build_comparison_section_has_heading_description_and_image() -> None:
+    """比較表のセクションは、## 比較表・説明文・画像の順に並ぶ。"""
+    assert build_comparison_section("img/trend_table/比較表.png") == (
+        "## 比較表\n\n今回の出走馬を項目ごとに見比べる表\n\n![比較表](img/trend_table/比較表.png)"
     )
-    assert result.endswith("### 比較表\n\n![基本項目の比較表](img/trend_table/基本項目.png)")
 
 
 def test_build_category_section_keeps_item_order() -> None:

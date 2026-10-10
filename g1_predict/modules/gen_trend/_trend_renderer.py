@@ -12,6 +12,10 @@ from ._trend_loader import TrendContext
 from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats, TrendCondition
 from ._trend_stats import compute_stats, get_juusho_race_names
 
+# 出走馬の比較表のセクションの見出しと説明文
+COMPARISON_HEADING = "比較表"
+_COMPARISON_DESCRIPTION = "今回の出走馬を項目ごとに見比べる表"
+
 
 @dataclass(frozen=True)
 class ItemTable:
@@ -194,7 +198,6 @@ def build_category_section(
     context: TrendContext,
     tables: list[ItemTable],
     with_entries: bool = False,
-    comparison_image: str | None = None,
     horse_count: int = 0,
 ) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
@@ -202,14 +205,13 @@ def build_category_section(
     ## カテゴリ名 とカテゴリの説明文から始まり、各項目の h3 テーブルを含む文字列を返す。
     with_entries が True の場合は、各テーブルの右端に今回の出走馬のうち行に当たる馬の馬番を
     書く「該当馬」列を付ける。ただし、今走の結果で値が決まる項目と hide_entry_column の項目には
-    付けない。comparison_image がある場合は、末尾に比較表の画像を載せる。
+    付けない。
 
     Args:
         category (TrendCategory): 出力するカテゴリ。
         context (TrendContext): 対象レースと集計対象の情報。
         tables (list[ItemTable]): カテゴリの各項目の表（表を出さない項目は含めない）。
         with_entries (bool): 該当馬列を付けるか。
-        comparison_image (str | None): 比較表の画像の、記事ディレクトリからの相対パス。
         horse_count (int): 今回の出走馬の頭数。
 
     Returns:
@@ -224,9 +226,20 @@ def build_category_section(
         )
         for table in tables
     ]
-    if comparison_image is not None:
-        sections.append(f"### 比較表\n\n![{category.name}の比較表]({comparison_image})")
     return header + "\n\n" + "\n\n".join(sections)
+
+
+def build_comparison_section(image_path: str) -> str:
+    """出走馬の比較表のセクション文字列を生成する。
+
+    Args:
+        image_path (str): 比較表の画像の、記事ディレクトリからの相対パス。
+
+    Returns:
+        str: ## 比較表 から始まる Markdown セクション文字列。
+    """
+    image = f"![{COMPARISON_HEADING}]({image_path})"
+    return f"## {COMPARISON_HEADING}\n\n{_COMPARISON_DESCRIPTION}\n\n{image}"
 
 
 def format_scope_note(context: TrendContext, race_label: str) -> str:

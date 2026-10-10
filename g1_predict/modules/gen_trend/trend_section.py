@@ -12,7 +12,10 @@ from ._trend_catalog import build_trend_categories, load_trend_catalog
 from ._trend_entries import fetch_entry_horses
 from ._trend_loader import build_race_context
 from ._trend_renderer import (
+    COMPARISON_HEADING,
+    ItemTable,
     build_category_section,
+    build_comparison_section,
     build_item_table,
     format_scope_note,
     is_entry_table_informative,
@@ -20,8 +23,8 @@ from ._trend_renderer import (
 from ._trend_table_config import TableColumn, parse_table_config
 from ._trend_table_image import make_comparison_table
 
-# 比較表の画像の、記事ディレクトリからの相対ディレクトリ
-_TABLE_IMAGE_DIR = "img/trend_table"
+# 比較表の画像の、記事ディレクトリからの相対パス
+_TABLE_IMAGE_PATH = "img/trend_table/比較表.png"
 
 
 def check_race_entries(race_code: str) -> None:
@@ -55,7 +58,8 @@ class TrendSections:
 
     Attributes:
         scope_note (str): 集計対象の注記。
-        sections (dict[str, str]): カテゴリ名 -> Markdownセクション文字列。
+        sections (dict[str, str]): 見出し -> Markdownセクション文字列。見出しはカテゴリ名と、
+            出走馬の確定後の「比較表」。
         images (dict[str, Figure]): 記事ディレクトリからの相対パス -> 比較表のFigure。
     """
 
@@ -74,8 +78,9 @@ def build_trend_sections(
     """傾向セクション群を生成する。
 
     entries を指定した場合は、各表に今回の出走馬が当たる行を「該当馬」列として書き、
-    table.yml に項目があるカテゴリには出走馬の比較表の画像を載せる。今回の出走馬が1頭も当たらない
-    表と、全頭が同じ1つの行だけに当たる表は、記事にも比較表にも載せない。
+    最後に table.yml の項目を並べた出走馬の比較表の画像を載せるセクションを足す。
+    今回の出走馬が1頭も当たらない表と、全頭が同じ1つの行だけに当たる表は、記事にも比較表にも
+    載せない。
 
     Args:
         race_info (pd.DataFrame): レース基本情報DataFrame（raw英語カラム名）。
@@ -86,7 +91,7 @@ def build_trend_sections(
             None の場合は、該当馬列も比較表も載せない。
 
     Returns:
-        TrendSections: 集計対象の注記と、カテゴリ名 -> Markdownセクション文字列、比較表の画像。
+        TrendSections: 集計対象の注記と、見出し -> Markdownセクション文字列、比較表の画像。
     """
     catalog = load_trend_catalog(trends_dir)
     context = build_race_context(race_info)
@@ -101,7 +106,7 @@ def build_trend_sections(
         horses = fetch_entry_horses(context.manager, entries.race_code)
 
     sections: dict[str, str] = {}
-    images: dict[str, Figure] = {}
+    category_tables: dict[str, dict[str, ItemTable]] = {}
     for category in categories:
         tables = [
             table
@@ -109,15 +114,21 @@ def build_trend_sections(
             if (table := build_item_table(item, context, entry_race_code)) is not None
             and (entries is None or is_entry_table_informative(table, len(horses)))
         ]
-        image_path: str | None = None
-        if category.name in table_columns:
-            figure = make_comparison_table(horses, tables, table_columns[category.name])
-            if figure is not None:
-                image_path = f"{_TABLE_IMAGE_DIR}/{category.name.replace('/', '')}.png"
-                images[image_path] = figure
+        category_tables[category.name] = {table.item.name: table for table in tables}
         sections[category.name] = build_category_section(
-            category, context, tables, entries is not None, image_path, horse_count=len(horses)
+            category, context, tables, entries is not None, horse_count=len(horses)
         )
+
+    images: dict[str, Figure] = {}
+    shown = [
+        (column, category_tables[category_name][column.item_name])
+        for category_name, columns in table_columns.items()
+        for column in columns
+        if column.item_name in category_tables[category_name]
+    ]
+    if shown:
+        images[_TABLE_IMAGE_PATH] = make_comparison_table(horses, shown)
+        sections[COMPARISON_HEADING] = build_comparison_section(_TABLE_IMAGE_PATH)
     return TrendSections(
         scope_note=format_scope_note(context, race_label),
         sections=sections,
