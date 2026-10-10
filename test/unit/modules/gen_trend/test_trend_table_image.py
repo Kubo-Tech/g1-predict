@@ -251,4 +251,33 @@ def test_make_comparison_table_good_column_counts_yellow_cells() -> None:
     texts, fills = _cells(figure)
     # 各行は7セル（枠・馬番・馬名・項目3列・好データ）で、先頭の1行が見出し
     assert [texts[13], texts[20], texts[27]] == ["2", "1", "0"]
-    assert fills[13] == "#FFFFFF"
+
+
+def test_make_comparison_table_good_column_colors_top_three_with_ties() -> None:
+    """好データの数の多い順に1位から3位を塗り、同じ数は同じ順位にする。0 は塗らない。"""
+    horses = pd.DataFrame({
+        "waku": [1, 2, 3, 4, 5, 6],
+        "umaban": [1, 2, 3, 4, 5, 6],
+        "bamei": ["A", "B", "C", "D", "E", "F"],
+    })
+    yellow = MetricRule(color="yellow", metric="複勝率", op=">=", value=30)
+    # 馬番ごとの好データの数: 3, 2, 2, 1, 0, 3 になるよう、各列で当たる馬を決める
+    hits = [[1, 2, 3, 4, 6], [1, 2, 3, 6], [1, 6]]
+    shown = []
+    for index, umabans in enumerate(hits):
+        name = f"項目{index}"
+        table = _make_table(name, {"行": _GOOD}, {umaban: ["行"] for umaban in umabans})
+        shown.append((TableColumn(name, (yellow,)), [table]))
+    figure = make_comparison_table(horses, shown)
+    texts, fills = _cells(figure)
+    # 各行は7セル（枠・馬番・馬名・項目3列・好データ）で、先頭の1行が見出し
+    good = [7 * row + 6 for row in range(1, 7)]
+    assert [texts[i] for i in good] == ["3", "2", "2", "1", "0", "3"]
+    assert [fills[i] for i in good] == [
+        "#FFD700",
+        "#87CEFA",
+        "#87CEFA",
+        "#D2A679",
+        "#FFFFFF",
+        "#FFD700",
+    ]

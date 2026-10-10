@@ -34,6 +34,8 @@ _FIXED_HEADERS = ("枠", "馬番", "馬名")
 # 右端に置く、黄色で塗ったセルの数を書く列
 _GOOD_HEADER = "好データ"
 _GOOD_COLOR = "yellow"
+# 好データの数が多い順の1位・2位・3位の塗りの色（netkeiba の着順の色）
+_GOOD_RANK_COLORS = ("#FFD700", "#87CEFA", "#D2A679")
 _FONT = FontProperties(family="Noto Sans CJK JP", size=10)
 _BOLD_FONT = FontProperties(family="Noto Sans CJK JP", size=10, weight="bold")
 # セルの寸法（インチ）
@@ -78,6 +80,9 @@ def make_comparison_table(
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
     右端には「好データ」の列を置き、その馬の項目の列のうち黄色で塗ったセルの数を書く。
+    好データの数が多い順に1位から3位までを、1位は黄色・2位は水色・3位は茶色で塗る。同じ数の馬は
+    同じ順位とし、次の数を次の順位とする（7・5・5・4 なら 7 が1位、5 が2位、4 が3位）。
+    0 は塗らない。
 
     Args:
         horses (pd.DataFrame): 馬番順の出走馬。
@@ -93,6 +98,7 @@ def make_comparison_table(
         header.append(_Cell(column.item_name, _HEADER_COLOR, bold=True, centered=True))
     header.append(_Cell(_GOOD_HEADER, _HEADER_COLOR, bold=True, centered=True))
     body: list[list[_Cell]] = []
+    good_counts: list[int] = []
     for horse in horses.to_dict("records"):
         waku = int(horse["waku"])
         umaban = int(horse["umaban"])
@@ -112,9 +118,28 @@ def make_comparison_table(
             if fill == _FILL_COLORS[_GOOD_COLOR]:
                 good_count += 1
             row.append(_Cell(names or _NO_ROW_TEXT, fill))
-        row.append(_Cell(str(good_count), _BODY_COLOR, centered=True))
         body.append(row)
+        good_counts.append(good_count)
+    rank_colors = _good_rank_colors(good_counts)
+    for row, good_count in zip(body, good_counts, strict=True):
+        fill = rank_colors.get(good_count, _BODY_COLOR)
+        row.append(_Cell(str(good_count), fill, centered=True))
     return _draw_table(header, body)
+
+
+def _good_rank_colors(good_counts: list[int]) -> dict[int, str]:
+    """好データの数ごとの塗りの色を返す。
+
+    数が多い順に、同じ数は同じ順位として1位から3位までに色を割り当てる。0 には割り当てない。
+
+    Args:
+        good_counts (list[int]): 出走馬ごとの好データの数。
+
+    Returns:
+        dict[int, str]: 好データの数 -> 塗りの色。3位までに入らない数は含まない。
+    """
+    ranked = sorted({count for count in good_counts if count > 0}, reverse=True)
+    return dict(zip(ranked, _GOOD_RANK_COLORS, strict=False))
 
 
 def _cell_entries(
