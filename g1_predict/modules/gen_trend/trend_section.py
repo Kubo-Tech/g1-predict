@@ -120,12 +120,16 @@ def build_trend_sections(
         )
 
     images: dict[str, Figure] = {}
-    shown = [
-        (column, category_tables[category_name][column.item_name])
-        for category_name, columns in table_columns.items()
-        for column in columns
-        if column.item_name in category_tables[category_name]
-    ]
+    shown: list[tuple[TableColumn, list[ItemTable]]] = []
+    for category_name, columns in table_columns.items():
+        for column in columns:
+            tables = [
+                category_tables[category_name][name]
+                for name in column.source_names
+                if name in category_tables[category_name]
+            ]
+            if tables:
+                shown.append((column, tables))
     if shown:
         images[_TABLE_IMAGE_PATH] = make_comparison_table(horses, shown)
         sections[COMPARISON_HEADING] = build_comparison_section(_TABLE_IMAGE_PATH)

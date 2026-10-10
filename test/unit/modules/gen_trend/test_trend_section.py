@@ -141,9 +141,9 @@ def test_build_trend_sections_with_entries_adds_comparison_section_at_end() -> N
     assert mock_section.call_args_list[0][1] == {"horse_count": 1}
     # 列は table.yml の順に並ぶ
     shown = mock_table.call_args[0][1]
-    assert [(column, table.item.name) for column, table in shown] == [
-        (TableColumn("同年高松宮記念着順", ()), "同年高松宮記念着順"),
-        (TableColumn("枠順", ()), "枠順"),
+    assert [(column, [t.item.name for t in tables]) for column, tables in shown] == [
+        (TableColumn("同年高松宮記念着順", ()), ["同年高松宮記念着順"]),
+        (TableColumn("枠順", ()), ["枠順"]),
     ]
 
 
@@ -193,7 +193,7 @@ def test_build_trend_sections_with_entries_drops_uninformative_tables() -> None:
         )
     assert mock_section.call_args_list[0][0][2] == [kept]
     assert mock_section.call_args_list[1][0][2] == []
-    assert [table for _, table in mock_table.call_args[0][1]] == [kept]
+    assert [tables for _, tables in mock_table.call_args[0][1]] == [[kept]]
 
 
 # 準正常系

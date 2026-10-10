@@ -24,18 +24,10 @@
       color_rules:
         - {labels: [距離短縮], color: yellow}
         - {labels: [距離延長], color: gray}
-  - 前走G1着順:
+  - 前走クラス着順:
       color_rules:
-        - {labels: [1着, 2着, 3着], color: yellow}
-  - 前走G2着順:
-      color_rules:
-        - {labels: [3着, 4着, 5着, 6-9着, 10着以下], color: gray}
-  - 前走G3着順:
-      color_rules:
-        - {labels: [6-9着, 10着以下], color: gray}
-  - 前走非重賞着順:
-      color_rules:
-        - {labels: [1着, 2着, 3着, 4着, 5着, 6-9着, 10着以下], color: gray}
+        - {labels: [G1 1着, G1 2着, G1 3着], color: yellow}
+        - {labels: [G2 3着, G2 4着, G2 5着, G2 6-9着, G2 10着以下, G3 6-9着, G3 10着以下, 非重賞 1着, 非重賞 2着, 非重賞 3着, 非重賞 4着, 非重賞 5着, 非重賞 6-9着, 非重賞 10着以下], color: gray}
 調教:
   - 当週/1週前坂路ラスト2F24.0秒未満:
       color_rules:

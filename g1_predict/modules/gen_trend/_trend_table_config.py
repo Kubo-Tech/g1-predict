@@ -26,6 +26,8 @@ _METRICS: dict[str, Callable[[RowStats], float]] = {
 _METRIC_RULE_KEYS = frozenset({"metric", "op", "value", "color"})
 _METRIC_RULE_OPTIONAL_KEYS = frozenset({"min_total"})
 _LABELS_RULE_KEYS = frozenset({"labels", "color"})
+# 前走のクラス別の着順の項目（class_label を持つ項目）を1列にまとめた比較表の列の名前
+CLASS_FINISH_COLUMN = "前走クラス着順"
 
 
 @dataclass(frozen=True)
@@ -94,15 +96,27 @@ ColorRule = MetricRule | LabelsRule
 
 @dataclass(frozen=True)
 class TableColumn:
-    """比較表に載せる項目1件。
+    """比較表に載せる列1件。
 
     Attributes:
-        item_name (str): trends.yml の項目名。
+        item_name (str): 列の名前。trends.yml の項目名、または「前走クラス着順」。
         color_rules (tuple[ColorRule, ...]): 色付けのルール。先頭から評価する。
+        parts (tuple[str, ...]): 「前走クラス着順」の列にまとめる trends.yml の項目名
+            （trends.yml の順）。1項目の列では空。
     """
 
     item_name: str
     color_rules: tuple[ColorRule, ...]
+    parts: tuple[str, ...] = ()
+
+    @property
+    def source_names(self) -> tuple[str, ...]:
+        """列に載せる trends.yml の項目名を返す。
+
+        Returns:
+            tuple[str, ...]: まとめる項目名。1項目の列では列の名前だけ。
+        """
+        return self.parts or (self.item_name,)
 
 
 def parse_table_config(
@@ -120,6 +134,7 @@ def parse_table_config(
 
     Raises:
         ValueError: trends.yml に無いカテゴリ・項目がある場合、今走の結果で決まる項目がある場合、
+            前走のクラス別の着順の項目を「前走クラス着順」にまとめずに書いた場合、
             または書式（項目・色付けのルールのキー、metric・op・color の値）が不正な場合。
     """
     if not isinstance(raw, dict) or not raw:
@@ -142,6 +157,9 @@ def parse_table_config(
 
 def _parse_column(entry: Any, category: TrendCategory) -> TableColumn:
     """table.yml の項目1件を TableColumn に変換する。
+
+    「前走クラス着順」は、カテゴリにある前走のクラス別の着順の項目（class_label を持つ項目）を
+    まとめた列にする。
 
     Args:
         entry (Any): 項目名（文字列）、または `{項目名: {color_rules: [...]}}`。
@@ -168,12 +186,26 @@ def _parse_column(entry: Any, category: TrendCategory) -> TableColumn:
             f"項目は項目名か {{項目名: {{color_rules: ...}}}} で指定してください: {entry!r}"
         )
 
+    rules = tuple(_parse_rule(rule, item_name) for rule in raw_rules)
+    if item_name == CLASS_FINISH_COLUMN:
+        parts = tuple(item.name for item in category.items if item.class_label is not None)
+        if not parts:
+            raise ValueError(
+                f"{CLASS_FINISH_COLUMN}: {category.name} の trends.yml に前走のクラス別の着順の"
+                "項目がありません。"
+            )
+        return TableColumn(item_name=item_name, color_rules=rules, parts=parts)
+
     items = {item.name: item for item in category.items}
     if item_name not in items:
         raise ValueError(f"{category.name} の trends.yml に無い項目です: {item_name}")
     if items[item_name].uses_race_result:
         raise ValueError(f"{item_name}: 今走の結果で決まる項目は比較表に載せられません。")
-    rules = tuple(_parse_rule(rule, item_name) for rule in raw_rules)
+    if items[item_name].class_label is not None:
+        raise ValueError(
+            f"{item_name}: 前走のクラス別の着順の項目は {CLASS_FINISH_COLUMN} に"
+            "まとめて書いてください。"
+        )
     return TableColumn(item_name=item_name, color_rules=rules)
 
 

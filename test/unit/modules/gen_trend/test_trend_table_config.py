@@ -27,7 +27,11 @@ _RACES = {"東京優駿": 2400, "安田記念": 1600, "宝塚記念": 2200, "ス
 
 
 def _make_categories() -> list[TrendCategory]:
-    """テスト用のカテゴリ（基本項目: 枠順・脚質（今走の結果で決まる）・所属、前走: 前走レース）。"""
+    """テスト用のカテゴリ。
+
+    基本項目: 枠順・脚質（今走の結果で決まる）・所属
+    前走: 前走レース・前走G1着順・前走オープン着順
+    """
     return [
         TrendCategory(
             name="基本項目",
@@ -41,7 +45,11 @@ def _make_categories() -> list[TrendCategory]:
         TrendCategory(
             name="前走",
             description="d",
-            items=[TrendItem(name="前走レース", config={}, condition=None)],
+            items=[
+                TrendItem(name="前走レース", config={}, condition=None),
+                TrendItem(name="前走G1着順", config={}, condition=None, class_label="G1"),
+                TrendItem(name="前走オープン着順", config={}, condition=None, class_label="OP"),
+            ],
         ),
     ]
 
@@ -84,6 +92,20 @@ def test_parse_table_config_reads_min_total() -> None:
     )
 
 
+def test_parse_table_config_class_finish_column_merges_class_items() -> None:
+    """前走クラス着順は、カテゴリにある前走のクラス別の着順の項目を trends.yml の順にまとめる。"""
+    rules = [{"labels": ["G1 1着"], "color": "yellow"}]
+    raw = {"前走": [{"前走クラス着順": {"color_rules": rules}}]}
+    column = parse_table_config(raw, _make_categories())["前走"][0]
+    assert column == TableColumn(
+        item_name="前走クラス着順",
+        color_rules=(LabelsRule(color="yellow", labels=("G1 1着",)),),
+        parts=("前走G1着順", "前走オープン着順"),
+    )
+    assert column.source_names == ("前走G1着順", "前走オープン着順")
+    assert TableColumn("所属", ()).source_names == ("所属",)
+
+
 # 準正常系
 @pytest.mark.parametrize(
     "raw",
@@ -103,6 +125,8 @@ def test_parse_table_config_reads_min_total() -> None:
         {"基本項目": [{"枠順": "yellow"}]},
         {"基本項目": [{"枠順": {"color_rules": ["yellow"]}, "所属": {"color_rules": []}}]},
         {"基本項目": [3]},
+        {"前走": ["前走G1着順"]},
+        {"基本項目": ["前走クラス着順"]},
     ],
 )
 def test_parse_table_config_invalid_structure_raises(raw: Any) -> None:

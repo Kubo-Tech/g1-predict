@@ -50,10 +50,11 @@ items:
     rows: {...}
 ```
 
-- 項目に書けるキーは `source` / `rows` / `display_map` / `conditionable` / `uses_race_result` / `hide_entry_column` / `note` / `hide_if_empty` で、`rows` は必須。
+- 項目に書けるキーは `source` / `rows` / `display_map` / `conditionable` / `uses_race_result` / `hide_entry_column` / `class_label` / `note` / `hide_if_empty` で、`rows` は必須。
 - `conditionable: true` の項目だけが、レースの `trends.yml` から開催条件を注入できる。
 - `uses_race_result: true` は、今走の結果で値が決まる項目（脚質・4角通過順位・上がり3F順位）に付ける。出走馬の確定後でもレース前には値が無いため、`--with-entries` でも該当馬列を付けず、table.yml にも載せられない。
 - `hide_entry_column: true` を書くと、`--with-entries` でも記事の表に該当馬列を付けない（人気・枠順で使う）。table.yml には載せられる。
+- `class_label` は、前走のクラス別の着順の項目（前走G1着順〜前走新馬着順、前走非重賞着順）に付けるクラスの略称（`G1` / `L` / `OP` / `3勝` / `未勝利` / `非重賞` など）。比較表の「前走クラス着順」列で値の前に付ける（[table.yml](#tableyml--出走馬の比較表)）。
 - `note` を書くと、表の直下にその文字列を出す。
 - `hide_if_empty: true` を書くと、集計対象にも今回の出走馬にも該当馬が1頭もいない場合は表を見出しごと出さない（前走{クラス}着順で使う）。
 - ファイル名はカテゴリ名から `/` を除いたもの（`同年/前年レース実績` → `同年前年レース実績.yml`）にする。
@@ -315,7 +316,8 @@ display_map:
         - {metric: 勝率, op: ">=", value: 10, color: yellow}
 ```
 
-- 項目は、そのレースの trends.yml の同じカテゴリにある項目から選ぶ。table.yml に書いたカテゴリの順、カテゴリ内の項目の順が、比較表の列の順になる。
+- 項目は、そのレースの trends.yml の同じカテゴリにある項目から選ぶ。
+- 前走のクラス別の着順の項目（`class_label` を持つ項目）は、前走の馬はどれか1つのクラスにしか当たらないため、個別に書かず `前走クラス着順` の1列にまとめる。`前走クラス着順` は、そのカテゴリの trends.yml にある `class_label` を持つ項目をまとめた列で、セルには `G1 1着` のようにクラスの略称と着順を書く。行の名前のルールもこの形で書く（例: `{labels: [G1 1着, G1 2着, G3 1着], color: yellow}`）。個別の項目を書いた場合は `ValueError` になる。table.yml に書いたカテゴリの順、カテゴリ内の項目の順が、比較表の列の順になる。
 - 画像は `img/trend_table/比較表.png` に保存する。記事に表が出ない項目（`hide_if_empty` で隠れた項目と、今回の出走馬が1頭も当たらない項目、全頭が同じ1つの行だけに当たる項目）は、比較表にも載せない。載せる項目が1つも無い場合は `## 比較表` を出さない。
 - そのレースの trends.yml に無いカテゴリ・項目、今走の結果で決まる項目（`uses_race_result: true`）、未知の `metric`・`op`・`color`、`color_rules` のキーの不足は `ValueError` になる。
 - `--with-entries` を付けたときに table.yml が無い場合は、例外で止まる。

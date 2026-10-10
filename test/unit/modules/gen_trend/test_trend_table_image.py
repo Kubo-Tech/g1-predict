@@ -55,7 +55,7 @@ def _draw(tables: list[ItemTable], columns: list[TableColumn]) -> Figure:
     """列と同じ名前の項目の表を組にして、比較表を描く。"""
     table_map = {table.item.name: table for table in tables}
     return make_comparison_table(
-        _HORSES, [(column, table_map[column.item_name]) for column in columns]
+        _HORSES, [(column, [table_map[column.item_name]]) for column in columns]
     )
 
 
@@ -203,3 +203,31 @@ def test_make_comparison_table_without_rules_leaves_cells_white() -> None:
     figure = _draw(tables, [TableColumn("所属", ())])
     _, fills = _cells(figure)
     assert fills[7] == "#FFFFFF"
+
+
+def test_make_comparison_table_class_finish_column_prefixes_class_label() -> None:
+    """前走クラス着順の列は、まとめた項目の値の前にクラスの略称を付けて書き、その値で塗る。"""
+
+    def finish_table(name: str, class_label: str, entry_rows: dict[int, list[str]]) -> ItemTable:
+        item = TrendItem(
+            name=name, config={"rows": {"type": "fixed"}}, condition=None, class_label=class_label
+        )
+        stats = {"1着": _GOOD, "10着以下": _BAD}
+        return ItemTable(
+            item=item, rows=list(stats), stats=stats, entry_rows=entry_rows, entry_values=entry_rows
+        )
+
+    column = TableColumn(
+        "前走クラス着順",
+        (LabelsRule(color="yellow", labels=("G1 1着",)),),
+        parts=("前走G1着順", "前走オープン着順"),
+    )
+    tables = [
+        finish_table("前走G1着順", "G1", {1: ["1着"]}),
+        finish_table("前走オープン着順", "OP", {3: ["10着以下"]}),
+    ]
+    figure = make_comparison_table(_HORSES, [(column, tables)])
+    texts, fills = _cells(figure)
+    assert texts[3] == "前走クラス着順"
+    assert [texts[7], texts[11], texts[15]] == ["G1 1着", "OP 10着以下", "-"]
+    assert [fills[7], fills[11]] == ["#FFEB9C", "#FFFFFF"]

@@ -10,6 +10,7 @@ from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Rectangle
 
+from ._trend_models import RowStats
 from ._trend_renderer import ItemTable
 from ._trend_table_config import TableColumn
 
@@ -61,7 +62,7 @@ class _Cell:
 
 def make_comparison_table(
     horses: pd.DataFrame,
-    shown: list[tuple[TableColumn, ItemTable]],
+    shown: list[tuple[TableColumn, list[ItemTable]]],
 ) -> Figure:
     """今回の出走馬を項目ごとに見比べる表を、画像にするためのFigureとして生成する。
 
@@ -70,13 +71,15 @@ def make_comparison_table(
     記事の表では「その他」にまとめた値も、騎手名などの値そのものを書く。
     複数の行に当たる場合は「・」でつなぎ、当たる行が無い場合は「-」と書く。ただし fixed の項目
     （前年3着以内・前年5着以内のように行の範囲が重なる項目）は、当たる行のうち表の先頭に近い行だけを書く。
+    「前走クラス着順」の列は、まとめた項目の値の前にクラスの略称を付けて「G1 1着」のように書く。
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
 
     Args:
         horses (pd.DataFrame): 馬番順の出走馬。
             waku（枠番）・umaban（馬番）・bamei（馬名）の列を持つ。
-        shown (list[tuple[TableColumn, ItemTable]]): 比較表に載せる列と、その項目の記事の表。
+        shown (list[tuple[TableColumn, list[ItemTable]]]): 比較表に載せる列と、列に載せる項目の
+            記事の表。
 
     Returns:
         Figure: 比較表。
@@ -94,50 +97,58 @@ def make_comparison_table(
             _Cell(str(umaban), _BODY_COLOR, centered=True),
             _Cell(str(horse["bamei"]), _BODY_COLOR),
         ]
-        for column, table in shown:
-            values = _cell_values(table, umaban)
-            names = _ROW_SEPARATOR.join(table.display_name(value) for value in values)
-            row.append(_Cell(names or _NO_ROW_TEXT, _find_fill_color(column, table, values)))
+        for column, tables in shown:
+            entries = [
+                entry for table in tables for entry in _cell_entries(column, table, umaban)
+            ]
+            names = _ROW_SEPARATOR.join(text for text, _ in entries)
+            row.append(_Cell(names or _NO_ROW_TEXT, _find_fill_color(column, entries)))
         body.append(row)
     return _draw_table(header, body)
 
 
-def _cell_values(table: ItemTable, umaban: int) -> list[str]:
-    """出走馬のセルに書く値を返す。
+def _cell_entries(
+    column: TableColumn, table: ItemTable, umaban: int
+) -> list[tuple[str, RowStats]]:
+    """出走馬のセルに書く値と、その値が当たる記事の表の行の集計値を返す。
 
     fixed の項目は、当たる行のうち表の先頭に近い行だけにする。
-
-    Args:
-        table (ItemTable): 列の項目の表。
-        umaban (int): 出走馬の馬番。
-
-    Returns:
-        list[str]: セルに書く値。当たる行が無い場合は空。
-    """
-    values = table.entry_values.get(umaban, [])
-    if table.item.config.get("rows", {}).get("type") == "fixed":
-        return values[:1]
-    return values
-
-
-def _find_fill_color(column: TableColumn, table: ItemTable, values: list[str]) -> str:
-    """セルを塗る色を返す。
-
-    セルの値を順に見て、先に色付けのルールに当てはまった値の、最初に当てはまったルールの色にする。
-    行の名前のルールは値の表示名で、指標のルールは値が当たる記事の表の行の集計値で判定する。
+    「前走クラス着順」の列では、値の前にクラスの略称を付ける。
 
     Args:
         column (TableColumn): 比較表の列。
-        table (ItemTable): 列の項目の表。
-        values (list[str]): セルに書く値。
+        table (ItemTable): 列に載せる項目の表。
+        umaban (int): 出走馬の馬番。
+
+    Returns:
+        list[tuple[str, RowStats]]: セルに書く値（表示名）と行の集計値。当たる行が無い場合は空。
+    """
+    values = table.entry_values.get(umaban, [])
+    if table.item.config.get("rows", {}).get("type") == "fixed":
+        values = values[:1]
+    prefix = f"{table.item.class_label} " if column.parts else ""
+    return [
+        (prefix + table.display_name(value), table.stats[table.row_of_value(value)])
+        for value in values
+    ]
+
+
+def _find_fill_color(column: TableColumn, entries: list[tuple[str, RowStats]]) -> str:
+    """セルを塗る色を返す。
+
+    セルの値を順に見て、先に色付けのルールに当てはまった値の、最初に当てはまったルールの色にする。
+    行の名前のルールはセルに書く値で、指標のルールは値が当たる記事の表の行の集計値で判定する。
+
+    Args:
+        column (TableColumn): 比較表の列。
+        entries (list[tuple[str, RowStats]]): セルに書く値と行の集計値。
 
     Returns:
         str: 塗る色。当てはまるルールが無い場合は背景色。
     """
-    for value in values:
-        stats = table.stats[table.row_of_value(value)]
+    for text, stats in entries:
         for rule in column.color_rules:
-            if rule.matches(table.display_name(value), stats):
+            if rule.matches(text, stats):
                 return _FILL_COLORS[rule.color]
     return _BODY_COLOR
 
