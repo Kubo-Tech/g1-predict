@@ -10,7 +10,7 @@ from mykeibadb.connection import ConnectionManager
 
 from ._trend_catalog import build_trend_categories, load_trend_catalog
 from ._trend_entries import fetch_entry_horses
-from ._trend_loader import build_race_context
+from ._trend_loader import build_race_context, fetch_race_info_from_history
 from ._trend_renderer import (
     COMPARISON_HEADING,
     ItemTable,
@@ -37,6 +37,26 @@ def check_race_entries(race_code: str) -> None:
         MykeibaDBError: 出走馬が DB に無い場合。
     """
     fetch_entry_horses(ConnectionManager(ConfigManager.from_env()), race_code)
+
+
+def build_race_info_from_history(race_code: str, tokubetsu_kyoso_bango: str) -> pd.DataFrame:
+    """今回のレースが DB に入る前に、同じ特別競走番号の直近の開催からレース基本情報を組み立てる。
+
+    競走名本題・距離・トラックは直近の開催の値、開催年・開催月日・競馬場は race_code の値を使う。
+
+    Args:
+        race_code (str): 今回のレースの16桁のレースコード。
+        tokubetsu_kyoso_bango (str): 今回のレースの特別競走番号（4桁）。
+
+    Returns:
+        pd.DataFrame: build_trend_sections に渡せる1行のレース基本情報。
+
+    Raises:
+        ValueError: 特別競走番号が4桁の数字でない場合。今回の開催年より前に同じ特別競走番号の
+            レースが無い場合。
+    """
+    manager = ConnectionManager(ConfigManager.from_env())
+    return fetch_race_info_from_history(manager, race_code, tokubetsu_kyoso_bango)
 
 
 @dataclass(frozen=True)

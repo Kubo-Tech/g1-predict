@@ -10,6 +10,7 @@ from g1_predict.modules.gen_trend._trend_loader import (
     build_race_context,
     decide_trend_years,
     fetch_past_races,
+    fetch_race_info_from_history,
 )
 from g1_predict.modules.gen_trend._trend_models import TREND_YEARS
 
@@ -224,3 +225,65 @@ def test_fetch_past_races_without_condition_has_no_filter() -> None:
 
     assert "WHERE TRUE" in manager.fetch_dataframe.call_args[0][0]
     assert manager.fetch_dataframe.call_args[1]["params"] == ()
+
+
+# --- fetch_race_info_from_history ---
+
+
+def test_fetch_race_info_from_history_combines_latest_edition_and_race_code() -> None:
+    """競走名・距離・トラックは直近の開催から、開催年・開催月日・競馬場は race_code から取る。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame({
+        "kyosomei_hondai": ["秋華賞"],
+        "kyori": ["2000"],
+        "track_code": ["10"],
+    })
+
+    race_info = fetch_race_info_from_history(manager, "2026101808040711", "0018")
+
+    assert race_info.to_dict("records") == [{
+        "race_code": "2026101808040711",
+        "kaisai_nen": "2026",
+        "kaisai_gappi": "1018",
+        "keibajo_code": "08",
+        "kyosomei_hondai": "秋華賞",
+        "kyori": "2000",
+        "track_code": "10",
+        "tokubetsu_kyoso_bango": "0018",
+    }]
+    sql = manager.fetch_dataframe.call_args[0][0]
+    assert "ORDER BY r.kaisai_nen DESC, r.kaisai_gappi DESC" in sql
+    assert manager.fetch_dataframe.call_args[1]["params"] == ("0018", "2026")
+
+
+def test_fetch_race_info_from_history_result_builds_race_context() -> None:
+    """組み立てたレース基本情報は build_race_context に渡せる。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame({
+        "kyosomei_hondai": ["秋華賞"],
+        "kyori": ["2000"],
+        "track_code": ["10"],
+    })
+    race_info = fetch_race_info_from_history(manager, "2026101808040711", "0018")
+
+    context, _ = _build_context(race_info)
+
+    assert (context.race_name, context.kyori, context.keibajo_code) == ("秋華賞", 2000, "08")
+    assert context.race_year == 2026
+    assert context.condition.tokubetsu_kyoso_bango == "0018"
+
+
+def test_fetch_race_info_from_history_without_past_edition_raises() -> None:
+    """今回の開催年より前に同じ特別競走番号のレースが無い場合は ValueError。"""
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame()
+
+    with pytest.raises(ValueError, match="特別競走番号 0018 のレースがありません"):
+        fetch_race_info_from_history(manager, "2026101808040711", "0018")
+
+
+@pytest.mark.parametrize("bango", ["18", "00180", "abcd"])
+def test_fetch_race_info_from_history_invalid_bango_raises(bango: str) -> None:
+    """特別競走番号が4桁の数字でない場合は ValueError。"""
+    with pytest.raises(ValueError, match="4桁の数字"):
+        fetch_race_info_from_history(MagicMock(), "2026101808040711", bango)

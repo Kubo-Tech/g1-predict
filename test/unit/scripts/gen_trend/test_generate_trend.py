@@ -207,6 +207,59 @@ def test_generate_trend_saves_comparison_images(public_dir: str) -> None:
     assert os.path.exists(image_path)
 
 
+def test_generate_trend_with_tokubetsu_builds_race_info_from_history(public_dir: str) -> None:
+    """特別競走番号を指定した場合は、今回のレースを DB から引かずに直近の開催から組み立てる。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    race_info = pd.DataFrame({"kyosomei_hondai": ["秋華賞"], "kaisai_nen": ["2026"]})
+    with (
+        patch("scripts.gen_trend.RaceGetter") as mock_race_getter,
+        patch(
+            "scripts.gen_trend.build_race_info_from_history", return_value=race_info
+        ) as mock_history,
+        patch("scripts.gen_trend._PUBLIC_DIR", public_dir),
+        patch(
+            "scripts.gen_trend._build_trend_sections",
+            return_value=TrendSections(scope_note="", sections={}),
+        ) as mock_build,
+    ):
+        generate_trend("2026101808040711", tokubetsu_kyoso_bango="0018")
+    mock_race_getter.assert_not_called()
+    mock_history.assert_called_once_with("2026101808040711", "0018")
+    assert mock_build.call_args[0][1] is race_info
+    assert _read_output(public_dir, "2026", "2026101808040711", "秋華賞") == (
+        "# 【秋華賞2026】傾向分析\n"
+    )
+
+
+# 異常系
+def test_generate_trend_with_entries_and_tokubetsu_raises(public_dir: str) -> None:
+    """--with-entries と特別競走番号を同時に指定した場合は ValueError。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    with pytest.raises(ValueError, match="同時に指定できません"):
+        generate_trend("2026101808040711", with_entries=True, tokubetsu_kyoso_bango="0018")
+
+
+def test_generate_trend_race_not_in_db_raises(public_dir: str) -> None:
+    """特別競走番号を指定せず、今回のレースが DB に無い場合は ValueError。
+
+    Args:
+        public_dir (str): public ディレクトリパス。
+    """
+    mock_race_getter = MagicMock()
+    mock_race_getter.get_race_shosai.return_value = pd.DataFrame()
+    with (
+        patch("scripts.gen_trend.RaceGetter", return_value=mock_race_getter),
+        pytest.raises(ValueError, match="--tokubetsu-kyoso-bango"),
+    ):
+        generate_trend("2026101808040711")
+
+
 # --- _build_trend_sections ---
 
 

@@ -1,6 +1,6 @@
 # スクリプトリファレンス
 
-すべてリポジトリルートから `python -m scripts.{名前} --race-code {16桁}` で実行する。引数は `--race-code` のみ（`gen_trend` だけ `--with-entries` も指定できる）。
+すべてリポジトリルートから `python -m scripts.{名前} --race-code {16桁}` で実行する。引数は `--race-code` のみ（`gen_trend` だけ `--with-entries` と `--tokubetsu-kyoso-bango` も指定できる）。
 
 **共通の注意**
 
@@ -26,18 +26,21 @@
 ```bash
 python -m scripts.gen_trend --race-code 2026061409030411                 # 出走馬の確定前
 python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出走馬の確定後
+python -m scripts.gen_trend --race-code 2026101808040711 --tokubetsu-kyoso-bango 0018  # レースが DB に入る前
 ```
 
 出力: `public/{開催年}/{race_code}_{レース名}/過去の傾向.md`（どちらも上書きする）、`--with-entries` の場合は `public/{開催年}/{race_code}_{レース名}/img/trend_table/比較表.png` も出力する。
 
 処理:
 
-1. `RaceGetter.get_race_shosai()` でレース名（`kyosomei_hondai`）と開催年を取得する。
+1. `RaceGetter.get_race_shosai()` でレース名（`kyosomei_hondai`）と開催年を取得する。レースが DB に無い場合は `ValueError` で停止する。`--tokubetsu-kyoso-bango` を付けた場合は DB からは引かず、同じ特別競走番号のレースのうち今回の開催年より前の直近の開催から競走名本題・距離・トラックを取り、`race_code` から開催年・開催月日・競馬場を取る。
 2. `configs/{レース名}/trends.yml` を読み込む。**ファイルが無い場合や中身が空の場合は、見出し行だけの `過去の傾向.md` を出力する**（エラーにはならない）。
 3. `build_trend_sections()` が、`configs/trends/` の共有定義から `trends.yml` に書かれた項目の定義を取り出し、カテゴリ（`基本項目` / `前走` など YAML のキー）ごとに項目を集計して Markdown テーブルへ整形する。
 4. 集計年数（過去10年。G1になってから10年に満たないレースはG1になった年から前年まで）を決める。
 5. `# 【{レース名}{年}】傾向分析` を先頭に、集計対象の注記、カテゴリセクションを連結して書き出す。
 6. `--with-entries` を付けた場合は、手順2の後に `configs/{レース名}/table.yml` も読み込み、各表に該当馬列を付け、記事の最後に `## 比較表` を足し、比較表の画像を作って `save_images()` で保存する。
+
+`--tokubetsu-kyoso-bango` は、出馬表が出る前でレースがまだ DB に無いときに使う。距離・芝ダは直近の開催と同じとみなすため、今年から距離や芝ダが変わるレースには使えない。特別競走番号が4桁の数字でない場合と、今回の開催年より前に同じ特別競走番号のレースが無い場合は `ValueError` で停止する。出走馬が要る `--with-entries` とは同時に指定できない。
 
 出力される表は次の形式（着度数は `1着-2着-3着-着外`）。
 
