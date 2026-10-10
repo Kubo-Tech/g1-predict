@@ -19,6 +19,7 @@ _OPERATORS: dict[str, Callable[[float, float], bool]] = {
 _METRICS: dict[str, Callable[[RowStats], float]] = {
     "勝率": lambda s: round(s.first / s.total * 100),
     "複勝率": lambda s: round((s.first + s.second + s.third) / s.total * 100),
+    "3着内数": lambda s: s.first + s.second + s.third,
     "単回": lambda s: round(s.tansho_kaishuu),
     "複回": lambda s: round(s.fukusho_kaishuu),
 }
@@ -33,9 +34,9 @@ class MetricRule:
 
     Attributes:
         color (str): 塗る色の名前。
-        metric (str): 指標（勝率・複勝率・単回・複回）。
+        metric (str): 指標（勝率・複勝率・単回・複回・3着内数）。
         op (str): 指標と基準値の比較演算子。
-        value (float): 基準値（%の数値）。
+        value (float): 基準値（3着内数は頭数、それ以外は%の数値）。
         min_total (int | None): 行の頭数の下限。行の頭数がこれに満たない場合は当てはまらない。
     """
 
@@ -49,7 +50,7 @@ class MetricRule:
         """出走馬が当たる行がこのルールに当てはまるか判定する。
 
         行の頭数が0の場合と、min_total に満たない場合は当てはまらない。
-        勝率・複勝率・単回・複回は、記事の表に出ている整数の%で比べる。
+        勝率・複勝率・単回・複回は、記事の表に出ている整数の%で比べる。3着内数は頭数で比べる。
 
         Args:
             label (str): 出走馬が当たる行の名前（表示名）。

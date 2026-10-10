@@ -162,6 +162,8 @@ def test_parse_table_config_invalid_rule_raises(rule: Any) -> None:
         ("単回", "==", 105, True),
         ("単回", "<=", 100, False),
         ("複回", "<", 90, True),
+        ("3着内数", ">=", 3, True),
+        ("3着内数", ">", 3, False),
     ],
 )
 def test_metric_rule_matches_rounded_percent(
