@@ -133,7 +133,9 @@ def test_build_trend_sections_with_entries_adds_comparison_section_at_end() -> N
 
     assert list(result.sections) == ["基本項目", "同年/前年レース実績", "比較表"]
     assert result.sections["比較表"] == (
-        "## 比較表\n\n今回の出走馬を項目ごとに見比べる表\n\n"
+        "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。\n"
+        "黄色はプラスデータ、灰色はマイナスデータ。\n"
+        "「好データ」はプラスデータの該当数を数えたもの。\n\n"
         "![比較表](img/trend_table/比較表.png)"
     )
     assert list(result.images) == ["img/trend_table/比較表.png"]

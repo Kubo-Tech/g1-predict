@@ -319,7 +319,10 @@ def test_build_category_section_description_without_years() -> None:
 def test_build_comparison_section_has_heading_description_and_image() -> None:
     """比較表のセクションは、## 比較表・説明文・画像の順に並ぶ。"""
     assert build_comparison_section("img/trend_table/比較表.png") == (
-        "## 比較表\n\n今回の出走馬を項目ごとに見比べる表\n\n![比較表](img/trend_table/比較表.png)"
+        "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。\n"
+        "黄色はプラスデータ、灰色はマイナスデータ。\n"
+        "「好データ」はプラスデータの該当数を数えたもの。\n\n"
+        "![比較表](img/trend_table/比較表.png)"
     )
 
 

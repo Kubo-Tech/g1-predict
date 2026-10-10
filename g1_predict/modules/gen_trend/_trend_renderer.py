@@ -14,7 +14,11 @@ from ._trend_stats import compute_stats, get_juusho_race_names
 
 # 出走馬の比較表のセクションの見出しと説明文
 COMPARISON_HEADING = "比較表"
-_COMPARISON_DESCRIPTION = "今回の出走馬を項目ごとに見比べる表"
+_COMPARISON_DESCRIPTION = (
+    "複勝率に差が出る項目を並べて比較した表。\n"
+    "黄色はプラスデータ、灰色はマイナスデータ。\n"
+    "「好データ」はプラスデータの該当数を数えたもの。"
+)
 
 
 @dataclass(frozen=True)
