@@ -274,10 +274,10 @@ def test_make_comparison_table_good_column_colors_top_three_with_ties() -> None:
     good = [7 * row + 6 for row in range(1, 7)]
     assert [texts[i] for i in good] == ["3", "2", "2", "1", "0", "3"]
     assert [fills[i] for i in good] == [
-        "#FFD700",
-        "#87CEFA",
-        "#87CEFA",
-        "#D2A679",
+        "#FFF080",
+        "#CCDFFF",
+        "#CCDFFF",
+        "#F0C8A0",
         "#FFFFFF",
-        "#FFD700",
+        "#FFF080",
     ]

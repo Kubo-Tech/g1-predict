@@ -10,6 +10,8 @@ from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Rectangle
 
+from g1_predict.modules.utils.race_dynamics import TOP_RANK_COLORS
+
 from ._trend_models import RowStats
 from ._trend_renderer import ItemTable
 from ._trend_table_config import TableColumn
@@ -34,8 +36,6 @@ _FIXED_HEADERS = ("枠", "馬番", "馬名")
 # 右端に置く、黄色で塗ったセルの数を書く列
 _GOOD_HEADER = "好データ"
 _GOOD_COLOR = "yellow"
-# 好データの数が多い順の1位・2位・3位の塗りの色（netkeiba の着順の色）
-_GOOD_RANK_COLORS = ("#FFD700", "#87CEFA", "#D2A679")
 _FONT = FontProperties(family="Noto Sans CJK JP", size=10)
 _BOLD_FONT = FontProperties(family="Noto Sans CJK JP", size=10, weight="bold")
 # セルの寸法（インチ）
@@ -80,9 +80,9 @@ def make_comparison_table(
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
     右端には「好データ」の列を置き、その馬の項目の列のうち黄色で塗ったセルの数を書く。
-    好データの数が多い順に1位から3位までを、1位は黄色・2位は水色・3位は茶色で塗る。同じ数の馬は
-    同じ順位とし、次の数を次の順位とする（7・5・5・4 なら 7 が1位、5 が2位、4 が3位）。
-    0 は塗らない。
+    好データの数が多い順に1位から3位までを、展開評価値のグラフの順位と同じ色
+    （netkeiba の人気・上がり順位の色）で塗る。同じ数の馬は同じ順位とし、次の数を次の順位とする
+    （7・5・5・4 なら 7 が1位、5 が2位、4 が3位）。0 は塗らない。
 
     Args:
         horses (pd.DataFrame): 馬番順の出走馬。
@@ -139,7 +139,11 @@ def _good_rank_colors(good_counts: list[int]) -> dict[int, str]:
         dict[int, str]: 好データの数 -> 塗りの色。3位までに入らない数は含まない。
     """
     ranked = sorted({count for count in good_counts if count > 0}, reverse=True)
-    return dict(zip(ranked, _GOOD_RANK_COLORS, strict=False))
+    return {
+        count: TOP_RANK_COLORS[rank]
+        for rank, count in enumerate(ranked, start=1)
+        if rank in TOP_RANK_COLORS
+    }
 
 
 def _cell_entries(

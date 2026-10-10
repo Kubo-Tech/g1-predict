@@ -46,7 +46,7 @@ _COLUMN_GAP = 0.2
 # 馬番・順位を囲む四角の幅（インチ）
 _BOX_WIDTH = 0.26
 # 順位の1〜3位を囲む四角の色（netkeibaの人気・上がり順位の色）
-_TOP_RANK_COLORS = {1: "#FFF080", 2: "#CCDFFF", 3: "#F0C8A0"}
+TOP_RANK_COLORS = {1: "#FFF080", 2: "#CCDFFF", 3: "#F0C8A0"}
 # 横軸の範囲。範囲を超える評価値の棒は端で切れる
 _CHART_LIMIT = 1.0
 _CHART_TICKS = (-1.0, -0.5, 0.0, 0.5, 1.0)
@@ -376,8 +376,8 @@ def _make_horse_bar_chart(rows: pd.DataFrame, columns: Sequence[_ChartColumn]) -
                 color = "black" if waku in _DARK_TEXT_WAKU else "white"
             elif column.kind == "rank":
                 text = str(int(cell)) if pd.notna(cell) else "-"
-                if pd.notna(cell) and int(cell) in _TOP_RANK_COLORS:
-                    add_box(x, position, _TOP_RANK_COLORS[int(cell)], "none")
+                if pd.notna(cell) and int(cell) in TOP_RANK_COLORS:
+                    add_box(x, position, TOP_RANK_COLORS[int(cell)], "none")
             else:
                 # 0に丸まる負の値を "-0.00" と表示しないよう、丸めてから -0.0 を 0.0 に正規化する
                 text = f"{round(float(cell), 2) + 0.0:+.2f}"
