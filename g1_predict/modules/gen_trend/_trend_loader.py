@@ -44,6 +44,58 @@ class TrendContext:
     race_count: int
 
 
+def fetch_race_info_from_history(
+    manager: ConnectionManager, race_code: str, tokubetsu_kyoso_bango: str
+) -> pd.DataFrame:
+    """今回のレースの基本情報を、同じ特別競走番号の直近の開催から組み立てる。
+
+    今回のレースが race_shosai に入る前に使う。競走名本題・距離・トラックは、今回のレースの
+    開催年より前に行われた同じ特別競走番号のレースのうち直近の開催の値を使い、開催年・開催月日・
+    競馬場は race_code から取る。
+
+    Args:
+        manager (ConnectionManager): DB接続マネージャ。
+        race_code (str): 今回のレースの16桁のレースコード。
+        tokubetsu_kyoso_bango (str): 今回のレースの特別競走番号（4桁）。
+
+    Returns:
+        pd.DataFrame: build_race_context に渡せる1行のレース基本情報。
+            race_code・kaisai_nen・kaisai_gappi・keibajo_code・kyosomei_hondai・kyori・
+            track_code・tokubetsu_kyoso_bango の列を持つ。
+
+    Raises:
+        ValueError: 特別競走番号が4桁の数字でない場合。今回の開催年より前に同じ特別競走番号の
+            レースが無い場合。
+    """
+    if len(tokubetsu_kyoso_bango) != 4 or not tokubetsu_kyoso_bango.isdigit():
+        raise ValueError(f"特別競走番号は4桁の数字で指定してください: {tokubetsu_kyoso_bango!r}")
+    kaisai_nen = race_code[0:4]
+    sql = """
+        SELECT TRIM(r.kyosomei_hondai) AS kyosomei_hondai,
+               TRIM(r.kyori) AS kyori,
+               TRIM(r.track_code) AS track_code
+        FROM race_shosai r
+        WHERE TRIM(r.tokubetsu_kyoso_bango) = %s AND r.kaisai_nen < %s
+        ORDER BY r.kaisai_nen DESC, r.kaisai_gappi DESC
+        LIMIT 1
+    """
+    latest = manager.fetch_dataframe(sql, params=(tokubetsu_kyoso_bango, kaisai_nen))
+    if latest.empty:
+        raise ValueError(
+            f"{kaisai_nen}年より前に特別競走番号 {tokubetsu_kyoso_bango} のレースがありません"
+        )
+    return pd.DataFrame({
+        "race_code": [race_code],
+        "kaisai_nen": [kaisai_nen],
+        "kaisai_gappi": [race_code[4:8]],
+        "keibajo_code": [race_code[8:10]],
+        "kyosomei_hondai": [latest["kyosomei_hondai"].iloc[0]],
+        "kyori": [latest["kyori"].iloc[0]],
+        "track_code": [latest["track_code"].iloc[0]],
+        "tokubetsu_kyoso_bango": [tokubetsu_kyoso_bango],
+    })
+
+
 def build_race_context(race_info: pd.DataFrame) -> TrendContext:
     """レース情報から集計対象の情報を構築して返す。
 

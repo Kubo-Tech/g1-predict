@@ -29,12 +29,11 @@ pip install -e ".[dev]"
 | --- | --- |
 | `keiba-domain`（GitHub） | 競馬ドメインの定義・判定。`keiba-data-interface` が要求する |
 | `keiba-data-interface`（GitHub） | 日本語カラム名でのレース・出走表・過去成績取得 |
-| `mykeibadb-python`（GitHub / `develop` ブランチ） | DB 直接アクセスと着度数集計（`analytics`） |
+| `mykeibadb-python`（GitHub / `develop` ブランチ） | DB 直接アクセスと着度数集計・出走馬のグループの値の取得（`analytics`） |
 | `race-data`（GitHub） | レースデータの取得・判定（`RaceData`）。`race-dynamics-evaluation` が要求する |
 | `feature-value-utils`（GitHub、private） | 統計量計算。`race-dynamics-evaluation` が要求する |
 | `race-dynamics-evaluation`（GitHub、private） | 展開評価（差し有利度・外枠有利度・外有利度）の計算とプロット |
-| `matplotlib` | 前日・当日の傾向のグラフ（出目の棒グラフ・展開グラフ・標準化散布図）の生成。日本語表示に Noto Sans CJK JP フォントを使う |
-| `openpyxl` | 分析表（xlsx）の書き出し |
+| `matplotlib` | 前日・当日の傾向のグラフ（出目の棒グラフ・展開グラフ・標準化散布図）と、過去の傾向の出走馬の比較表の画像の生成。日本語表示に Noto Sans CJK JP フォントを使う |
 | `python-dotenv` | `.env` の読み込み |
 | `pyyaml` | `configs/` 配下の YAML の読み込み |
 | `requests` | はてなブログ AtomPub / Fotolife API |

@@ -1,0 +1,58 @@
+基本項目:
+  - 前走脚質:
+      color_rules:
+        - {labels: [差し], color: yellow}
+  - 前走4角通過順位:
+      color_rules:
+        - {labels: [6-9番手, 10番手以下], color: yellow}
+  - 前走上がり3F順位:
+      color_rules:
+        - {labels: [1位, 2位], color: yellow}
+  - 所属:
+      color_rules:
+        - {labels: [栗東], color: yellow}
+  - 馬体重:
+      color_rules:
+        - {labels: [500-519kg, 520kg以上], color: gray}
+前走:
+  - 前走レース:
+      color_rules:
+        - {labels: [優駿牝馬, 関西テレビ放送賞ローズステークス, 紫苑ステークス], color: yellow}
+  - 前走クラス着順:
+      color_rules:
+        - {labels: [G1 1着, G1 2着, G1 3着], color: yellow}
+        - {labels: [G2 6-9着, G2 10着以下, G3 6-9着, G3 10着以下, 非重賞 1着, 非重賞 2着, 非重賞 3着, 非重賞 4着, 非重賞 5着, 非重賞 6-9着, 非重賞 10着以下], color: gray}
+実績:
+  - 勝利数:
+      color_rules:
+        - {labels: [3勝以上], color: yellow}
+        - {labels: [1勝], color: gray}
+  - 重賞勝利数:
+      color_rules:
+        - {labels: [2勝以上], color: yellow}
+世代戦:
+  - デビュー競馬場:
+    color_rules:
+        - {labels: [京都], color: yellow}
+        - {labels: [中山], color: gray}
+同年/前年レース実績:
+  - 同年桜花賞着順:
+      color_rules:
+        - {labels: [1着, 2着, 3着], color: yellow}
+  - 同年オークス着順:
+      color_rules:
+        - {labels: [1着, 2着, 3着, 4着, 5着], color: yellow}
+馬以外の属性:
+  - 騎手:
+      color_rules:
+        - {metric: 3着内数, op: ">=", value: 2, color: yellow}
+  - 継続騎乗:
+    color_rules:
+        - {labels: [継続騎乗], color: yellow}
+        - {labels: [乗り戻り], color: gray}
+  - 生産者:
+      color_rules:
+        - {metric: 3着内数, op: ">=", value: 2, color: yellow}
+  - 種牡馬:
+      color_rules:
+        - {metric: 3着内数, op: ">=", value: 2, color: yellow}

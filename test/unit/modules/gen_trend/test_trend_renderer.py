@@ -10,18 +10,37 @@ from g1_predict.modules.gen_trend._trend_catalog import TrendCategory, TrendItem
 from g1_predict.modules.gen_trend._trend_loader import TrendContext
 from g1_predict.modules.gen_trend._trend_models import OTHER_LABEL, RowStats, TrendCondition
 from g1_predict.modules.gen_trend._trend_renderer import (
+    ItemTable,
     _aggregate_other_stats,
-    _build_metric_section,
     _format_chakudo,
+    _format_item_section,
     _format_percent,
     _format_table_row,
     _get_dynamic_labels,
     build_category_section,
+    build_comparison_section,
+    build_item_table,
     format_condition_note,
     format_scope_note,
 )
 
 _RENDERER = "g1_predict.modules.gen_trend._trend_renderer"
+
+
+def _render_item(item: TrendItem, context: TrendContext) -> str | None:
+    """項目の表を作り、Markdownセクションにする。表を出さない項目は None。"""
+    table = build_item_table(item, context)
+    return None if table is None else _format_item_section(table, with_entries=False)
+
+
+def _render_category(category: TrendCategory, context: TrendContext) -> str:
+    """カテゴリの各項目の表を作り、カテゴリのセクションにする。"""
+    tables: list[ItemTable] = []
+    for item in category.items:
+        table = build_item_table(item, context)
+        if table is not None:
+            tables.append(table)
+    return build_category_section(category, context, tables)
 
 
 def _make_context(
@@ -84,6 +103,20 @@ def test_get_dynamic_labels_sorted_by_top3() -> None:
     assert labels[0] == "A"
     assert labels[1] == "C"
     assert labels[2] == "B"
+
+
+def test_get_dynamic_labels_breaks_ties_by_finishes_then_label() -> None:
+    """3着内数が同じラベルは、1着数・2着数・3着数・4着以下数の多い順、ラベルの昇順に並ぶ。"""
+    stats_map = {
+        "E": RowStats(fourth_plus=3),
+        "D": RowStats(fourth_plus=3),
+        "C": RowStats(fourth_plus=5),
+        "B": RowStats(second=1, third=1),
+        "A": RowStats(second=2),
+        "F": RowStats(first=1, third=1),
+    }
+    labels = _get_dynamic_labels(stats_map, top_n=None)
+    assert labels == ["F", "A", "B", "C", "D", "E"]
 
 
 def test_get_dynamic_labels_exclude_no_top3() -> None:
@@ -211,6 +244,22 @@ def test_format_table_row_zero_total() -> None:
     assert "- |" in row
 
 
+@pytest.mark.parametrize(
+    "tansho, fukusho, expected",
+    [
+        (100.4, 99.0, "| 100% | 99% |"),
+        (100.6, 250.0, "| **101%** | **250%** |"),
+        (180.0, 60.0, "| **180%** | 60% |"),
+    ],
+)
+def test_format_table_row_bolds_kaishuu_over_100(
+    tansho: float, fukusho: float, expected: str
+) -> None:
+    """単回・複回は、四捨五入した値が100%を超える場合に太字にする。"""
+    s = RowStats(first=1, fourth_plus=1, total=2, tansho_kaishuu=tansho, fukusho_kaishuu=fukusho)
+    assert _format_table_row("A", s).endswith(expected)
+
+
 # --- _format_chakudo ---
 
 
@@ -262,14 +311,14 @@ def _make_category(
 def test_build_category_section_has_header_and_description() -> None:
     """## カテゴリ名 の直後にカテゴリの説明文が続く。"""
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = build_category_section(_make_category(), _make_context())
+        result = _render_category(_make_category(), _make_context())
     assert result.startswith("## 基本項目\n\n同じG1レースの過去10年における傾向\n\n### 枠番")
 
 
 def test_build_category_section_embeds_actual_years_in_description() -> None:
     """説明文の {years} には実際に集計した年数が入る。"""
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = build_category_section(_make_category(), _make_context(first_year=2017, years=9))
+        result = _render_category(_make_category(), _make_context(first_year=2017, years=9))
     assert "同じG1レースの過去9年における傾向" in result
 
 
@@ -277,22 +326,25 @@ def test_build_category_section_description_without_years() -> None:
     """{years} を含まない説明文はそのまま出力される。"""
     category = _make_category(description="調教の内容")
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = build_category_section(category, _make_context())
+        result = _render_category(category, _make_context())
     assert result.startswith("## 基本項目\n\n調教の内容\n\n")
 
 
-def test_build_category_section_has_hikaku_table_at_end() -> None:
-    """### 比較表 プレースホルダーが末尾に配置される。"""
-    with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = build_category_section(_make_category(), _make_context())
-    assert result.rstrip().endswith("### 比較表")
+def test_build_comparison_section_has_heading_description_and_image() -> None:
+    """比較表のセクションは、## 比較表・説明文・画像の順に並ぶ。"""
+    assert build_comparison_section("img/trend_table/比較表.png") == (
+        "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。\n"
+        "黄色はプラスデータ、灰色はマイナスデータ。\n"
+        "「好データ」はプラスデータの該当数を数えたもの。\n\n"
+        "![比較表](img/trend_table/比較表.png)"
+    )
 
 
 def test_build_category_section_keeps_item_order() -> None:
     """項目は渡された順に並ぶ。"""
     category = _make_category([_make_item("人気"), _make_item("枠順")])
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = build_category_section(category, _make_context())
+        result = _render_category(category, _make_context())
     assert result.index("### 人気") < result.index("### 枠順")
 
 
@@ -330,10 +382,42 @@ def test_build_metric_section_always_include_grades_adds_missing_juusho() -> Non
             return_value={"天皇賞", "マイルCS", "スプリンターズS", "ヴィクトリアM"},
         ),
     ):
-        result = _build_metric_section(item, _make_context())
+        result = _render_item(item, _make_context())
 
     assert "ヴィクトリアM" in result
     assert "天皇賞" in result
+
+
+def test_build_metric_section_always_include_grades_sorts_added_juusho() -> None:
+    """top_n 外から足す重賞も、3着内数・1〜3着数・4着以下数の多い順、名前の昇順に並ぶ。"""
+    stats_map = {
+        "天皇賞": RowStats(first=5, total=5),
+        "函館SS": RowStats(fourth_plus=2, total=2),
+        "CBC賞": RowStats(fourth_plus=2, total=2),
+        "北九州記念": RowStats(fourth_plus=4, total=4),
+        "セントウルS": RowStats(third=1, total=1),
+    }
+    item = TrendItem(
+        name="前走レース",
+        config={
+            "source": {"type": "prev_race_name", "overseas_label": "海外"},
+            "rows": {"type": "dynamic", "top_n": 1, "always_include_grades": ["A", "B", "C"]},
+        },
+        condition=None,
+    )
+
+    with (
+        patch(f"{_RENDERER}.compute_stats", return_value=stats_map),
+        patch(f"{_RENDERER}.get_juusho_race_names", return_value=set(stats_map)),
+    ):
+        result = _render_item(item, _make_context())
+
+    row_lines = [
+        ln for ln in result.split("\n")
+        if ln.startswith("| ") and "---" not in ln and "前走レース" not in ln
+    ]
+    labels_in_result = [ln.split("|")[1].strip() for ln in row_lines]
+    assert labels_in_result[:5] == ["天皇賞", "セントウルS", "北九州記念", "CBC賞", "函館SS"]
 
 
 def test_build_metric_section_always_include_grades_overseas_not_added() -> None:
@@ -360,7 +444,7 @@ def test_build_metric_section_always_include_grades_overseas_not_added() -> None
         patch(f"{_RENDERER}.compute_stats", return_value=stats_map),
         patch(f"{_RENDERER}.get_juusho_race_names", return_value={"マイルCS"}),
     ):
-        result = _build_metric_section(item, _make_context())
+        result = _render_item(item, _make_context())
 
     lines = result.split("\n")
     row_lines = [
@@ -387,7 +471,7 @@ def test_build_metric_section_dynamic_top_n_adds_other_row() -> None:
         condition=None,
     )
     with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
-        result = _build_metric_section(item, _make_context())
+        result = _render_item(item, _make_context())
 
     assert "| A | 3-0-0-1 |" in result
     assert "| B | 1-0-0-2 |" in result
@@ -405,7 +489,7 @@ def test_build_metric_section_does_not_require_entries() -> None:
     )
     context = _make_context()
     with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
-        result = _build_metric_section(item, context)
+        result = _render_item(item, context)
 
     assert "| 武豊 | 1-0-0-5 |" in result
     context.manager.fetch_dataframe.assert_not_called()
@@ -419,7 +503,7 @@ def test_build_metric_section_hide_empty_omits_zero_rows() -> None:
     stats_map = {"1-4枠": RowStats(first=1, fourth_plus=3, total=4)}
     item = TrendItem(name="枠番", config=_make_fixed_config(hide_empty=True), condition=None)
     with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
-        result = _build_metric_section(item, _make_context())
+        result = _render_item(item, _make_context())
 
     assert "| 1-4枠 |" in result
     assert "5-8枠" not in result
@@ -429,7 +513,7 @@ def test_build_metric_section_without_hide_empty_keeps_zero_rows() -> None:
     """hide_empty を指定しない場合、頭数が0の行も出力する。"""
     stats_map = {"1-4枠": RowStats(first=1, fourth_plus=3, total=4)}
     with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
-        result = _build_metric_section(_make_item(), _make_context())
+        result = _render_item(_make_item(), _make_context())
 
     assert "| 5-8枠 | 0-0-0-0 | - | - | - | - |" in result
 
@@ -441,14 +525,14 @@ def test_build_metric_section_hide_if_empty_returns_none_without_horses() -> Non
     """hide_if_empty 指定時、該当馬が1頭もいなければ表を出力しない。"""
     stats_map = {"1-4枠": RowStats(), "5-8枠": RowStats()}
     with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
-        assert _build_metric_section(_make_item(hide_if_empty=True), _make_context()) is None
+        assert _render_item(_make_item(hide_if_empty=True), _make_context()) is None
 
 
 def test_build_metric_section_hide_if_empty_keeps_table_with_horses() -> None:
     """hide_if_empty 指定時でも、該当馬がいれば0頭の行を含めて表を出力する。"""
     stats_map = {"1-4枠": RowStats(first=1, fourth_plus=3, total=4)}
     with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
-        result = _build_metric_section(_make_item(hide_if_empty=True), _make_context())
+        result = _render_item(_make_item(hide_if_empty=True), _make_context())
 
     assert result is not None
     assert "| 5-8枠 | 0-0-0-0 | - | - | - | - |" in result
@@ -459,7 +543,7 @@ def test_build_category_section_omits_hidden_item() -> None:
     items = [_make_item(name="前走新馬着順", hide_if_empty=True), _make_item(name="枠番")]
     stats_map = {"1-4枠": RowStats()}
     with patch(f"{_RENDERER}.compute_stats", return_value=stats_map):
-        result = build_category_section(_make_category(items), _make_context())
+        result = _render_category(_make_category(items), _make_context())
 
     assert "### 前走新馬着順" not in result
     assert "### 枠番" in result
@@ -580,7 +664,7 @@ def test_build_metric_section_with_condition_appends_note() -> None:
     item = _make_item(condition=condition)
     context = _make_context(keibajo_code="09")
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = _build_metric_section(item, context)
+        result = _render_item(item, context)
 
     assert result.endswith("\n\n※阪神・4日目・良のみ")
 
@@ -588,7 +672,7 @@ def test_build_metric_section_with_condition_appends_note() -> None:
 def test_build_metric_section_without_condition_no_note() -> None:
     """条件を注入しない項目には、※注記を出力しない。"""
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = _build_metric_section(_make_item(), _make_context())
+        result = _render_item(_make_item(), _make_context())
 
     assert "※" not in result
 
@@ -604,7 +688,7 @@ def test_build_metric_section_passes_applied_condition_to_compute_stats() -> Non
         patch(f"{_RENDERER}.apply_trend_condition", return_value=(narrowed, entry_filters)),
         patch(f"{_RENDERER}.compute_stats", return_value={}) as mock_compute,
     ):
-        _build_metric_section(item, context)
+        _render_item(item, context)
 
     args = mock_compute.call_args[0]
     assert args[1] is context.manager
@@ -616,7 +700,7 @@ def test_build_metric_section_without_condition_uses_base_condition() -> None:
     """条件を注入しない項目は、既定の集計対象で集計する。"""
     context = _make_context()
     with patch(f"{_RENDERER}.compute_stats", return_value={}) as mock_compute:
-        _build_metric_section(_make_item(), context)
+        _render_item(_make_item(), context)
 
     args = mock_compute.call_args[0]
     assert args[2] is context.condition
@@ -630,7 +714,7 @@ def test_build_metric_section_appends_item_note() -> None:
     """項目に note がある場合は、表の直下に出力する。"""
     item = _make_item(note="※父の実績は過去30年のレースで判定")
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = _build_metric_section(item, _make_context())
+        result = _render_item(item, _make_context())
 
     assert result.endswith("\n\n※父の実績は過去30年のレースで判定")
 
@@ -643,6 +727,6 @@ def test_build_metric_section_condition_note_precedes_item_note() -> None:
         patch(f"{_RENDERER}.apply_trend_condition", return_value=(RaceCondition(), [])),
         patch(f"{_RENDERER}.compute_stats", return_value={}),
     ):
-        result = _build_metric_section(item, context)
+        result = _render_item(item, context)
 
     assert result.endswith("\n\n※4日目のみ\n\n※補足")

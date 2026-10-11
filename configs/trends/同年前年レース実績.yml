@@ -15,3 +15,27 @@ items:
         - {label: "5着以内", op: "<=", value: 5}
         - {label: "6着以下", op: ">=", value: 6}
         - {label: "出走無し", op: "==", value: "出走無し"}
+  同年桜花賞着順:
+    source:
+      type: tokubetsu_race_finish
+      tokubetsu_kyoso_bango: "0001"
+      year_offset: 0
+      absent_label: 出走無し
+    rows: &classic_finish_rows
+      type: fixed
+      items:
+        - {label: "1着", op: "==", value: 1}
+        - {label: "2着", op: "==", value: 2}
+        - {label: "3着", op: "==", value: 3}
+        - {label: "4着", op: "==", value: 4}
+        - {label: "5着", op: "==", value: 5}
+        - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
+        - {label: "10着以下", op: ">=", value: 10}
+        - {label: "出走無し", op: "==", value: "出走無し"}
+  同年オークス着順:
+    source:
+      type: tokubetsu_race_finish
+      tokubetsu_kyoso_bango: "0003"
+      year_offset: 0
+      absent_label: 出走無し
+    rows: *classic_finish_rows

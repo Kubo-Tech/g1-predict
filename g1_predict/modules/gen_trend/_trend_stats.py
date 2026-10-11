@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from mykeibadb.analytics import (
@@ -92,6 +93,24 @@ _HIST_FILTER_FIELD_MAP: dict[str, str] = {
 }
 
 
+@dataclass(frozen=True)
+class ItemGrouping:
+    """項目の集計と出走馬の判定で共有するグループ分けの定義。
+
+    Attributes:
+        group_by (GroupBy): グループ分け軸。
+        assign_rows (Callable[[str], list[str]]): グループの値 -> その値が当たる表の行のラベル。
+            fixed の op・chokyo_match_days の op・boolean_multi の父の判定により、
+            複数の行に当たることがある。
+        row_labels (list[str] | None): 集計値が空でも表に必ず載せる行のラベル。
+            dynamic の項目は None。
+    """
+
+    group_by: GroupBy
+    assign_rows: Callable[[str], list[str]]
+    row_labels: list[str] | None = None
+
+
 def compute_stats(
     metric_cfg: dict[str, Any],
     manager: ConnectionManager,
@@ -100,8 +119,8 @@ def compute_stats(
 ) -> dict[str, RowStats]:
     """metric 設定に従って analytics からデータを取得し RowStats を返す。
 
-    source.type に応じて適切な analytics 関数を呼び出す。
-    boolean_multi 型の場合は sire_race_condition_finisher の集計を行う。
+    build_item_grouping で組み立てたグループ分けで analyze_chakudo を実行し、
+    グループごとの集計値を表の行に割り当てて合算する。
 
     Args:
         metric_cfg (dict[str, Any]): metric の YAML 設定dict。
@@ -111,29 +130,61 @@ def compute_stats(
 
     Returns:
         dict[str, RowStats]: 行ラベル -> RowStats。
+    """
+    grouping = build_item_grouping(
+        metric_cfg, manager, condition, lambda: _past_race_codes(manager, condition)
+    )
+    result = _analyze(manager, filters, condition, grouping.group_by)
+    grouped: dict[str, list[RowStats]] = {label: [] for label in grouping.row_labels or []}
+    for row in result.rows:
+        stats = _chakudo_row_to_stats(row)
+        for label in grouping.assign_rows(row.group):
+            grouped.setdefault(label, []).append(stats)
+    return {label: _combine_stats(stats_list) for label, stats_list in grouped.items()}
+
+
+def build_item_grouping(
+    metric_cfg: dict[str, Any],
+    manager: ConnectionManager,
+    condition: RaceCondition,
+    race_codes: Callable[[], list[str]],
+) -> ItemGrouping:
+    """metric 設定から、集計と出走馬の判定で共有するグループ分けを組み立てる。
+
+    過去走を参照する SQL 式は、race_codes のレースの出走馬について値を求める式になる。
+    集計では過去の開催のレースコード、出走馬の判定では対象レースのレースコードを渡す。
+
+    Args:
+        metric_cfg (dict[str, Any]): metric の YAML 設定dict。
+        manager (ConnectionManager): DB接続マネージャ。
+        condition (RaceCondition): レース絞り込み条件。特別競走番号と、
+            boolean_multi の判定の基準年（year_to の翌年）に使う。
+        race_codes (Callable[[], list[str]]): 過去走を参照する式を組み立てるときだけ呼ばれ、
+            値を求める出走馬のレースコードを返す。
+
+    Returns:
+        ItemGrouping: グループ分け軸と、グループの値から行への割り当て。
 
     Raises:
-        ValueError: tokubetsu_race_finish の特別競走番号が condition にも source にも無い場合。
+        ValueError: source.type が未対応の場合、tokubetsu_race_finish の特別競走番号が
+            condition にも source にも無い場合、または boolean_multi で condition.year_to が
+            None の場合。
     """
     rows_cfg = metric_cfg["rows"]
 
     if rows_cfg.get("type") == "boolean_multi":
-        return _compute_sire_condition_stats(rows_cfg, manager, condition, filters)
+        return _build_sire_condition_grouping(rows_cfg, manager, condition)
 
     src = metric_cfg["source"]
     src_type = src.get("type", "")
 
-    race_col_expr = _build_race_col_expr(src, manager, condition)
+    race_col_expr = _build_race_col_expr(src, race_codes)
     if race_col_expr is not None:
-        result = _analyze(
-            manager, filters, condition, GroupBy(kind="race_col", column=race_col_expr)
-        )
-        return _group_by_rows_cfg(result, rows_cfg)
+        return _rows_cfg_grouping(GroupBy(kind="race_col", column=race_col_expr), rows_cfg)
 
     if src_type in SUBJECT_MAP:
-        subject = SUBJECT_MAP[src_type]
-        result = _analyze(manager, filters, condition, GroupBy(kind="subject", subject=subject))
-        return _chakudo_to_stats_map(result)
+        group_by = GroupBy(kind="subject", subject=SUBJECT_MAP[src_type])
+        return ItemGrouping(group_by, _same_group_row)
 
     if src_type in (
         "past_race_top_n_count",
@@ -143,9 +194,7 @@ def compute_stats(
         "jockey_continuity",
         "prev_race_col",
     ):
-        group_by = _build_group_by(src, rows_cfg)
-        result = _analyze(manager, filters, condition, group_by)
-        return _chakudo_to_stats_map(result)
+        return ItemGrouping(_build_group_by(src, rows_cfg), _same_group_row)
 
     if src_type == "tokubetsu_race_finish":
         if "tokubetsu_kyoso_bango" not in src:
@@ -155,19 +204,15 @@ def compute_stats(
                 )
             src = {**src, "tokubetsu_kyoso_bango": condition.tokubetsu_kyoso_bango}
         group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
-        result = _analyze(manager, filters, condition, group_by)
-        return _group_by_rows_cfg(result, rows_cfg)
+        return _rows_cfg_grouping(group_by, rows_cfg)
 
     if src_type == "chokyo_match_days":
         group_by = GroupBy(kind="history", source=AttrSource.from_dict(src))
-        result = _analyze(manager, filters, condition, group_by)
-        return _group_by_chokyo_match_days_rows_cfg(result, rows_cfg)
+        return _build_chokyo_match_days_grouping(group_by, rows_cfg)
 
     if src_type in _PREV_RACE_COL_TYPES:
         attr_source = AttrSource.from_dict(_convert_prev_race_source(src))
-        group_by = GroupBy(kind="history", source=attr_source)
-        result = _analyze(manager, filters, condition, group_by)
-        return _group_by_rows_cfg(result, rows_cfg)
+        return _rows_cfg_grouping(GroupBy(kind="history", source=attr_source), rows_cfg)
 
     raise ValueError(f"未対応の source.type です: {src_type!r}")
 
@@ -226,17 +271,29 @@ def _analyze(
     return result
 
 
+def _past_race_codes(manager: ConnectionManager, condition: RaceCondition) -> list[str]:
+    """条件に合う過去のレースのレースコードを返す。
+
+    Args:
+        manager (ConnectionManager): DB接続マネージャ。
+        condition (RaceCondition): レース絞り込み条件。
+
+    Returns:
+        list[str]: 集計対象レースのレースコード。
+    """
+    return list(fetch_past_races(manager, condition)["race_code"].tolist())
+
+
 def _build_race_col_expr(
     src: dict[str, Any],
-    manager: ConnectionManager,
-    condition: RaceCondition,
+    race_codes_loader: Callable[[], list[str]],
 ) -> str | None:
     """source から GroupBy(kind="race_col") に渡す SQL 式を組み立てる。
 
     Args:
         src (dict[str, Any]): source の YAML 設定dict。
-        manager (ConnectionManager): DB接続マネージャ。
-        condition (RaceCondition): レース絞り込み条件。
+        race_codes_loader (Callable[[], list[str]]): 過去走を参照する式に埋め込む
+            レースコードを返す関数。
 
     Returns:
         str | None: SQL 式。race_col で集計しない source.type の場合は None。
@@ -250,8 +307,7 @@ def _build_race_col_expr(
     if src_type not in _HISTORY_EXPR_BUILDERS and src_type != "prev_race_finish_by_class":
         return None
 
-    past_races = fetch_past_races(manager, condition)
-    race_codes = past_races["race_code"].tolist()
+    race_codes = race_codes_loader()
     if src_type == "prev_race_finish_by_class":
         if "race_class" not in src:
             raise ValueError("prev_race_finish_by_class には race_class が必要です。")
@@ -358,25 +414,23 @@ def _convert_prev_race_source(src: dict[str, Any]) -> dict[str, Any]:
     return converted
 
 
-def _compute_sire_condition_stats(
+def _build_sire_condition_grouping(
     rows_cfg: dict[str, Any],
     manager: ConnectionManager,
     condition: RaceCondition,
-    filters: list[EntryFilter],
-) -> dict[str, RowStats]:
-    """boolean_multi (sire_race_condition_finisher) の RowStats を返す。
+) -> ItemGrouping:
+    """boolean_multi (sire_race_condition_finisher) のグループ分けを組み立てる。
 
-    過去レースの全種牡馬別着度数を取得し、条件を満たす父馬を持つ出走馬を集約する。
+    種牡馬名でグループ分けし、条件を満たす種牡馬の産駒を各行に割り当てる。
     同一 source 条件の SQL は1回のみ実行してキャッシュする。
 
     Args:
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
         manager (ConnectionManager): DB接続マネージャ。
         condition (RaceCondition): レース絞り込み条件。
-        filters (list[EntryFilter]): 追加のエントリフィルタ。
 
     Returns:
-        dict[str, RowStats]: 行ラベル -> RowStats。
+        ItemGrouping: 種牡馬名でグループ分けし、父が行の条件を満たす行に割り当てる定義。
 
     Raises:
         ValueError: condition.year_to が None の場合。
@@ -384,29 +438,24 @@ def _compute_sire_condition_stats(
     if condition.year_to is None:
         raise ValueError("condition.year_to は必須です。")
     race_year = int(condition.year_to) + 1
-    sire_result = _analyze(
-        manager, filters, condition, GroupBy(kind="subject", subject=Subject.SIRE)
-    )
-    sire_stats: dict[str, ChakudoRow] = {row.group: row for row in sire_result.rows}
 
     winner_set_cache: dict[tuple[Any, ...], set[str]] = {}
-    stats_map: dict[str, RowStats] = {}
+    winner_sets: dict[str, set[str]] = {}
     for item in rows_cfg.get("items", []):
         src = item.get("source", {})
         if src.get("type") != "sire_race_condition_finisher":
             continue
-        label = item["label"]
         cache_key = _src_cache_key(src)
         if cache_key not in winner_set_cache:
             winner_set_cache[cache_key] = _get_sire_winner_set(src, manager, race_year)
-        winner_set = winner_set_cache[cache_key]
-        matching = [
-            _chakudo_row_to_stats(row)
-            for name, row in sire_stats.items()
-            if name in winner_set
-        ]
-        stats_map[label] = _merge_stats(matching) if matching else RowStats()
-    return stats_map
+        winner_sets[item["label"]] = winner_set_cache[cache_key]
+
+    def assign_rows(sire_name: str) -> list[str]:
+        return [label for label, winners in winner_sets.items() if sire_name in winners]
+
+    return ItemGrouping(
+        GroupBy(kind="subject", subject=Subject.SIRE), assign_rows, list(winner_sets)
+    )
 
 
 def _get_sire_winner_set(
@@ -521,16 +570,30 @@ def _between_bounds(value: Any) -> tuple[int, int]:
     return int(value[0]), int(value[1])
 
 
-def _chakudo_to_stats_map(result: ChakudoResult) -> dict[str, RowStats]:
-    """ChakudoResult を group -> RowStats の辞書に変換する。
+def _same_group_row(group: str) -> list[str]:
+    """グループの値をそのまま行のラベルとして返す。
 
     Args:
-        result (ChakudoResult): analytics 集計結果。
+        group (str): グループの値。
 
     Returns:
-        dict[str, RowStats]: 行ラベル -> RowStats。
+        list[str]: グループの値だけを持つリスト。
     """
-    return {row.group: _chakudo_row_to_stats(row) for row in result.rows}
+    return [group]
+
+
+def _combine_stats(stats_list: list[RowStats]) -> RowStats:
+    """行に割り当てられたグループの集計値を1つにまとめる。
+
+    Args:
+        stats_list (list[RowStats]): 行に割り当てられたグループの集計値。
+
+    Returns:
+        RowStats: 1つだけならそのまま、複数なら合算した集計値。空なら全て0の集計値。
+    """
+    if len(stats_list) == 1:
+        return stats_list[0]
+    return _merge_stats(stats_list)
 
 
 def _chakudo_row_to_stats(row: ChakudoRow) -> RowStats:
@@ -553,39 +616,30 @@ def _chakudo_row_to_stats(row: ChakudoRow) -> RowStats:
     )
 
 
-def _group_by_rows_cfg(
-    result: ChakudoResult,
-    rows_cfg: dict[str, Any],
-) -> dict[str, RowStats]:
-    """ChakudoResult を YAML rows.items に従ってグループ化する。
+def _rows_cfg_grouping(group_by: GroupBy, rows_cfg: dict[str, Any]) -> ItemGrouping:
+    """グループの値を YAML rows.items に従って行に割り当てる定義を返す。
 
-    dynamic 型はそのまま変換する。fixed 型は rows_cfg の items を評価して
-    条件に合致するグループを集約する。op: "in" も対応する。
+    dynamic 型はグループの値をそのまま行のラベルにする。fixed 型は rows_cfg の items を
+    評価して条件に合致する行すべてに割り当てる。op: "in" も対応する。
 
     Args:
-        result (ChakudoResult): analytics 集計結果。
+        group_by (GroupBy): グループ分け軸。
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
 
     Returns:
-        dict[str, RowStats]: 行ラベル -> RowStats。
+        ItemGrouping: グループ分け軸と、グループの値から行への割り当て。
     """
-    rows_type = rows_cfg.get("type", "dynamic")
-    if rows_type == "dynamic":
-        return _chakudo_to_stats_map(result)
+    if rows_cfg.get("type", "dynamic") == "dynamic":
+        return ItemGrouping(group_by, _same_group_row)
 
-    raw_stats: dict[str, ChakudoRow] = {row.group: row for row in result.rows}
-    stats_map: dict[str, RowStats] = {}
-    for item in rows_cfg.get("items", []):
-        label = item["label"]
-        op = item["op"]
-        value = item["value"]
-        matching = [
-            _chakudo_row_to_stats(row)
-            for group_str, row in raw_stats.items()
-            if _group_matches(group_str, op, value)
+    items = rows_cfg.get("items", [])
+
+    def assign_rows(group: str) -> list[str]:
+        return [
+            item["label"] for item in items if _group_matches(group, item["op"], item["value"])
         ]
-        stats_map[label] = _merge_stats(matching) if matching else RowStats()
-    return stats_map
+
+    return ItemGrouping(group_by, assign_rows, [item["label"] for item in items])
 
 
 def _group_matches(group_str: str, op: str, threshold: Any) -> bool:
@@ -648,38 +702,31 @@ def _group_matches(group_str: str, op: str, threshold: Any) -> bool:
     return False
 
 
-def _group_by_chokyo_match_days_rows_cfg(
-    result: ChakudoResult,
-    rows_cfg: dict[str, Any],
-) -> dict[str, RowStats]:
-    """chokyo_match_days の ChakudoResult を YAML rows.items に従ってグループ化する。
+def _build_chokyo_match_days_grouping(group_by: GroupBy, rows_cfg: dict[str, Any]) -> ItemGrouping:
+    """chokyo_match_days のグループの値を YAML rows.items に従って行に割り当てる定義を返す。
 
-    各行の group（`[[何日前, 該当bool], ...]` 形式のJSON配列テキスト）を
-    any_match / none_match / empty のいずれかで判定し、条件に合致する行を集約する。
+    グループの値（`[[何日前, 該当bool], ...]` 形式のJSON配列テキスト）を
+    any_match / none_match / empty のいずれかで判定し、条件に合致する行すべてに割り当てる。
 
     Args:
-        result (ChakudoResult): analytics 集計結果。
+        group_by (GroupBy): グループ分け軸。
         rows_cfg (dict[str, Any]): rows の YAML 設定dict。
 
     Returns:
-        dict[str, RowStats]: 行ラベル -> RowStats。
+        ItemGrouping: グループ分け軸と、グループの値から行への割り当て。
 
     Raises:
         ValueError: item の op が any_match / none_match / empty 以外の場合。
     """
-    stats_map: dict[str, RowStats] = {}
-    for item in rows_cfg.get("items", []):
-        label = item["label"]
-        op = item["op"]
-        if op not in _CHOKYO_MATCH_DAYS_OPS:
-            raise ValueError(f"chokyo_match_days の rows.items で未対応の op です: {op!r}")
-        matching = [
-            _chakudo_row_to_stats(row)
-            for row in result.rows
-            if _chokyo_match_days_matches(row.group, op)
-        ]
-        stats_map[label] = _merge_stats(matching) if matching else RowStats()
-    return stats_map
+    items = rows_cfg.get("items", [])
+    for item in items:
+        if item["op"] not in _CHOKYO_MATCH_DAYS_OPS:
+            raise ValueError(f"chokyo_match_days の rows.items で未対応の op です: {item['op']!r}")
+
+    def assign_rows(group: str) -> list[str]:
+        return [item["label"] for item in items if _chokyo_match_days_matches(group, item["op"])]
+
+    return ItemGrouping(group_by, assign_rows, [item["label"] for item in items])
 
 
 def _chokyo_match_days_matches(group_text: str, op: str) -> bool:

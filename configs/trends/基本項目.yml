@@ -2,6 +2,7 @@ name: 基本項目
 description: 同じG1レースの過去{years}年における傾向
 items:
   人気:
+    hide_entry_column: true
     source: {type: popularity}
     rows:
       type: fixed
@@ -14,6 +15,7 @@ items:
         - {label: "10人気以下", op: ">=", value: 10}
   枠順:
     conditionable: true
+    hide_entry_column: true
     source: {type: gate_number}
     rows:
       type: fixed
@@ -28,6 +30,7 @@ items:
         - {label: "8枠", op: "==", value: 8}
   脚質:
     conditionable: true
+    uses_race_result: true
     source: {type: running_style}
     rows: &running_style_rows
       type: fixed
@@ -42,6 +45,7 @@ items:
     rows: *running_style_rows
   4角通過順位:
     conditionable: true
+    uses_race_result: true
     source: {type: corner4_juni}
     rows: &corner4_rows
       type: fixed
@@ -56,6 +60,7 @@ items:
     rows: *corner4_rows
   上がり3F順位:
     conditionable: true
+    uses_race_result: true
     source: {type: agari_3f_rank}
     rows: &agari_3f_rank_rows
       type: fixed
