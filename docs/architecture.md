@@ -46,6 +46,7 @@ flowchart TD
     TPL[templates/]
 
     DB --> GT[gen_trend]
+    DB --> GDH[gen_dynamics_history]
     DB --> GP[gen_predict]
     DB --> GR[gen_result]
     DB --> GRC[gen_result_comment]
@@ -60,10 +61,13 @@ flowchart TD
 
     GT --> MD1[public/年/race/過去の傾向.md]
     GT --> IMG[public/年/race/img/trend_table/*.png]
+    GDH --> MD4[public/年/race/過去の展開.md]
+    GDH --> IMG2[public/年/race/img/dynamics_history/*.png]
     GP --> MD2[public/年/race/予想.md]
     GR --> MD3[public/年/race/回顧.md]
 
     MD1 --> PUSH[main へ push]
+    MD4 --> PUSH
     MD2 --> PUSH
     MD3 --> PUSH
     PUSH --> GHA[GitHub Actions<br/>hatena-publish]
@@ -93,6 +97,8 @@ g1-predict/
 │   │   ├── _trend_table_image.py   # 出走馬の比較表の画像
 │   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル、該当馬列、注記
 │   │   └── trend_section.py        # 傾向セクション群の公開 API
+│   ├── gen_dynamics_history/       # 過去の展開記事の生成ロジック
+│   │   └── dynamics_history.py     # 勝ちタイム・1000m通過、推移の節と年ごとの節、画像
 │   ├── gen_day_trend/              # 前日・当日の傾向の生成ロジック
 │   │   └── day_trend.py            # 前日または当日の同競馬場・同芝ダの結果集計
 │   ├── gen_past_race_dynamics/     # 出走馬の過去走の展開評価の生成ロジック
@@ -109,6 +115,7 @@ g1-predict/
 │       ├── race_result.py          # レース名・グレード・結果の行の整形（脚質・4角通過・後3F）
 │       └── tfjv.py                 # TARGET frontier JV ファイルの読み書き
 ├── scripts/                        # エントリポイント（python -m scripts.xxx）
+│   ├── gen_dynamics_history.py     # 過去の展開のエントリポイント
 │   ├── gen_past_race_dynamics.py   # 出走馬の過去走の展開評価のエントリポイント
 │   └── gen_day_trend.py            # 前日・当日の傾向に共通する出力処理（gen_prev_day_trend / gen_race_day_trend から呼ぶ）
 ├── templates/
@@ -116,13 +123,13 @@ g1-predict/
 │   ├── TEMPLATE_RESULT.md          # 結果記事の骨組み
 │   └── points/{レース名}.md         # レース固有の「ポイント」原稿（手書き）
 ├── public/{年}/{race_code}_{レース名}/
-│   ├── 過去の傾向.md / 前日の傾向.md / 当日の傾向.md / 出走馬の過去走の展開評価.md / 予想.md / 回顧.md
-│   ├── img/                        # 記事に貼る画像（trend_table/ past_dynamics/ prev_day/ race_day/ race_result/ など）
+│   ├── 過去の傾向.md / 過去の展開.md / 前日の傾向.md / 当日の傾向.md / 出走馬の過去走の展開評価.md / 予想.md / 回顧.md
+│   ├── img/                        # 記事に貼る画像（trend_table/ dynamics_history/ past_dynamics/ prev_day/ race_day/ race_result/ など）
 │   └── ../.hatena_entry_ids.json   # 投稿済みエントリ ID と画像 URL の記録
 └── test/unit/                      # scripts / modules の単体テスト
 ```
 
-`scripts/` は「引数のパース・入出力パス決定・テンプレート埋め込み」に徹し、集計や判定のロジックは `g1_predict/modules/` 側に置く方針になっている。`modules/` 配下のパッケージ名は、それを使うスクリプト名と対応させる（`scripts/gen_trend.py` → `modules/gen_trend/`）。前日の傾向と当日の傾向は同じロジックを共有するため、`scripts/gen_prev_day_trend.py` と `scripts/gen_race_day_trend.py` は `modules/gen_day_trend/` を使う。前日・当日の傾向、出走馬の過去走の展開評価、回顧で共通する展開評価・レース名と結果の整形・画像保存は `modules/utils/` に置く。複数の機能から参照する定数だけが `modules/constants.py` に置かれる。
+`scripts/` は「引数のパース・入出力パス決定・テンプレート埋め込み」に徹し、集計や判定のロジックは `g1_predict/modules/` 側に置く方針になっている。`modules/` 配下のパッケージ名は、それを使うスクリプト名と対応させる（`scripts/gen_trend.py` → `modules/gen_trend/`）。前日の傾向と当日の傾向は同じロジックを共有するため、`scripts/gen_prev_day_trend.py` と `scripts/gen_race_day_trend.py` は `modules/gen_day_trend/` を使う。過去の展開、前日・当日の傾向、出走馬の過去走の展開評価、回顧で共通する展開評価・レース名と結果の整形・画像保存は `modules/utils/` に置く。複数の機能から参照する定数だけが `modules/constants.py` に置かれる。
 
 ## race_code（16桁）の構造
 

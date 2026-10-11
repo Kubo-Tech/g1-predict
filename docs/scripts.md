@@ -11,6 +11,7 @@
 | スクリプト | DB | TFJV | configs | templates | 出力 |
 | --- | --- | --- | --- | --- | --- |
 | `gen_trend` | ○ | − | `trends.yml`, `configs/trends/`, `table.yml`（`--with-entries` のみ） | − | `過去の傾向.md`, `img/trend_table/比較表.png`（`--with-entries` のみ） |
+| `gen_dynamics_history` | ○ | − | − | − | `過去の展開.md`, `img/dynamics_history/*.png` |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
 | `gen_past_race_dynamics` | ○ | − | − | − | `出走馬の過去走の展開評価.md`, `img/past_dynamics/*.png` |
@@ -121,6 +122,27 @@ JRAの平地G1の特別競走番号は次のとおり（1年の開催順）。�
 出走馬の判定は `mykeibadb.analytics.get_race_entry_groups` で、集計と同じ `GroupBy` の値を出走馬について求めて行う。`g1_predict/modules/gen_trend/_trend_stats.py` の `build_item_grouping()` が集計と出走馬の判定で共通のグループ分けと行の割り当てを組み立て、`_trend_entries.py` が出走馬の判定、`_trend_table_config.py` が `table.yml` の検証、`_trend_table_image.py` が画像の生成を担う。
 
 生成後は、各表の下に `> 一言コメント` を足したり、不要な表を削ったりして記事に仕上げる。
+
+---
+
+## gen_dynamics_history — 過去の展開記事
+
+```bash
+python -m scripts.gen_dynamics_history --race-code 2025101908030711                                # レースが DB にある場合
+python -m scripts.gen_dynamics_history --race-code 2026101808040711 --tokubetsu-kyoso-bango 0018   # レースが DB に入る前
+```
+
+出力: `public/{開催年}/{race_code}_{レース名}/過去の展開.md`（上書きする）と、`img/dynamics_history/` 配下の画像（差し有利度・外枠有利度・外有利度の推移の折れ線グラフ3枚、年ごとの標準化散布図と展開評価値の棒グラフ）。
+
+処理:
+
+1. `load_race_info()` で今回のレースの基本情報を取得する。`--tokubetsu-kyoso-bango` の扱いは `gen_trend` と同じ。レースが DB に無く `--tokubetsu-kyoso-bango` も無い場合は `ValueError` で停止する。
+2. `gen_trend` と同じ決め方で集計年数（過去10年。G1になってから10年に満たないレースはG1になった年から前年まで）と集計対象のレース（今年と同じ特別競走番号・競馬場・距離・芝ダ）を求める。集計対象のレースが1つも無い場合は `ValueError` で停止する。
+3. 集計対象の年ごとに、基準日を開催日の翌日にして展開評価を行う。1000m直線コースの場合は `ValueError` で停止する。結果情報や4コーナーの通過順が無い場合は `CornerDataError` で停止する。
+4. 年ごとの勝ちタイム（確定着順1着の走破タイム）、1000m通過、馬場状態（芝のレースは芝、ダートのレースはダートの馬場状態）を求める。1000m通過は `race_shosai` のラップ（`lap_time1`〜）から求める。最初のラップは距離を200で割った余り（余りが0なら200m）の長さで、以降は200mずつとする。1000m地点がラップの区切りに当たらない場合は、その地点を含むラップを距離で案分し、0.1秒単位に四捨五入する。
+5. 画像を `save_images()` で保存してから、`過去の展開.md` を書き出す。
+
+記事は、冒頭の `## 過去{N}年の推移` に3つの有利度の推移の折れ線グラフを載せ、続けて集計対象の年を新しい順に `## 25年 Aコース7日目 (良)` の見出しで並べる。コース区分が空のレース（ダートなど）の見出しは `## 25年 (良)` になる。今年と競馬場・距離・芝ダが異なる年は節を出さない。折れ線グラフの点は、良馬場の年が塗りつぶし、稍重・重・不良の年が白抜きになる。有利度が求まらない年と節の無い年は点を打たない。
 
 ---
 
