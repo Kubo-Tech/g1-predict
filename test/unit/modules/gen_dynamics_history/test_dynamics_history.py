@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from evaluation import CornerDataError
 from matplotlib.figure import Figure
 
 from g1_predict.modules.gen_dynamics_history.dynamics_history import (
@@ -275,6 +276,24 @@ def test_build_dynamics_history_straight_race_raises() -> None:
     """集計対象のレースが1000m直線コースなら ValueError。"""
     with pytest.raises(ValueError, match="直線"):
         _run([_race(_CODE_2025)], _context(2025, 1), {_CODE_2025: None})
+
+
+def test_build_dynamics_history_missing_result_raises_corner_data_error() -> None:
+    """結果情報が無いレースは、勝ちタイムが無くても CornerDataError をそのまま出す。"""
+    with (
+        patch(f"{_MODULE}.build_race_context", return_value=_context(2025, 1)),
+        patch(f"{_MODULE}.fetch_past_races", return_value=pd.DataFrame([_race(_CODE_2025)])),
+        patch(f"{_MODULE}.DataInterface"),
+        patch(f"{_MODULE}._fetch_win_times", return_value={}),
+        patch(f"{_MODULE}._fetch_laps", return_value={}),
+        patch(f"{_MODULE}.fetch_course_days", return_value={"1019": 7}),
+        patch(
+            f"{_MODULE}.evaluate_race_dynamics_with_plot",
+            side_effect=CornerDataError("結果情報がありません"),
+        ),
+        pytest.raises(CornerDataError),
+    ):
+        build_dynamics_history(pd.DataFrame({"kaisai_nen": ["2026"]}), "秋華賞")
 
 
 # 正常系

@@ -291,7 +291,8 @@ def _evaluate_year(
         _YearEvaluation: 1年分の展開評価と表示に使う値。
 
     Raises:
-        ValueError: 勝ちタイムまたはラップが無い場合。1000m直線コースの場合。
+        ValueError: 1000m直線コースの場合。勝ちタイムまたはラップが無い場合。
+        CornerDataError: 結果情報または4コーナーの通過順データが無い場合。
     """
     race_code = str(race["race_code"])
     year = int(race["kaisai_nen"])
@@ -300,16 +301,16 @@ def _evaluate_year(
     if course_kubun:
         course_days = fetch_course_days(context.manager, str(race["keibajo_code"]), str(year))
         course_day = course_days[str(race["kaisai_gappi"])]
-    if race_code not in win_times:
-        raise ValueError(f"勝ちタイムがありません: {race_code}")
-    if race_code not in laps:
-        raise ValueError(f"ラップがありません: {race_code}")
     race_date = datetime.strptime(race_code[0:8], "%Y%m%d").date()
     dynamics, figure = evaluate_race_dynamics_with_plot(
         race_code, data_interface, _reference_date(race_date)
     )
     if dynamics is None or figure is None:
         raise ValueError(f"1000m直線コースは展開評価の対象外です: {race_code}")
+    if race_code not in win_times:
+        raise ValueError(f"勝ちタイムがありません: {race_code}")
+    if race_code not in laps:
+        raise ValueError(f"ラップがありません: {race_code}")
     babajotai_code = str(race["babajotai_code"])
     return _YearEvaluation(
         race_code=race_code,
