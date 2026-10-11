@@ -366,6 +366,9 @@ def test_make_dynamics_history_chart_axes() -> None:
     assert [label.get_text() for label in ax.get_xticklabels()] == [str(y) for y in _YEARS]
     assert ax.get_ylim() == pytest.approx((-100.0, 100.0))
     assert list(ax.get_yticks()) == pytest.approx([-100, -50, 0, 50, 100])
+    assert [label.get_text() for label in ax.get_yticklabels()] == [
+        "-100", "-50", "0", "+50", "+100",
+    ]  # fmt: skip
     assert ax.get_ylabel() == "差し有利度"
     zero_lines = [line for line in ax.lines if _data(line.get_ydata()) == [0, 0]]
     assert len(zero_lines) == 1

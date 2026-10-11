@@ -272,6 +272,7 @@ def make_past_evaluation_trend_chart(
             x_tick_labels=[f"{runs_ago}走前" for runs_ago in slots],
             y_limit=_CHART_LIMIT,
             y_ticks=_CHART_TICKS,
+            y_tick_labels=None,
             y_label="展開評価値",
             format_value=lambda value: f"{round(value, 2) + 0.0:+.2f}",
         ),
@@ -321,6 +322,7 @@ def make_dynamics_history_chart(
             x_tick_labels=[str(year) for year in years],
             y_limit=_HISTORY_LIMIT,
             y_ticks=_HISTORY_TICKS,
+            y_tick_labels=[f"{round(tick):+d}" if tick else "0" for tick in _HISTORY_TICKS],
             y_label=column,
             format_value=lambda value: f"{round(value):+d}",
         ),
@@ -350,6 +352,7 @@ class _LineAxes:
         x_tick_labels (Sequence[str]): 横軸の目盛りの文字（左から順）。
         y_limit (float): 縦軸の範囲（-y_limit〜+y_limit）。
         y_ticks (Sequence[float]): 縦軸の目盛り。
+        y_tick_labels (Sequence[str] | None): 縦軸の目盛りの文字。None なら既定の表記。
         y_label (str): 縦軸のラベル。
         format_value (Callable[[float], str]): 点の数値の書式。
     """
@@ -357,6 +360,7 @@ class _LineAxes:
     x_tick_labels: Sequence[str]
     y_limit: float
     y_ticks: Sequence[float]
+    y_tick_labels: Sequence[str] | None
     y_label: str
     format_value: Callable[[float], str]
 
@@ -412,6 +416,8 @@ def _make_line_chart(points: Sequence[_LinePoint], axes: _LineAxes) -> Figure:
     ax.set_xlim(-0.5, len(axes.x_tick_labels) - 0.5)
     ax.set_ylim(-axes.y_limit, axes.y_limit)
     ax.set_yticks(axes.y_ticks)
+    if axes.y_tick_labels is not None:
+        ax.set_yticklabels(axes.y_tick_labels)
     ax.set_ylabel(axes.y_label, fontproperties=_JAPANESE_FONT)
     ax.grid(True, axis="y", linestyle="--", alpha=0.5)
     figure.tight_layout()
