@@ -15,16 +15,6 @@ from scripts.gen_dynamics_history import generate_dynamics_history, main
 _RACE_CODE = "2026101808040711"
 
 
-def _race_info() -> pd.DataFrame:
-    return pd.DataFrame({"kyosomei_hondai": ["秋華賞"], "kaisai_nen": ["2026"]})
-
-
-def _body() -> DynamicsHistoryBody:
-    return DynamicsHistoryBody(
-        content="# 【秋華賞2026】過去10年の展開\n", images={"img/dynamics_history/a.png": Figure()}
-    )
-
-
 # 正常系
 def test_generate_dynamics_history_writes_article(tmp_path: Path) -> None:
     """記事が {race_code}_{race_name}/過去の展開.md に出力される。"""
@@ -127,3 +117,13 @@ def test_main_requires_race_code() -> None:
     """--race-code が無いと終了する。"""
     with patch.object(sys, "argv", ["prog"]), pytest.raises(SystemExit):
         main()
+
+
+def _race_info() -> pd.DataFrame:
+    return pd.DataFrame({"kyosomei_hondai": ["秋華賞"], "kaisai_nen": ["2026"]})
+
+
+def _body() -> DynamicsHistoryBody:
+    return DynamicsHistoryBody(
+        content="# 【秋華賞2026】過去10年の展開\n", images={"img/dynamics_history/a.png": Figure()}
+    )

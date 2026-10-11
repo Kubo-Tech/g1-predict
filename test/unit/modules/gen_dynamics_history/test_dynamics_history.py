@@ -24,71 +24,8 @@ _MODULE = "g1_predict.modules.gen_dynamics_history.dynamics_history"
 _CODE_2025 = "2025101908030711"
 _CODE_2024 = "2024102008030711"
 _CODE_2023 = "2023102208030711"
-
-
-def _cor_df(sashi: float, waku: float, soto: float) -> pd.DataFrame:
-    return pd.DataFrame({"差し有利度": [sashi], "外枠有利度": [waku], "外有利度": [soto]})
-
-
-def _context(first_year: int = 2023, race_count: int = 3) -> SimpleNamespace:
-    return SimpleNamespace(
-        manager=MagicMock(),
-        condition=MagicMock(),
-        race_year=2026,
-        keibajo_code="08",
-        kyori=2000,
-        shiba_da="芝",
-        first_year=first_year,
-        years=2026 - first_year,
-        race_count=race_count,
-    )
-
-
-def _race(race_code: str, kubun: str = "A", baba: str = "1") -> dict[str, str]:
-    return {
-        "race_code": race_code,
-        "kaisai_nen": race_code[0:4],
-        "kaisai_gappi": race_code[4:8],
-        "keibajo_code": "08",
-        "grade_code": "A",
-        "course_kubun": kubun,
-        "babajotai_code": baba,
-    }
-
-
 # lap 2000m: 12.0 x 10 の 1000m 通過 = 60.0
 _LAPS = [120] * 10
-
-
-def _run(
-    races: list[dict[str, str]],
-    context: SimpleNamespace | None = None,
-    dynamics_by_code: dict[str, object] | None = None,
-) -> DynamicsHistoryBody:
-    """build_dynamics_history を DB 部分をモックして実行する。"""
-    context = context or _context()
-    codes = [race["race_code"] for race in races]
-    default = SimpleNamespace(cor_df=_cor_df(0.12, -0.05, 0.3), eval_df=pd.DataFrame())
-    dynamics_by_code = dynamics_by_code or {}
-
-    def evaluate(race_code: str, di: object, reference: date) -> tuple[object, Figure | None]:
-        dynamics = dynamics_by_code.get(race_code, default)
-        return dynamics, None if dynamics is None else Figure()
-
-    with (
-        patch(f"{_MODULE}.build_race_context", return_value=context),
-        patch(f"{_MODULE}.fetch_past_races", return_value=pd.DataFrame(races)),
-        patch(f"{_MODULE}.DataInterface"),
-        patch(f"{_MODULE}._fetch_win_times", return_value={c: 1183 for c in codes}),
-        patch(f"{_MODULE}._fetch_laps", return_value={c: _LAPS for c in codes}),
-        patch(
-            f"{_MODULE}.fetch_course_days",
-            return_value={"1019": 7, "1020": 4, "1022": 2},
-        ),
-        patch(f"{_MODULE}.evaluate_race_dynamics_with_plot", side_effect=evaluate),
-        patch(f"{_MODULE}.make_total_evaluation_chart", side_effect=lambda *_: Figure()),
-    ):
-        return build_dynamics_history(pd.DataFrame({"kaisai_nen": ["2026"]}), "秋華賞")
 
 
 # 正常系
@@ -325,3 +262,64 @@ def test_fetch_laps_keeps_position_of_missing_lap() -> None:
     manager = MagicMock()
     manager.fetch_dataframe.return_value = pd.DataFrame([row])
     assert _fetch_laps(manager, [_CODE_2025]) == {_CODE_2025: [120, 0, 115]}
+
+
+def _cor_df(sashi: float, waku: float, soto: float) -> pd.DataFrame:
+    return pd.DataFrame({"差し有利度": [sashi], "外枠有利度": [waku], "外有利度": [soto]})
+
+
+def _context(first_year: int = 2023, race_count: int = 3) -> SimpleNamespace:
+    return SimpleNamespace(
+        manager=MagicMock(),
+        condition=MagicMock(),
+        race_year=2026,
+        keibajo_code="08",
+        kyori=2000,
+        shiba_da="芝",
+        first_year=first_year,
+        years=2026 - first_year,
+        race_count=race_count,
+    )
+
+
+def _race(race_code: str, kubun: str = "A", baba: str = "1") -> dict[str, str]:
+    return {
+        "race_code": race_code,
+        "kaisai_nen": race_code[0:4],
+        "kaisai_gappi": race_code[4:8],
+        "keibajo_code": "08",
+        "grade_code": "A",
+        "course_kubun": kubun,
+        "babajotai_code": baba,
+    }
+
+
+def _run(
+    races: list[dict[str, str]],
+    context: SimpleNamespace | None = None,
+    dynamics_by_code: dict[str, object] | None = None,
+) -> DynamicsHistoryBody:
+    """build_dynamics_history を DB 部分をモックして実行する。"""
+    context = context or _context()
+    codes = [race["race_code"] for race in races]
+    default = SimpleNamespace(cor_df=_cor_df(0.12, -0.05, 0.3), eval_df=pd.DataFrame())
+    dynamics_by_code = dynamics_by_code or {}
+
+    def evaluate(race_code: str, di: object, reference: date) -> tuple[object, Figure | None]:
+        dynamics = dynamics_by_code.get(race_code, default)
+        return dynamics, None if dynamics is None else Figure()
+
+    with (
+        patch(f"{_MODULE}.build_race_context", return_value=context),
+        patch(f"{_MODULE}.fetch_past_races", return_value=pd.DataFrame(races)),
+        patch(f"{_MODULE}.DataInterface"),
+        patch(f"{_MODULE}._fetch_win_times", return_value={c: 1183 for c in codes}),
+        patch(f"{_MODULE}._fetch_laps", return_value={c: _LAPS for c in codes}),
+        patch(
+            f"{_MODULE}.fetch_course_days",
+            return_value={"1019": 7, "1020": 4, "1022": 2},
+        ),
+        patch(f"{_MODULE}.evaluate_race_dynamics_with_plot", side_effect=evaluate),
+        patch(f"{_MODULE}.make_total_evaluation_chart", side_effect=lambda *_: Figure()),
+    ):
+        return build_dynamics_history(pd.DataFrame({"kaisai_nen": ["2026"]}), "秋華賞")
