@@ -122,6 +122,12 @@ def test_calc_passage_1000m_short_laps_raises() -> None:
         calc_passage_1000m(2000, [120, 120])
 
 
+def test_calc_passage_1000m_missing_lap_raises() -> None:
+    """1000m地点までに記録されていないラップがある場合は ValueError。"""
+    with pytest.raises(ValueError, match="記録されていません"):
+        calc_passage_1000m(2000, [120, 110, 0, 122, 121, 126])
+
+
 # 正常系
 @pytest.mark.parametrize(
     ("tenths", "expected"),
@@ -282,11 +288,21 @@ def test_fetch_win_times_parses_soha_time() -> None:
     assert result == {_CODE_2025: 1183, _CODE_2024: 1185}
 
 
-def test_fetch_laps_drops_empty_columns() -> None:
-    """ラップが空の列は含めず、0.1秒単位の整数で返す。"""
+def test_fetch_laps_drops_trailing_empty_columns() -> None:
+    """末尾の空の列は含めず、0.1秒単位の整数で返す。"""
     row = {"race_code": _CODE_2025} | {f"lap_time{i}": "" for i in range(1, 26)}
     row["lap_time1"] = "120"
     row["lap_time2"] = " 115"
     manager = MagicMock()
     manager.fetch_dataframe.return_value = pd.DataFrame([row])
     assert _fetch_laps(manager, [_CODE_2025]) == {_CODE_2025: [120, 115]}
+
+
+def test_fetch_laps_keeps_position_of_missing_lap() -> None:
+    """途中の空の列は詰めずに 0 として残す。"""
+    row = {"race_code": _CODE_2025} | {f"lap_time{i}": "" for i in range(1, 26)}
+    row["lap_time1"] = "120"
+    row["lap_time3"] = "115"
+    manager = MagicMock()
+    manager.fetch_dataframe.return_value = pd.DataFrame([row])
+    assert _fetch_laps(manager, [_CODE_2025]) == {_CODE_2025: [120, 0, 115]}

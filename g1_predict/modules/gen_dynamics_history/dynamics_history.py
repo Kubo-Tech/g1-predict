@@ -133,13 +133,15 @@ def calc_passage_1000m(distance: int, laps: Sequence[int]) -> int:
         int: 0.1秒単位の1000m通過タイム。
 
     Raises:
-        ValueError: ラップが1000m地点に届かない場合。
+        ValueError: ラップが1000m地点に届かない場合。1000m地点までのラップが0以下の場合。
     """
     first_length = distance % _LAP_LENGTH or _LAP_LENGTH
     lengths = [first_length] + [_LAP_LENGTH] * (len(laps) - 1)
     elapsed = 0
     run = 0
     for length, lap in zip(lengths, laps):
+        if lap <= 0:
+            raise ValueError(f"{run}m地点からのラップが記録されていません: distance={distance}")
         if run + length <= _PASSAGE_DISTANCE:
             elapsed += lap
             run += length
@@ -366,7 +368,7 @@ def _fetch_laps(manager: ConnectionManager, race_codes: Sequence[str]) -> dict[s
 
     Returns:
         dict[str, list[int]]: レースコード -> 0.1秒単位のラップ（先頭が最初のラップ）。
-            ラップが記録されていない列は含めない。
+            末尾のラップが記録されていない列は含めない。途中の記録されていない列は 0 になる。
     """
     columns = [f"lap_time{i}" for i in range(1, _LAP_COLUMN_COUNT + 1)]
     select_columns = ", ".join(f"TRIM(r.{column}) AS {column}" for column in columns)
@@ -379,5 +381,7 @@ def _fetch_laps(manager: ConnectionManager, race_codes: Sequence[str]) -> dict[s
     result: dict[str, list[int]] = {}
     for _, row in df.iterrows():
         values = [int(row[column]) if str(row[column]).strip() else 0 for column in columns]
-        result[str(row["race_code"])] = [value for value in values if value > 0]
+        while values and values[-1] == 0:
+            values.pop()
+        result[str(row["race_code"])] = values
     return result
