@@ -67,7 +67,6 @@ flowchart TD
     GR --> MD3[public/年/race/回顧.md]
 
     MD1 --> PUSH[main へ push]
-    MD4 --> PUSH
     MD2 --> PUSH
     MD3 --> PUSH
     PUSH --> GHA[GitHub Actions<br/>hatena-publish]
