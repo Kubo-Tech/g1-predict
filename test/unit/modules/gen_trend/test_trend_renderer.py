@@ -105,6 +105,20 @@ def test_get_dynamic_labels_sorted_by_top3() -> None:
     assert labels[2] == "B"
 
 
+def test_get_dynamic_labels_breaks_ties_by_finishes_then_label() -> None:
+    """3着内数が同じラベルは、1着数・2着数・3着数・4着以下数の多い順、ラベルの昇順に並ぶ。"""
+    stats_map = {
+        "E": RowStats(fourth_plus=3),
+        "D": RowStats(fourth_plus=3),
+        "C": RowStats(fourth_plus=5),
+        "B": RowStats(second=1, third=1),
+        "A": RowStats(second=2),
+        "F": RowStats(first=1, third=1),
+    }
+    labels = _get_dynamic_labels(stats_map, top_n=None)
+    assert labels == ["F", "A", "B", "C", "D", "E"]
+
+
 def test_get_dynamic_labels_exclude_no_top3() -> None:
     """exclude_no_top3 指定時、3着内数が0のラベルは上位に入れない。"""
     stats_map = {
@@ -372,6 +386,38 @@ def test_build_metric_section_always_include_grades_adds_missing_juusho() -> Non
 
     assert "ヴィクトリアM" in result
     assert "天皇賞" in result
+
+
+def test_build_metric_section_always_include_grades_sorts_added_juusho() -> None:
+    """top_n 外から足す重賞も、3着内数・1〜3着数・4着以下数の多い順、名前の昇順に並ぶ。"""
+    stats_map = {
+        "天皇賞": RowStats(first=5, total=5),
+        "函館SS": RowStats(fourth_plus=2, total=2),
+        "CBC賞": RowStats(fourth_plus=2, total=2),
+        "北九州記念": RowStats(fourth_plus=4, total=4),
+        "セントウルS": RowStats(third=1, total=1),
+    }
+    item = TrendItem(
+        name="前走レース",
+        config={
+            "source": {"type": "prev_race_name", "overseas_label": "海外"},
+            "rows": {"type": "dynamic", "top_n": 1, "always_include_grades": ["A", "B", "C"]},
+        },
+        condition=None,
+    )
+
+    with (
+        patch(f"{_RENDERER}.compute_stats", return_value=stats_map),
+        patch(f"{_RENDERER}.get_juusho_race_names", return_value=set(stats_map)),
+    ):
+        result = _render_item(item, _make_context())
+
+    row_lines = [
+        ln for ln in result.split("\n")
+        if ln.startswith("| ") and "---" not in ln and "前走レース" not in ln
+    ]
+    labels_in_result = [ln.split("|")[1].strip() for ln in row_lines]
+    assert labels_in_result[:5] == ["天皇賞", "セントウルS", "北九州記念", "CBC賞", "函館SS"]
 
 
 def test_build_metric_section_always_include_grades_overseas_not_added() -> None:

@@ -131,10 +131,7 @@ def build_item_table(
                 name for name in juusho_names
                 if name in stats_map and name not in labels_set
             ]
-            extra.sort(
-                key=lambda n: stats_map[n].first + stats_map[n].second + stats_map[n].third,
-                reverse=True,
-            )
+            extra.sort(key=lambda n: _dynamic_sort_key(n, stats_map[n]))
             labels = labels + extra
         has_top_n = rows_cfg.get("top_n") is not None
         has_allowed = allowed_values is not None
@@ -417,6 +414,7 @@ def _get_dynamic_labels(
 ) -> list[str]:
     """3着内数の多い順にラベルを返す。
 
+    3着内数が同じラベルは _dynamic_sort_key の順に並べる。
     「その他」ラベルは集計対象から除外する。
     top_n が None の場合は全件返す。
     exclude_no_top3 が True の場合は、3着内数が0のラベルを上位に入れない。
@@ -436,11 +434,27 @@ def _get_dynamic_labels(
     ]
     if exclude_no_top3:
         items = [(label, score) for label, score in items if score > 0]
-    items.sort(key=lambda x: x[1], reverse=True)
+    items.sort(key=lambda x: _dynamic_sort_key(x[0], stats_map[x[0]]))
     if top_n is None or len(items) <= top_n:
         return [label for label, _ in items]
     threshold = items[top_n - 1][1]
     return [label for label, score in items if score >= threshold]
+
+
+def _dynamic_sort_key(label: str, stats: RowStats) -> tuple[int, int, int, int, int, str]:
+    """dynamic の行の並び順のキーを返す。
+
+    3着内数・1着数・2着数・3着数・4着以下数の多い順に並べ、すべて同じ場合はラベルの昇順にする。
+
+    Args:
+        label (str): 行のラベル。
+        stats (RowStats): 行の集計値。
+
+    Returns:
+        tuple[int, int, int, int, int, str]: 昇順に並べるとこの順になるキー。
+    """
+    top3 = stats.first + stats.second + stats.third
+    return (-top3, -stats.first, -stats.second, -stats.third, -stats.fourth_plus, label)
 
 
 def _aggregate_other_stats(
