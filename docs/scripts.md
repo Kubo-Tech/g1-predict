@@ -1,6 +1,6 @@
 # スクリプトリファレンス
 
-すべてリポジトリルートから `python -m scripts.{名前} --race-code {16桁}` で実行する。引数は `--race-code` のみ（`gen_trend` だけ `--with-entries` と `--tokubetsu-kyoso-bango` も指定できる）。
+すべてリポジトリルートから `python -m scripts.{名前} --race-code {16桁}` で実行する。
 
 **共通の注意**
 
