@@ -10,7 +10,7 @@ from mykeibadb.exceptions import MykeibaDBError
 
 from g1_predict.modules.gen_trend._trend_catalog import TrendItem
 from g1_predict.modules.gen_trend._trend_entries import fetch_entry_horses, find_entry_rows
-from g1_predict.modules.gen_trend._trend_loader import TrendContext
+from g1_predict.modules.utils.race_history import TrendContext
 
 _ENTRIES = "g1_predict.modules.gen_trend._trend_entries"
 _STATS = "g1_predict.modules.gen_trend._trend_stats"

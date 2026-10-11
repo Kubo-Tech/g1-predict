@@ -1,4 +1,4 @@
-"""傾向計算に必要な DB コンテキストを構築するモジュール。"""
+"""集計対象のレースと年を決める DB コンテキストを構築するモジュール。"""
 
 from dataclasses import dataclass, replace
 
@@ -9,8 +9,8 @@ from mykeibadb.connection import ConnectionManager
 
 from g1_predict.modules.constants import TRACK_CODE_TO_SHIBA_DA
 
-from ._trend_models import TREND_YEARS
-
+# 集計期間の既定の年数（対象レース年の前年までの過去年数）
+TREND_YEARS = 10
 # 傾向の集計対象にするグレード（G1）
 _G1_GRADE_CODE = "A"
 
@@ -199,9 +199,14 @@ def fetch_past_races(manager: ConnectionManager, condition: RaceCondition) -> pd
 
     Returns:
         pd.DataFrame: 開催年月日順のレース。
-            race_code・kaisai_nen・kaisai_gappi・keibajo_code・grade_code・course_kubun の列を持つ
-            （いずれも前後の空白を除いた文字列）。
+            race_code・kaisai_nen・kaisai_gappi・keibajo_code・grade_code・course_kubun・
+            babajotai_code の列を持つ（いずれも前後の空白を除いた文字列）。
+            babajotai_code は、ダートのレースはダート、それ以外は芝の馬場状態コード。
     """
+    babajotai_expr = (
+        "(CASE WHEN TRIM(r.track_code) BETWEEN '23' AND '29' "
+        "THEN TRIM(r.dirt_babajotai_code) ELSE TRIM(r.shiba_babajotai_code) END)"
+    )
     where_parts: list[str] = []
     params: list[object] = []
     if condition.keibajo_codes:
@@ -229,10 +234,7 @@ def fetch_past_races(manager: ConnectionManager, condition: RaceCondition) -> pd
         where_parts.append("TRIM(r.kaisai_nichime)::INTEGER = ANY(%s)")
         params.append([int(n) for n in condition.kaisai_nichime])
     if condition.babajotai_codes:
-        where_parts.append(
-            "(CASE WHEN TRIM(r.track_code) BETWEEN '23' AND '29' "
-            "THEN TRIM(r.dirt_babajotai_code) ELSE TRIM(r.shiba_babajotai_code) END) = ANY(%s)"
-        )
+        where_parts.append(f"{babajotai_expr} = ANY(%s)")
         params.append(list(condition.babajotai_codes))
     where_clause = " AND ".join(where_parts) if where_parts else "TRUE"
     sql = f"""
@@ -241,7 +243,8 @@ def fetch_past_races(manager: ConnectionManager, condition: RaceCondition) -> pd
                TRIM(r.kaisai_gappi) AS kaisai_gappi,
                TRIM(r.keibajo_code) AS keibajo_code,
                TRIM(r.grade_code) AS grade_code,
-               TRIM(r.course_kubun) AS course_kubun
+               TRIM(r.course_kubun) AS course_kubun,
+               {babajotai_expr} AS babajotai_code
         FROM race_shosai r
         WHERE {where_clause}
         ORDER BY r.kaisai_nen, r.kaisai_gappi

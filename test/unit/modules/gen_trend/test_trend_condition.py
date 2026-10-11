@@ -10,8 +10,8 @@ from g1_predict.modules.gen_trend._trend_condition import (
     apply_trend_condition,
     parse_trend_condition,
 )
-from g1_predict.modules.gen_trend._trend_loader import TrendContext
 from g1_predict.modules.gen_trend._trend_models import TrendCondition
+from g1_predict.modules.utils.race_history import TrendContext
 
 _CONDITION = "g1_predict.modules.gen_trend._trend_condition"
 

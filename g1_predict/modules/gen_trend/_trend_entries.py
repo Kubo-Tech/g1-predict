@@ -5,8 +5,9 @@ from mykeibadb.analytics import get_race_entry_groups
 from mykeibadb.connection import ConnectionManager
 from mykeibadb.exceptions import MykeibaDBError
 
+from g1_predict.modules.utils.race_history import TrendContext
+
 from ._trend_catalog import TrendItem
-from ._trend_loader import TrendContext
 from ._trend_stats import build_item_grouping
 
 # 出走取消・発走除外・競走除外の異常区分コード
