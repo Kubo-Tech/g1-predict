@@ -1,6 +1,6 @@
 """記事に載せる展開評価（相関係数の表・標準化散布図・総合評価の棒グラフ）を生成するユーティリティ。"""
 
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -52,9 +52,12 @@ _CHART_LIMIT = 1.0
 _CHART_TICKS = (-1.0, -0.5, 0.0, 0.5, 1.0)
 # 過去走の展開評価値の折れ線グラフの寸法（インチ）
 _TREND_FIGSIZE = (6.0, 3.0)
+# 有利度の推移の折れ線グラフの縦軸の範囲と目盛り（相関係数を100倍した値）
+_HISTORY_LIMIT = 100.0
+_HISTORY_TICKS = (-100.0, -50.0, 0.0, 50.0, 100.0)
 # 折れ線の点に書く数値を点から離す距離（ポイント）
 _TREND_LABEL_OFFSET = 8
-# 縦軸の端からこの範囲にある点は、数値を図の内側に書く（外側に書くと図からはみ出すため）
+# 縦軸の端からこの割合の範囲にある点は、数値を図の内側に書く（外側に書くと図からはみ出すため）
 _TREND_LABEL_EDGE_MARGIN = 0.2
 # 馬名を0から離す距離（横軸の値）
 _NAME_OFFSET = 0.02
@@ -262,22 +265,140 @@ def make_past_evaluation_trend_chart(
     """
     slots = sorted(axis_runs_ago, reverse=True)
     runs = sorted(evaluations, key=lambda evaluation: -evaluation[0])
+    points = [_LinePoint(slots.index(runs_ago), value, True) for runs_ago, value in runs]
+    return _make_line_chart(
+        points,
+        _LineAxes(
+            x_tick_labels=[f"{runs_ago}走前" for runs_ago in slots],
+            y_limit=_CHART_LIMIT,
+            y_ticks=_CHART_TICKS,
+            y_label="展開評価値",
+            format_value=lambda value: f"{round(value, 2) + 0.0:+.2f}",
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class HistoryPoint:
+    """推移の折れ線グラフの点1つ。
+
+    Attributes:
+        year (int): 開催年。
+        value (float): 相関係数（-1.0〜+1.0）。
+        is_good_track (bool): 良馬場か。False の点は白抜きにする。
+    """
+
+    year: int
+    value: float
+    is_good_track: bool
+
+
+def make_dynamics_history_chart(
+    column: str, points: Sequence[HistoryPoint], years: Sequence[int]
+) -> Figure:
+    """有利度1つの年ごとの推移を折れ線グラフにする。
+
+    横軸には years を等間隔に並べ、目盛りは西暦にする。points に無い年は位置だけ取り、
+    点を打たないが、前後の点は線でつなぐ。値が NaN の点も打たず、前後の点をつなぐ。
+    縦軸は相関係数を100倍した値で、-100から+100に固定する。
+
+    Args:
+        column (str): 有利度の名前（差し有利度 / 外枠有利度 / 外有利度）。縦軸のラベルにする。
+        points (Sequence[HistoryPoint]): 点を打つ年の値。year はすべて years に含まれること。
+        years (Sequence[int]): 横軸に並べる年（昇順）。
+
+    Returns:
+        Figure: 折れ線グラフ。
+    """
+    line_points = [
+        _LinePoint(list(years).index(point.year), point.value * 100, point.is_good_track)
+        for point in points
+        if not pd.isna(point.value)
+    ]
+    return _make_line_chart(
+        sorted(line_points, key=lambda point: point.x),
+        _LineAxes(
+            x_tick_labels=[str(year) for year in years],
+            y_limit=_HISTORY_LIMIT,
+            y_ticks=_HISTORY_TICKS,
+            y_label=column,
+            format_value=lambda value: f"{round(value):+d}",
+        ),
+    )
+
+
+@dataclass(frozen=True)
+class _LinePoint:
+    """折れ線グラフの点1つ。
+
+    Attributes:
+        x (int): 横軸の位置（左から0始まり）。
+        y (float): 縦軸の値。
+        filled (bool): 塗りつぶすか。False の点は白抜きにする。
+    """
+
+    x: int
+    y: float
+    filled: bool
+
+
+@dataclass(frozen=True)
+class _LineAxes:
+    """折れ線グラフの軸と点の数値の設定。
+
+    Attributes:
+        x_tick_labels (Sequence[str]): 横軸の目盛りの文字（左から順）。
+        y_limit (float): 縦軸の範囲（-y_limit〜+y_limit）。
+        y_ticks (Sequence[float]): 縦軸の目盛り。
+        y_label (str): 縦軸のラベル。
+        format_value (Callable[[float], str]): 点の数値の書式。
+    """
+
+    x_tick_labels: Sequence[str]
+    y_limit: float
+    y_ticks: Sequence[float]
+    y_label: str
+    format_value: Callable[[float], str]
+
+
+def _make_line_chart(points: Sequence[_LinePoint], axes: _LineAxes) -> Figure:
+    """点を横軸の左から順につないだ折れ線グラフにする。
+
+    横軸の位置は目盛りの文字の数だけ等間隔に取り、points に無い位置には点を打たない。
+    縦軸は-y_limitから+y_limitに固定する。範囲を超える点は図の外に出るが、数値は図の中の端に書く。
+    点の数値は、正の値は点の上、負の値は点の下に書く。縦軸の端に近い点は図の内側に書く。
+
+    Args:
+        points (Sequence[_LinePoint]): 点（x の昇順）。x はすべて目盛りの範囲内であること。
+        axes (_LineAxes): 軸と点の数値の設定。
+
+    Returns:
+        Figure: 折れ線グラフ。
+    """
     figure = Figure(figsize=_TREND_FIGSIZE)
     ax = figure.subplots()
-    xs = [slots.index(runs_ago) for runs_ago, _ in runs]
-    ys = [value for _, value in runs]
+    xs = [point.x for point in points]
+    ys = [point.y for point in points]
     ax.plot(xs, ys, color=_BAR_COLOR, marker="o")
+    # 塗りつぶさない点は、白い点を重ねて白抜きにする
+    for point in points:
+        if not point.filled:
+            ax.plot(
+                [point.x], [point.y], color=_BAR_COLOR, marker="o", markerfacecolor="white",
+                linestyle="none",
+            )  # fmt: skip
     ax.axhline(0, color="black", linewidth=0.8)
     for x, y in zip(xs, ys, strict=True):
-        label_y = min(max(y, -_CHART_LIMIT), _CHART_LIMIT)
-        if label_y > _CHART_LIMIT - _TREND_LABEL_EDGE_MARGIN:
+        label_y = min(max(y, -axes.y_limit), axes.y_limit)
+        edge_margin = axes.y_limit * _TREND_LABEL_EDGE_MARGIN
+        if label_y > axes.y_limit - edge_margin:
             below = True
-        elif label_y < -_CHART_LIMIT + _TREND_LABEL_EDGE_MARGIN:
+        elif label_y < -axes.y_limit + edge_margin:
             below = False
         else:
             below = label_y < 0
         ax.annotate(
-            f"{round(y, 2) + 0.0:+.2f}",
+            axes.format_value(y),
             (x, label_y),
             xytext=(0, -_TREND_LABEL_OFFSET if below else _TREND_LABEL_OFFSET),
             textcoords="offset points",
@@ -286,12 +407,12 @@ def make_past_evaluation_trend_chart(
             # 範囲を超える点では線が数値の下を通るため、背景を白にして読めるようにする
             bbox={"facecolor": "white", "edgecolor": "none", "pad": 1},
         )
-    ax.set_xticks(range(len(slots)))
-    ax.set_xticklabels([f"{runs_ago}走前" for runs_ago in slots], fontproperties=_JAPANESE_FONT)
-    ax.set_xlim(-0.5, len(slots) - 0.5)
-    ax.set_ylim(-_CHART_LIMIT, _CHART_LIMIT)
-    ax.set_yticks(_CHART_TICKS)
-    ax.set_ylabel("展開評価値", fontproperties=_JAPANESE_FONT)
+    ax.set_xticks(range(len(axes.x_tick_labels)))
+    ax.set_xticklabels(axes.x_tick_labels, fontproperties=_JAPANESE_FONT)
+    ax.set_xlim(-0.5, len(axes.x_tick_labels) - 0.5)
+    ax.set_ylim(-axes.y_limit, axes.y_limit)
+    ax.set_yticks(axes.y_ticks)
+    ax.set_ylabel(axes.y_label, fontproperties=_JAPANESE_FONT)
     ax.grid(True, axis="y", linestyle="--", alpha=0.5)
     figure.tight_layout()
     return figure
