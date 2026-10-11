@@ -265,10 +265,29 @@ def test_fetch_laps_keeps_position_of_missing_lap() -> None:
 
 
 def _cor_df(sashi: float, waku: float, soto: float) -> pd.DataFrame:
+    """有利度の表（相関係数）を作る。
+
+    Args:
+        sashi (float): 差し有利度の相関係数。
+        waku (float): 外枠有利度の相関係数。
+        soto (float): 外有利度の相関係数。
+
+    Returns:
+        pd.DataFrame: RaceDynamicsResult.cor_df と同じ列の1行の表。
+    """
     return pd.DataFrame({"差し有利度": [sashi], "外枠有利度": [waku], "外有利度": [soto]})
 
 
 def _context(first_year: int = 2023, race_count: int = 3) -> SimpleNamespace:
+    """2026年の京都芝2000mのレースの TrendContext の代わりを作る。
+
+    Args:
+        first_year (int): 集計期間の初年。
+        race_count (int): 集計対象のレースの数。
+
+    Returns:
+        SimpleNamespace: TrendContext と同じ属性を持つオブジェクト。
+    """
     return SimpleNamespace(
         manager=MagicMock(),
         condition=MagicMock(),
@@ -283,6 +302,16 @@ def _context(first_year: int = 2023, race_count: int = 3) -> SimpleNamespace:
 
 
 def _race(race_code: str, kubun: str = "A", baba: str = "1") -> dict[str, str]:
+    """fetch_past_races() の1行を作る。
+
+    Args:
+        race_code (str): レースコード。
+        kubun (str): コース区分。
+        baba (str): 馬場状態コード。
+
+    Returns:
+        dict[str, str]: fetch_past_races() の戻り値の1行。
+    """
     return {
         "race_code": race_code,
         "kaisai_nen": race_code[0:4],
@@ -299,7 +328,17 @@ def _run(
     context: SimpleNamespace | None = None,
     dynamics_by_code: dict[str, object] | None = None,
 ) -> DynamicsHistoryBody:
-    """build_dynamics_history を DB 部分をモックして実行する。"""
+    """build_dynamics_history を DB 部分をモックして実行する。
+
+    Args:
+        races (list[dict[str, str]]): fetch_past_races() が返す行。
+        context (SimpleNamespace | None): build_race_context() が返す値。None なら _context()。
+        dynamics_by_code (dict[str, object] | None): レースコード -> 展開評価の結果。
+            None を値にしたレースは1000m直線コースとして扱う。
+
+    Returns:
+        DynamicsHistoryBody: 記事全文と画像。
+    """
     context = context or _context()
     codes = [race["race_code"] for race in races]
     default = SimpleNamespace(cor_df=_cor_df(0.12, -0.05, 0.3), eval_df=pd.DataFrame())

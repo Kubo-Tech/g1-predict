@@ -120,10 +120,20 @@ def test_main_requires_race_code() -> None:
 
 
 def _race_info() -> pd.DataFrame:
+    """秋華賞2026のレース基本情報を作る。
+
+    Returns:
+        pd.DataFrame: load_race_info() の戻り値の代わり。
+    """
     return pd.DataFrame({"kyosomei_hondai": ["秋華賞"], "kaisai_nen": ["2026"]})
 
 
 def _body() -> DynamicsHistoryBody:
+    """画像を1枚持つ記事本文を作る。
+
+    Returns:
+        DynamicsHistoryBody: build_dynamics_history() の戻り値の代わり。
+    """
     return DynamicsHistoryBody(
         content="# 【秋華賞2026】過去10年の展開\n", images={"img/dynamics_history/a.png": Figure()}
     )
