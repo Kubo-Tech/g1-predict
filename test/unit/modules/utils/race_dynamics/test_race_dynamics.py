@@ -9,11 +9,13 @@ import pytest
 from evaluation.params import WAKU_TO_COLOR_DICT
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from matplotlib.text import Text
-from numpy.typing import ArrayLike
 
 from g1_predict.modules.utils.race_dynamics import (
+    DYNAMICS_COLUMNS,
+    MATLAB_COLORS,
     HistoryPoint,
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
@@ -220,7 +222,7 @@ def test_make_total_evaluation_chart_xlim_is_fixed() -> None:
 def test_make_total_evaluation_chart_has_zero_line() -> None:
     """0の位置に縦線を引く。"""
     ax = make_total_evaluation_chart(*_chart_inputs()).axes[0]
-    assert any(_data(line.get_xdata()) == [0, 0] for line in ax.lines)
+    assert any(list(line.get_xdata()) == [0, 0] for line in ax.lines)
 
 
 def test_make_total_evaluation_chart_default_colors_and_weights() -> None:
@@ -312,8 +314,8 @@ def test_make_past_evaluation_trend_chart_axes() -> None:
     assert labels == ["5走前", "4走前", "3走前", "2走前", "1走前"]
     assert ax.get_ylim() == pytest.approx((-1.0, 1.0))
     line = ax.lines[0]
-    assert _data(line.get_xdata()) == [2, 4]
-    assert _data(line.get_ydata()) == pytest.approx([-0.1, 0.2])
+    assert list(line.get_xdata()) == [2, 4]
+    assert list(line.get_ydata()) == pytest.approx([-0.1, 0.2])
 
 
 def test_make_past_evaluation_trend_chart_skipped_runs_are_evenly_spaced() -> None:
@@ -322,7 +324,7 @@ def test_make_past_evaluation_trend_chart_skipped_runs_are_evenly_spaced() -> No
     ax = figure.axes[0]
     labels = [label.get_text() for label in ax.get_xticklabels()]
     assert labels == ["8走前", "7走前", "5走前", "4走前", "1走前"]
-    assert _data(ax.lines[0].get_xdata()) == [0, 4]
+    assert list(ax.lines[0].get_xdata()) == [0, 4]
 
 
 def test_make_past_evaluation_trend_chart_labels() -> None:
@@ -346,102 +348,6 @@ def test_make_past_evaluation_trend_chart_labels_inside_for_out_of_range() -> No
     assert texts["-1.20"].get_va() == "bottom"
     assert texts["+0.90"].get_va() == "top"
     assert texts["-0.90"].get_va() == "bottom"
-
-
-# make_dynamics_history_chart
-def _data(values: ArrayLike) -> list[float]:
-    """折れ線のデータ列をリストにして返す。"""
-    return np.asarray(values).tolist()
-
-
-_YEARS = [2020, 2021, 2022, 2023, 2024]
-
-
-def test_make_dynamics_history_chart_axes() -> None:
-    """横軸は西暦を等間隔に並べ、縦軸は-100から+100に固定して目盛りと0の横線を引く。"""
-    figure = make_dynamics_history_chart(
-        "差し有利度", [HistoryPoint(2021, 0.45, True), HistoryPoint(2024, -0.1, True)], _YEARS
-    )
-    ax = figure.axes[0]
-    assert [label.get_text() for label in ax.get_xticklabels()] == [str(y) for y in _YEARS]
-    assert ax.get_ylim() == pytest.approx((-100.0, 100.0))
-    assert list(ax.get_yticks()) == pytest.approx([-100, -50, 0, 50, 100])
-    assert [label.get_text() for label in ax.get_yticklabels()] == [
-        "-100", "-50", "0", "+50", "+100",
-    ]  # fmt: skip
-    assert ax.get_ylabel() == "差し有利度"
-    zero_lines = [line for line in ax.lines if _data(line.get_ydata()) == [0, 0]]
-    assert len(zero_lines) == 1
-
-
-def test_make_dynamics_history_chart_plots_value_times_100() -> None:
-    """点は相関係数を100倍した値を、年の位置に打つ。"""
-    figure = make_dynamics_history_chart(
-        "外有利度", [HistoryPoint(2021, 0.45, True), HistoryPoint(2024, -0.1, True)], _YEARS
-    )
-    line = figure.axes[0].lines[0]
-    assert _data(line.get_xdata()) == [1, 4]
-    assert _data(line.get_ydata()) == pytest.approx([45.0, -10.0])
-
-
-def test_make_dynamics_history_chart_labels_signed_integer() -> None:
-    """点の数値は符号付きの整数で、正は点の上、負は点の下に書く。"""
-    figure = make_dynamics_history_chart(
-        "差し有利度", [HistoryPoint(2020, 0.45, True), HistoryPoint(2021, -0.3, True)], _YEARS
-    )
-    texts = _annotations(figure)
-    assert set(texts) == {"+45", "-30"}
-    assert texts["+45"].get_va() == "bottom"
-    assert texts["-30"].get_va() == "top"
-
-
-def test_make_dynamics_history_chart_connects_points_across_missing_year() -> None:
-    """点の無い年をまたぐ点も1本の線でつなぎ、無い年には点を打たない。"""
-    figure = make_dynamics_history_chart(
-        "差し有利度",
-        [HistoryPoint(2020, 0.1, True), HistoryPoint(2023, 0.2, True)],
-        _YEARS,
-    )
-    ax = figure.axes[0]
-    assert _data(ax.lines[0].get_xdata()) == [0, 3]
-    assert len(_annotations(figure)) == 2
-
-
-def test_make_dynamics_history_chart_skips_nan_and_connects_neighbors() -> None:
-    """値が NaN の点は打たず、前後の点を線でつなぐ。"""
-    figure = make_dynamics_history_chart(
-        "差し有利度",
-        [
-            HistoryPoint(2020, 0.1, True),
-            HistoryPoint(2021, float("nan"), True),
-            HistoryPoint(2022, 0.3, True),
-        ],
-        _YEARS,
-    )
-    assert _data(figure.axes[0].lines[0].get_xdata()) == [0, 2]
-    assert set(_annotations(figure)) == {"+10", "+30"}
-
-
-def test_make_dynamics_history_chart_hollow_for_not_good_track() -> None:
-    """良馬場でない年の点だけを白抜きにする。"""
-    figure = make_dynamics_history_chart(
-        "差し有利度",
-        [HistoryPoint(2020, 0.1, True), HistoryPoint(2021, 0.2, False)],
-        _YEARS,
-    )
-    ax = figure.axes[0]
-    main = ax.lines[0]
-    assert len(_data(main.get_xdata())) == 2
-    assert to_hex(main.get_markerfacecolor()) == _BAR_COLOR.lower()
-    hollow = [line for line in ax.lines[1:] if line.get_markerfacecolor() == "white"]
-    assert [_data(line.get_xdata()) for line in hollow] == [[1]]
-
-
-def test_make_dynamics_history_chart_without_points() -> None:
-    """点が1つも無くても横軸と縦軸だけの図を返す。"""
-    figure = make_dynamics_history_chart("外枠有利度", [], _YEARS)
-    assert len(_data(figure.axes[0].lines[0].get_xdata())) == 0
-    assert figure.axes[0].get_ylim() == pytest.approx((-100.0, 100.0))
 
 
 def test_evaluate_race_dynamics_with_plot_returns_cor_df_and_figure() -> None:
@@ -479,3 +385,101 @@ def test_evaluate_race_dynamics_with_plot_straight_race_is_skipped() -> None:
         )
     assert result == (None, None)
     mock_evaluate.assert_not_called()
+
+
+# make_dynamics_history_chart
+_YEARS = [2020, 2021, 2022, 2023, 2024]
+
+
+# 正常系
+def test_make_dynamics_history_chart_axes() -> None:
+    """横軸は西暦を等間隔に並べ、縦軸は-100%から100%に固定して0に横線を引く。"""
+    figure = make_dynamics_history_chart([_history_point(2021, 0.45)], _YEARS)
+    ax = figure.axes[0]
+    assert [label.get_text() for label in ax.get_xticklabels()] == [str(y) for y in _YEARS]
+    assert ax.get_ylim() == pytest.approx((-100.0, 100.0))
+    assert ax.yaxis.get_major_formatter()(100, 0) == "100%"
+    assert any(_data(line.get_ydata()) == [0, 0] for line in ax.lines)
+
+
+def test_make_dynamics_history_chart_draws_three_columns_with_legend() -> None:
+    """3つの有利度を MATLAB の標準色の順に1つのグラフに描き、凡例に有利度の名前を出す。"""
+    figure = make_dynamics_history_chart([_history_point(2021, 0.45, 0.1, -0.2)], _YEARS)
+    ax = figure.axes[0]
+    legend = ax.get_legend()
+    assert legend is not None
+    assert [text.get_text() for text in legend.get_texts()] == list(DYNAMICS_COLUMNS)
+    lines = _column_lines(figure)
+    assert [to_hex(line.get_color()).upper() for line in lines] == list(MATLAB_COLORS[:3])
+    assert [_data(line.get_ydata()) for line in lines] == [
+        pytest.approx([45.0]), pytest.approx([10.0]), pytest.approx([-20.0]),
+    ]  # fmt: skip
+
+
+def test_make_dynamics_history_chart_connects_across_missing_and_nan_years() -> None:
+    """points に無い年と NaN の年は点を打たず、前後の点を1本の線でつなぐ。"""
+    points = [
+        _history_point(2023, 0.3),
+        _history_point(2020, 0.1),
+        _history_point(2021, float("nan")),
+    ]
+    figure = make_dynamics_history_chart(points, _YEARS)
+    sashi = _column_lines(figure)[0]
+    assert _data(sashi.get_xdata()) == [0, 3]
+    assert _data(sashi.get_ydata()) == pytest.approx([10.0, 30.0])
+
+
+def test_make_dynamics_history_chart_hollow_for_not_good_track() -> None:
+    """良馬場でない年の点だけ、白い点を重ねて白抜きにする。"""
+    points = [_history_point(2020, 0.1), _history_point(2021, 0.2, is_good_track=False)]
+    figure = make_dynamics_history_chart(points, _YEARS)
+    hollow = [line for line in figure.axes[0].lines if line.get_markerfacecolor() == "white"]
+    assert len(hollow) == 3
+    assert all(_data(line.get_xdata()) == [1] for line in hollow)
+
+
+def _history_point(
+    year: int,
+    sashi: float,
+    waku: float = 0.0,
+    soto: float = 0.0,
+    is_good_track: bool = True,
+) -> HistoryPoint:
+    """推移の折れ線グラフの1年分の点を作る。
+
+    Args:
+        year (int): 開催年。
+        sashi (float): 差し有利度の相関係数。
+        waku (float): 外枠有利度の相関係数。
+        soto (float): 外有利度の相関係数。
+        is_good_track (bool): 良馬場か。
+
+    Returns:
+        HistoryPoint: 推移の折れ線グラフの点。
+    """
+    values = {"差し有利度": sashi, "外枠有利度": waku, "外有利度": soto}
+    return HistoryPoint(year, values, is_good_track)
+
+
+def _column_lines(figure: Figure) -> list[Line2D]:
+    """有利度ごとの折れ線（凡例に載る線）を返す。
+
+    Args:
+        figure (Figure): 推移の折れ線グラフ。
+
+    Returns:
+        list[Line2D]: 差し有利度・外枠有利度・外有利度の順の折れ線。
+    """
+    return [line for line in figure.axes[0].lines if not line.get_label().startswith("_")]
+
+
+def _data(values: object) -> list[float]:
+    """折れ線の座標を float のリストにする。
+
+    Args:
+        values (object): Line2D.get_xdata() または get_ydata() の戻り値。
+
+    Returns:
+        list[float]: 座標のリスト。
+    """
+    return [float(value) for value in np.asarray(values, dtype=float)]

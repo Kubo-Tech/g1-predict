@@ -30,6 +30,11 @@ from g1_predict.modules.utils.race_history import (
 
 # 画像を保存する、記事ディレクトリからの相対ディレクトリ
 _IMAGE_DIR = "img/dynamics_history"
+_HISTORY_CHART_PATH = f"{_IMAGE_DIR}/dynamics.png"
+# 推移の折れ線グラフの点の塗りつぶしと白抜きの説明
+_TRACK_MARK_DESCRIPTION = (
+    "グラフの点は、塗りつぶし（●）が良馬場、白抜き（○）が稍重・重・不良で行われた年。"
+)
 # 馬場状態コード -> 馬場状態の名称
 _BABAJOTAI_NAMES: dict[str, str] = {"1": "良", "2": "稍重", "3": "重", "4": "不良"}
 _GOOD_BABAJOTAI_CODE = "1"
@@ -220,16 +225,18 @@ def build_dynamics_history(race_info: pd.DataFrame, race_label: str) -> Dynamics
 
     images: dict[str, Figure] = {}
     years = list(range(context.first_year, context.race_year))
-    for column in DYNAMICS_COLUMNS:
-        points = [
-            HistoryPoint(
-                evaluation.year,
-                float(evaluation.dynamics.cor_df[column].iloc[0]),
-                evaluation.is_good_track,
-            )
-            for evaluation in evaluations
-        ]
-        images[f"{_IMAGE_DIR}/{column}.png"] = make_dynamics_history_chart(column, points, years)
+    points = [
+        HistoryPoint(
+            evaluation.year,
+            {
+                column: float(evaluation.dynamics.cor_df[column].iloc[0])
+                for column in DYNAMICS_COLUMNS
+            },
+            evaluation.is_good_track,
+        )
+        for evaluation in evaluations
+    ]
+    images[_HISTORY_CHART_PATH] = make_dynamics_history_chart(points, years)
 
     title = f"# 【{race_label}{context.race_year}】過去{context.years}年の展開"
     last_year = context.race_year - 1
@@ -243,11 +250,12 @@ def build_dynamics_history(race_info: pd.DataFrame, race_label: str) -> Dynamics
         f"## 過去{context.years}年の推移",
         "",
         DYNAMICS_DESCRIPTION,
+        _TRACK_MARK_DESCRIPTION,
         "",
+        f"![過去{context.years}年の推移]({_HISTORY_CHART_PATH})",
+        "",
+        TOTAL_EVALUATION_DESCRIPTION,
     ]
-    for column in DYNAMICS_COLUMNS:
-        lines += [f"![{column}の推移]({_IMAGE_DIR}/{column}.png)", ""]
-    lines += [TOTAL_EVALUATION_DESCRIPTION]
     for evaluation in sorted(evaluations, key=lambda item: item.year, reverse=True):
         image_path = f"{_IMAGE_DIR}/{evaluation.race_code}.png"
         chart_path = f"{_IMAGE_DIR}/{evaluation.race_code}_evaluation.png"

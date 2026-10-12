@@ -16,6 +16,7 @@ from g1_predict.modules.constants import TRACK_CODE_TO_SHIBA_DA
 from g1_predict.modules.utils.race_dynamics import (
     DYNAMICS_COLUMNS,
     DYNAMICS_DESCRIPTION,
+    MATLAB_COLORS,
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
 )
@@ -29,10 +30,6 @@ from g1_predict.modules.utils.race_result import (
     race_condition_display,
 )
 
-# MATLABの標準色（線・棒の既定の色順）
-_MATLAB_COLORS: tuple[str, ...] = (
-    "#0072BD", "#D95319", "#EDB120", "#7E2F8E", "#77AC30", "#4DBEEE", "#A2142F",
-)
 _KYAKUSHITSU_URL = "http://next5.jra-van.jp/appli/kyakushitsu3.html"
 _JAPANESE_FONT = FontProperties(family="Noto Sans CJK JP")
 # 展開評価に必要なコーナー通過順が揃っている結果区分。
@@ -303,7 +300,7 @@ def _make_dynamics_chart(matched_races: list[_MatchedRace]) -> Figure:
     figure = Figure(figsize=(8, 4))
     ax = figure.subplots()
     positions = list(range(len(matched_races)))
-    for column, color in zip(DYNAMICS_COLUMNS, _MATLAB_COLORS, strict=False):
+    for column, color in zip(DYNAMICS_COLUMNS, MATLAB_COLORS, strict=False):
         values = [
             float(race.cor_df[column].iloc[0]) * 100 if race.cor_df is not None else float("nan")
             for race in matched_races
@@ -399,7 +396,7 @@ def _build_dememe_section(
     agari_labels = ["1位", "2位", "3位", "4-6位", "7-9位", "10位以下"]
     kyaku_labels = list(KYAKUSHITSU_DISPLAY.values())
     # 枠番以外の棒はMATLABの標準色の1色目で揃える
-    base_color = _MATLAB_COLORS[0]
+    base_color = MATLAB_COLORS[0]
 
     # (項目名, 見出しのリンク先, 画像ファイル名, 目盛りラベル, 頭数, 棒の色)
     charts: list[tuple[str, str | None, str, list[str], list[int], list[str]]] = [

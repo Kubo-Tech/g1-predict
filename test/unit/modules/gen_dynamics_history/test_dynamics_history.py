@@ -147,6 +147,14 @@ def test_build_dynamics_history_descriptions_appear_once() -> None:
     assert body.content.count(TOTAL_EVALUATION_DESCRIPTION) == 1
 
 
+def test_build_dynamics_history_explains_track_marks_before_years() -> None:
+    """推移の節に、点の塗りつぶしと白抜きが馬場状態を表すことを書く。"""
+    body = _run([_race(_CODE_2024), _race(_CODE_2025)], _context(2024, 2))
+    sentence = "グラフの点は、塗りつぶし（●）が良馬場、白抜き（○）が稍重・重・不良で行われた年。"
+    assert body.content.count(sentence) == 1
+    assert body.content.index(sentence) < body.content.index("## 25年")
+
+
 def test_build_dynamics_history_skips_years_with_other_course() -> None:
     """条件に合わない年は節を出さず、{M}年分は条件に合うレースの数になる。"""
     body = _run([_race(_CODE_2023), _race(_CODE_2025)], _context(2023, 2))
@@ -157,20 +165,17 @@ def test_build_dynamics_history_skips_years_with_other_course() -> None:
 
 
 def test_build_dynamics_history_image_keys() -> None:
-    """推移グラフ3枚と、年ごとの標準化散布図・展開評価値の2枚が画像になる。"""
+    """推移グラフ1枚と、年ごとの標準化散布図・展開評価値の2枚が画像になる。"""
     body = _run([_race(_CODE_2024), _race(_CODE_2025)], _context(2024, 2))
     assert set(body.images) == {
-        "img/dynamics_history/差し有利度.png",
-        "img/dynamics_history/外枠有利度.png",
-        "img/dynamics_history/外有利度.png",
+        "img/dynamics_history/dynamics.png",
         f"img/dynamics_history/{_CODE_2025}.png",
         f"img/dynamics_history/{_CODE_2025}_evaluation.png",
         f"img/dynamics_history/{_CODE_2024}.png",
         f"img/dynamics_history/{_CODE_2024}_evaluation.png",
     }
     assert all(isinstance(figure, Figure) for figure in body.images.values())
-    assert body.content.index("差し有利度の推移") < body.content.index("外枠有利度の推移")
-    assert body.content.index("外枠有利度の推移") < body.content.index("外有利度の推移")
+    assert "![過去2年の推移](img/dynamics_history/dynamics.png)" in body.content
 
 
 def test_build_dynamics_history_without_course_kubun_heading() -> None:
