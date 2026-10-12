@@ -5,6 +5,7 @@
 ```mermaid
 flowchart LR
     A[configs/レース名/<br/>templates/points/] --> B[gen_trend<br/>過去の傾向.md]
+    A --> V[gen_dynamics_history<br/>過去の展開.md]
     B --> C[gen_trend --with-entries<br/>該当馬列・比較表]
     C --> D[TARGET で印を付ける]
     D --> P[gen_prev_day_trend<br/>前日の傾向.md]
@@ -38,6 +39,17 @@ python -m scripts.gen_trend --race-code 2026101808040711 --tokubetsu-kyoso-bango
 
 - 各表の下に `> 一言コメント` を足す（引用記法で書くのが既存記事のスタイル）。
 - 使わない表は削る。
+
+同じ週の前半に、同じG1の過去の開催の展開をまとめた記事も生成する。出走馬が確定する前から出力できる。
+
+```bash
+python -m scripts.gen_dynamics_history --race-code 2026061409030411
+python -m scripts.gen_dynamics_history --race-code 2026101808040711 --tokubetsu-kyoso-bango 0018  # レースが DB に入る前
+```
+
+`過去の展開.md` が生成される。冒頭に差し有利度・外枠有利度・外有利度の年ごとの推移を1つにまとめた折れ線グラフが載り、続けて今回と同じコースで行われた年を新しい順に、勝ちタイム・1000m通過・有利度の表・標準化散布図・展開評価値の棒グラフが並ぶ。集計対象の年は `過去の傾向.md` と同じ。折れ線グラフと標準化散布図は `img/dynamics_history/` に保存される。
+
+- 推移グラフの点が白抜きの年は、稍重・重・不良の馬場で行われている。良馬場の年と分けて見る。
 
 ## 2. 出走馬の比較表（出馬表の確定後）
 

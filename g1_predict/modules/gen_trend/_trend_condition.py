@@ -5,8 +5,9 @@ from typing import Any
 
 from mykeibadb.analytics import EntryFilter, RaceColFilter, RaceCondition
 
-from ._course_days import fetch_course_days
-from ._trend_loader import TrendContext, fetch_past_races
+from g1_predict.modules.utils.course_days import fetch_course_days
+from g1_predict.modules.utils.race_history import TrendContext, fetch_past_races
+
 from ._trend_models import TrendCondition
 
 _CONDITION_KEYS = frozenset(

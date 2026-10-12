@@ -12,17 +12,16 @@ import os
 import pandas as pd
 import yaml
 from dotenv import find_dotenv, load_dotenv
-from mykeibadb import RaceGetter
 
 from g1_predict.modules.gen_trend.trend_section import (
     EntrySettings,
     TrendSections,
-    build_race_info_from_history,
     build_trend_sections,
     check_race_entries,
 )
 from g1_predict.modules.utils.image_output import save_images
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
+from g1_predict.modules.utils.race_info import load_race_info
 from g1_predict.modules.utils.race_name import to_race_label
 
 load_dotenv(find_dotenv())
@@ -55,18 +54,9 @@ def generate_trend(
             tokubetsu_kyoso_bango を指定せず、今回のレースが DB に無い場合。
     """
     validate_race_code(race_code)
-    if tokubetsu_kyoso_bango is not None:
-        if with_entries:
-            raise ValueError("--with-entries と --tokubetsu-kyoso-bango は同時に指定できません")
-        race_shosai = build_race_info_from_history(race_code, tokubetsu_kyoso_bango)
-    else:
-        race_getter = RaceGetter()
-        race_shosai = race_getter.get_race_shosai(race_code=race_code, convert_codes=False)
-        if race_shosai.empty:
-            raise ValueError(
-                f"レースが DB にありません: {race_code}。"
-                "DB に入る前は --tokubetsu-kyoso-bango で特別競走番号を指定してください"
-            )
+    if tokubetsu_kyoso_bango is not None and with_entries:
+        raise ValueError("--with-entries と --tokubetsu-kyoso-bango は同時に指定できません")
+    race_shosai = load_race_info(race_code, tokubetsu_kyoso_bango)
     race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
     race_label = to_race_label(race_name)
     year = str(race_shosai["kaisai_nen"].iloc[0]).strip()

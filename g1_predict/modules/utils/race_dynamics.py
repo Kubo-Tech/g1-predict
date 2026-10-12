@@ -1,6 +1,6 @@
 """記事に載せる展開評価（相関係数の表・標準化散布図・総合評価の棒グラフ）を生成するユーティリティ。"""
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -12,6 +12,7 @@ from keiba_data_interface import DataInterface
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Rectangle
+from matplotlib.ticker import PercentFormatter
 from race_data import RaceData
 
 # 展開評価の相関係数カラム
@@ -27,6 +28,10 @@ TOTAL_EVALUATION_DESCRIPTION = (
     "走破タイムを補正した値。大きいほど展開の不利をはね返して好走した馬。"
 )
 # MATLABの標準色の1色目（通常の棒）・2色目（強調する馬の棒）・3色目（今回の出走馬の棒）
+# MATLABの標準色（線・棒の既定の色順）
+MATLAB_COLORS: tuple[str, ...] = (
+    "#0072BD", "#D95319", "#EDB120", "#7E2F8E", "#77AC30", "#4DBEEE", "#A2142F",
+)
 _BAR_COLOR = "#0072BD"
 _HIGHLIGHT_COLOR = "#D95319"
 _RUNNER_COLOR = "#EDB120"
@@ -52,6 +57,8 @@ _CHART_LIMIT = 1.0
 _CHART_TICKS = (-1.0, -0.5, 0.0, 0.5, 1.0)
 # 過去走の展開評価値の折れ線グラフの寸法（インチ）
 _TREND_FIGSIZE = (6.0, 3.0)
+# 有利度の推移の折れ線グラフの寸法（インチ）
+_HISTORY_FIGSIZE = (8.0, 4.0)
 # 折れ線の点に書く数値を点から離す距離（ポイント）
 _TREND_LABEL_OFFSET = 8
 # 縦軸の端からこの範囲にある点は、数値を図の内側に書く（外側に書くと図からはみ出すため）
@@ -293,6 +300,65 @@ def make_past_evaluation_trend_chart(
     ax.set_yticks(_CHART_TICKS)
     ax.set_ylabel("展開評価値", fontproperties=_JAPANESE_FONT)
     ax.grid(True, axis="y", linestyle="--", alpha=0.5)
+    figure.tight_layout()
+    return figure
+
+
+@dataclass(frozen=True)
+class HistoryPoint:
+    """有利度の推移の折れ線グラフの1年分の点。
+
+    Attributes:
+        year (int): 開催年。
+        values (Mapping[str, float]): 有利度の名前 -> 相関係数（-1.0〜+1.0）。
+            キーは DYNAMICS_COLUMNS。
+        is_good_track (bool): 良馬場か。False の年の点は白抜きにする。
+    """
+
+    year: int
+    values: Mapping[str, float]
+    is_good_track: bool
+
+
+def make_dynamics_history_chart(points: Sequence[HistoryPoint], years: Sequence[int]) -> Figure:
+    """差し有利度・外枠有利度・外有利度の年ごとの推移を1つの折れ線グラフにする。
+
+    横軸には years を等間隔に並べ、目盛りは西暦にする。縦軸は相関係数を100倍した
+    -100%から100%とする。points に無い年と値が NaN の年は点を打たず、前後の点を線でつなぐ。
+    良馬場の年の点は塗りつぶし、それ以外の年の点は白抜きにする。
+
+    Args:
+        points (Sequence[HistoryPoint]): 点を打つ年の値。year はすべて years に含まれること。
+        years (Sequence[int]): 横軸に並べる年（昇順）。
+
+    Returns:
+        Figure: 折れ線グラフ。
+    """
+    figure = Figure(figsize=_HISTORY_FIGSIZE)
+    ax = figure.subplots()
+    year_list = list(years)
+    ordered = sorted(points, key=lambda point: point.year)
+    for column, color in zip(DYNAMICS_COLUMNS, MATLAB_COLORS, strict=False):
+        drawn = [point for point in ordered if not pd.isna(point.values[column])]
+        xs = [year_list.index(point.year) for point in drawn]
+        ys = [point.values[column] * 100 for point in drawn]
+        ax.plot(xs, ys, color=color, marker="o", label=column)
+        # 良馬場でない年は、白い点を重ねて白抜きにする
+        hollow = [point for point in drawn if not point.is_good_track]
+        if hollow:
+            ax.plot(
+                [year_list.index(point.year) for point in hollow],
+                [point.values[column] * 100 for point in hollow],
+                color=color, marker="o", markerfacecolor="white", linestyle="none",
+            )  # fmt: skip
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.set_ylim(-100, 100)
+    ax.yaxis.set_major_formatter(PercentFormatter(decimals=0))
+    ax.set_xticks(range(len(year_list)))
+    ax.set_xticklabels([str(year) for year in year_list])
+    ax.set_xlim(-0.5, len(year_list) - 0.5)
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.legend(prop=_JAPANESE_FONT)
     figure.tight_layout()
     return figure
 

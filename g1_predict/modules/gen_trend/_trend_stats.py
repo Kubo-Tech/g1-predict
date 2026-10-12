@@ -18,7 +18,8 @@ from mykeibadb.analytics import (
 )
 from mykeibadb.connection import ConnectionManager
 
-from ._trend_loader import fetch_past_races
+from g1_predict.modules.utils.race_history import fetch_past_races
+
 from ._trend_models import SIRE_YEARS, RowStats
 from ._trend_sql_exprs import (
     BIRTH_MONTH_EXPR,

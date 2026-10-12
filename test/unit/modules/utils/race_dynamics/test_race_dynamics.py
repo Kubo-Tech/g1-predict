@@ -3,19 +3,25 @@
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 import pytest
 from evaluation.params import WAKU_TO_COLOR_DICT
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 
 from g1_predict.modules.utils.race_dynamics import (
+    DYNAMICS_COLUMNS,
+    MATLAB_COLORS,
+    HistoryPoint,
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
     format_correlation,
     make_average_evaluation_chart,
+    make_dynamics_history_chart,
     make_past_evaluation_trend_chart,
     make_total_evaluation_chart,
 )
@@ -379,3 +385,101 @@ def test_evaluate_race_dynamics_with_plot_straight_race_is_skipped() -> None:
         )
     assert result == (None, None)
     mock_evaluate.assert_not_called()
+
+
+# make_dynamics_history_chart
+_YEARS = [2020, 2021, 2022, 2023, 2024]
+
+
+# 正常系
+def test_make_dynamics_history_chart_axes() -> None:
+    """横軸は西暦を等間隔に並べ、縦軸は-100%から100%に固定して0に横線を引く。"""
+    figure = make_dynamics_history_chart([_history_point(2021, 0.45)], _YEARS)
+    ax = figure.axes[0]
+    assert [label.get_text() for label in ax.get_xticklabels()] == [str(y) for y in _YEARS]
+    assert ax.get_ylim() == pytest.approx((-100.0, 100.0))
+    assert ax.yaxis.get_major_formatter()(100, 0) == "100%"
+    assert any(_data(line.get_ydata()) == [0, 0] for line in ax.lines)
+
+
+def test_make_dynamics_history_chart_draws_three_columns_with_legend() -> None:
+    """3つの有利度を MATLAB の標準色の順に1つのグラフに描き、凡例に有利度の名前を出す。"""
+    figure = make_dynamics_history_chart([_history_point(2021, 0.45, 0.1, -0.2)], _YEARS)
+    ax = figure.axes[0]
+    legend = ax.get_legend()
+    assert legend is not None
+    assert [text.get_text() for text in legend.get_texts()] == list(DYNAMICS_COLUMNS)
+    lines = _column_lines(figure)
+    assert [to_hex(line.get_color()).upper() for line in lines] == list(MATLAB_COLORS[:3])
+    assert [_data(line.get_ydata()) for line in lines] == [
+        pytest.approx([45.0]), pytest.approx([10.0]), pytest.approx([-20.0]),
+    ]  # fmt: skip
+
+
+def test_make_dynamics_history_chart_connects_across_missing_and_nan_years() -> None:
+    """points に無い年と NaN の年は点を打たず、前後の点を1本の線でつなぐ。"""
+    points = [
+        _history_point(2023, 0.3),
+        _history_point(2020, 0.1),
+        _history_point(2021, float("nan")),
+    ]
+    figure = make_dynamics_history_chart(points, _YEARS)
+    sashi = _column_lines(figure)[0]
+    assert _data(sashi.get_xdata()) == [0, 3]
+    assert _data(sashi.get_ydata()) == pytest.approx([10.0, 30.0])
+
+
+def test_make_dynamics_history_chart_hollow_for_not_good_track() -> None:
+    """良馬場でない年の点だけ、白い点を重ねて白抜きにする。"""
+    points = [_history_point(2020, 0.1), _history_point(2021, 0.2, is_good_track=False)]
+    figure = make_dynamics_history_chart(points, _YEARS)
+    hollow = [line for line in figure.axes[0].lines if line.get_markerfacecolor() == "white"]
+    assert len(hollow) == 3
+    assert all(_data(line.get_xdata()) == [1] for line in hollow)
+
+
+def _history_point(
+    year: int,
+    sashi: float,
+    waku: float = 0.0,
+    soto: float = 0.0,
+    is_good_track: bool = True,
+) -> HistoryPoint:
+    """推移の折れ線グラフの1年分の点を作る。
+
+    Args:
+        year (int): 開催年。
+        sashi (float): 差し有利度の相関係数。
+        waku (float): 外枠有利度の相関係数。
+        soto (float): 外有利度の相関係数。
+        is_good_track (bool): 良馬場か。
+
+    Returns:
+        HistoryPoint: 推移の折れ線グラフの点。
+    """
+    values = {"差し有利度": sashi, "外枠有利度": waku, "外有利度": soto}
+    return HistoryPoint(year, values, is_good_track)
+
+
+def _column_lines(figure: Figure) -> list[Line2D]:
+    """有利度ごとの折れ線（凡例に載る線）を返す。
+
+    Args:
+        figure (Figure): 推移の折れ線グラフ。
+
+    Returns:
+        list[Line2D]: 差し有利度・外枠有利度・外有利度の順の折れ線。
+    """
+    return [line for line in figure.axes[0].lines if not line.get_label().startswith("_")]
+
+
+def _data(values: object) -> list[float]:
+    """折れ線の座標を float のリストにする。
+
+    Args:
+        values (object): Line2D.get_xdata() または get_ydata() の戻り値。
+
+    Returns:
+        list[float]: 座標のリスト。
+    """
+    return [float(value) for value in np.asarray(values, dtype=float)]

@@ -7,7 +7,6 @@ import pytest
 from mykeibadb.analytics import RaceColFilter, RaceCondition
 
 from g1_predict.modules.gen_trend._trend_catalog import TrendCategory, TrendItem
-from g1_predict.modules.gen_trend._trend_loader import TrendContext
 from g1_predict.modules.gen_trend._trend_models import OTHER_LABEL, RowStats, TrendCondition
 from g1_predict.modules.gen_trend._trend_renderer import (
     ItemTable,
@@ -23,6 +22,7 @@ from g1_predict.modules.gen_trend._trend_renderer import (
     format_condition_note,
     format_scope_note,
 )
+from g1_predict.modules.utils.race_history import TrendContext
 
 _RENDERER = "g1_predict.modules.gen_trend._trend_renderer"
 

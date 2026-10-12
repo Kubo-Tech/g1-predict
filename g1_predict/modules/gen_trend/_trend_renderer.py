@@ -5,11 +5,12 @@ from dataclasses import dataclass
 from keiba_domain import baba_from_code, keibajo_from_code
 from mykeibadb.analytics import EntryFilter
 
+from g1_predict.modules.utils.race_history import TREND_YEARS, TrendContext
+
 from ._trend_catalog import TrendCategory, TrendItem
 from ._trend_condition import apply_trend_condition
 from ._trend_entries import find_entry_rows
-from ._trend_loader import TrendContext
-from ._trend_models import OTHER_LABEL, TREND_YEARS, RowStats, TrendCondition
+from ._trend_models import OTHER_LABEL, RowStats, TrendCondition
 from ._trend_stats import compute_stats, get_juusho_race_names
 
 # 出走馬の比較表のセクションの見出しと説明文

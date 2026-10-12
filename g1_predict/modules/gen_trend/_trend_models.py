@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-TREND_YEARS = 10
 SIRE_YEARS = 30
 OTHER_LABEL = "その他"
 
