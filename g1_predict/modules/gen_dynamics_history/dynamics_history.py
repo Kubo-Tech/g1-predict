@@ -15,7 +15,6 @@ from g1_predict.modules.utils.course_days import fetch_course_days
 from g1_predict.modules.utils.race_dynamics import (
     DYNAMICS_COLUMNS,
     DYNAMICS_DESCRIPTION,
-    TOTAL_EVALUATION_DESCRIPTION,
     HistoryPoint,
     build_dynamics_table_lines,
     evaluate_race_dynamics_with_plot,
@@ -244,17 +243,17 @@ def build_dynamics_history(race_info: pd.DataFrame, race_label: str) -> Dynamics
     lines = [
         title,
         "",
-        f"過去{context.years}年（{context.first_year}年〜{last_year}年）の{race_label}の展開をまとめる。",
+        # 末尾の半角スペース2つで、次の文を改行して表示する
+        f"過去{context.years}年（{context.first_year}年〜{last_year}年）の{race_label}の展開を"
+        "まとめる。  ",
         f"集計対象は{course}で行われた{len(evaluations)}年分。",
         "",
         f"## 過去{context.years}年の推移",
         "",
-        DYNAMICS_DESCRIPTION,
+        f"{DYNAMICS_DESCRIPTION}  ",
         _TRACK_MARK_DESCRIPTION,
         "",
         f"![過去{context.years}年の推移]({_HISTORY_CHART_PATH})",
-        "",
-        TOTAL_EVALUATION_DESCRIPTION,
     ]
     for evaluation in sorted(evaluations, key=lambda item: item.year, reverse=True):
         image_path = f"{_IMAGE_DIR}/{evaluation.race_code}.png"

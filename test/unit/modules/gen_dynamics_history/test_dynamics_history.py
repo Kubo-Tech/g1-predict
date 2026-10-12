@@ -136,7 +136,7 @@ def test_build_dynamics_history_orders_years_newest_first() -> None:
 
 
 def test_build_dynamics_history_descriptions_appear_once() -> None:
-    """有利度と展開評価値の説明は推移の節に1回だけ書く。"""
+    """有利度の説明は推移の節に1回だけ書き、展開評価値の説明は書かない。"""
     from g1_predict.modules.utils.race_dynamics import (
         DYNAMICS_DESCRIPTION,
         TOTAL_EVALUATION_DESCRIPTION,
@@ -144,7 +144,16 @@ def test_build_dynamics_history_descriptions_appear_once() -> None:
 
     body = _run([_race(_CODE_2024), _race(_CODE_2025)], _context(2024, 2))
     assert body.content.count(DYNAMICS_DESCRIPTION) == 1
-    assert body.content.count(TOTAL_EVALUATION_DESCRIPTION) == 1
+    assert TOTAL_EVALUATION_DESCRIPTION not in body.content
+
+
+def test_build_dynamics_history_breaks_lines_after_intro_and_description() -> None:
+    """冒頭の1文目と有利度の説明の末尾に半角スペース2つを付けて改行表示にする。"""
+    from g1_predict.modules.utils.race_dynamics import DYNAMICS_DESCRIPTION
+
+    body = _run([_race(_CODE_2024), _race(_CODE_2025)], _context(2024, 2))
+    assert "の秋華賞の展開をまとめる。  \n集計対象は" in body.content
+    assert f"{DYNAMICS_DESCRIPTION}  \nグラフの点は" in body.content
 
 
 def test_build_dynamics_history_explains_track_marks_before_years() -> None:
