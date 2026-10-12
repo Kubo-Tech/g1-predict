@@ -92,32 +92,36 @@ def test_parse_soha_time_invalid_raises(value: str) -> None:
 
 # 正常系
 def test_build_section_heading_with_course_kubun() -> None:
-    """コース区分がある場合は コース区分・何日目・馬場状態が入る。"""
-    assert build_section_heading(2025, "A", 7, "1") == "## 25年 Aコース7日目 (良)"
+    """コース区分・何日目・馬場状態が入り、netkeiba の結果ページへリンクする。"""
+    assert build_section_heading(_CODE_2025, "A", 7, "1") == (
+        "## [25年 Aコース7日目 (良)](https://race.netkeiba.com/race/result.html?race_id=202508030711)"
+    )
 
 
 def test_build_section_heading_without_course_kubun() -> None:
     """コース区分が空の場合は年と馬場状態だけになる。"""
-    assert build_section_heading(2009, "", None, "2") == "## 09年 (稍重)"
+    assert build_section_heading("2009102505040811", "", None, "2") == (
+        "## [09年 (稍重)](https://race.netkeiba.com/race/result.html?race_id=200905040811)"
+    )
 
 
 @pytest.mark.parametrize(("code", "name"), [("3", "重"), ("4", "不良")])
 def test_build_section_heading_baba_names(code: str, name: str) -> None:
     """馬場状態コードが名称に変換される。"""
-    assert build_section_heading(2020, "", None, code).endswith(f"({name})")
+    assert build_section_heading(_CODE_2023, "", None, code).startswith(f"## [23年 ({name})]")
 
 
 # 異常系
 def test_build_section_heading_invalid_baba_raises() -> None:
     """馬場状態コードが不正なら ValueError。"""
     with pytest.raises(ValueError, match="馬場状態コード"):
-        build_section_heading(2020, "A", 1, "0")
+        build_section_heading(_CODE_2023, "A", 1, "0")
 
 
 def test_build_section_heading_missing_course_day_raises() -> None:
     """コース区分があるのに何日目が無いなら ValueError。"""
     with pytest.raises(ValueError, match="何日目"):
-        build_section_heading(2020, "A", None, "1")
+        build_section_heading(_CODE_2023, "A", None, "1")
 
 
 # 正常系
@@ -129,8 +133,9 @@ def test_build_dynamics_history_orders_years_newest_first() -> None:
     assert "過去3年（2023年〜2025年）の秋華賞の展開をまとめる。" in content
     assert "集計対象は京都芝2000mで行われた3年分。" in content
     assert "## 過去3年の推移" in content
-    assert content.index("## 25年") < content.index("## 24年") < content.index("## 23年")
-    assert "## 25年 Aコース7日目 (良)" in content
+    assert content.index("## [25年") < content.index("## [24年") < content.index("## [23年")
+    url = "https://race.netkeiba.com/race/result.html?race_id=202508030711"
+    assert f"## [25年 Aコース7日目 (良)]({url})" in content
     assert "勝ちタイム: 1:58.3  \n1000m通過: 1:00.0" in content
     assert "| +12% | -5% | +30% |" in content
 
@@ -161,16 +166,16 @@ def test_build_dynamics_history_explains_track_marks_before_years() -> None:
     body = _run([_race(_CODE_2024), _race(_CODE_2025)], _context(2024, 2))
     sentence = "グラフの点は、塗りつぶし（●）が良馬場、白抜き（○）が稍重・重・不良で行われた年。"
     assert body.content.count(sentence) == 1
-    assert body.content.index(sentence) < body.content.index("## 25年")
+    assert body.content.index(sentence) < body.content.index("## [25年")
 
 
 def test_build_dynamics_history_skips_years_with_other_course() -> None:
     """条件に合わない年は節を出さず、{M}年分は条件に合うレースの数になる。"""
     body = _run([_race(_CODE_2023), _race(_CODE_2025)], _context(2023, 2))
     assert "集計対象は京都芝2000mで行われた2年分。" in body.content
-    assert "## 24年" not in body.content
-    assert "## 25年" in body.content
-    assert "## 23年" in body.content
+    assert "## [24年" not in body.content
+    assert "## [25年" in body.content
+    assert "## [23年" in body.content
 
 
 def test_build_dynamics_history_image_keys() -> None:
@@ -190,7 +195,7 @@ def test_build_dynamics_history_image_keys() -> None:
 def test_build_dynamics_history_without_course_kubun_heading() -> None:
     """コース区分が空の年は見出しに コース区分と何日目を出さない。"""
     body = _run([_race(_CODE_2025, kubun="", baba="2")], _context(2025, 1))
-    assert "## 25年 (稍重)" in body.content
+    assert "## [25年 (稍重)]" in body.content
 
 
 def test_build_dynamics_history_uses_day_after_race_as_reference_date() -> None:

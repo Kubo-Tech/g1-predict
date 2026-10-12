@@ -26,6 +26,7 @@ from g1_predict.modules.utils.race_history import (
     build_race_context,
     fetch_past_races,
 )
+from g1_predict.modules.utils.race_result import netkeiba_result_url
 
 # 画像を保存する、記事ディレクトリからの相対ディレクトリ
 _IMAGE_DIR = "img/dynamics_history"
@@ -159,18 +160,18 @@ def calc_passage_1000m(distance: int, laps: Sequence[int]) -> int:
 
 
 def build_section_heading(
-    year: int, course_kubun: str, course_day: int | None, babajotai_code: str
+    race_code: str, course_kubun: str, course_day: int | None, babajotai_code: str
 ) -> str:
-    """年ごとの節の見出しを返す。
+    """年ごとの節の見出しを返す。見出しの文字は netkeiba のレース結果ページへのリンクにする。
 
     Args:
-        year (int): 開催年（西暦）。
+        race_code (str): 16桁のレースコード。
         course_kubun (str): コース区分。空の場合はコース区分と何日目を出さない。
         course_day (int | None): コース区分の何日目か。コース区分が空の場合は None。
         babajotai_code (str): 馬場状態コード（"1"〜"4"）。
 
     Returns:
-        str: `## 25年 Aコース7日目 (良)` の形式の見出し。
+        str: `## [25年 Aコース7日目 (良)]({netkeiba の結果ページの URL})` の形式の見出し。
 
     Raises:
         ValueError: 馬場状態コードが "1"〜"4" でない場合。
@@ -179,12 +180,14 @@ def build_section_heading(
     baba = _BABAJOTAI_NAMES.get(babajotai_code)
     if baba is None:
         raise ValueError(f"馬場状態コードが不正です: {babajotai_code!r}")
-    prefix = f"## {year % 100:02d}年"
+    year = race_code[2:4]
     if not course_kubun:
-        return f"{prefix} ({baba})"
-    if course_day is None:
-        raise ValueError(f"コース区分があるのに何日目が不明です: year={year}")
-    return f"{prefix} {course_kubun}コース{course_day}日目 ({baba})"
+        title = f"{year}年 ({baba})"
+    elif course_day is None:
+        raise ValueError(f"コース区分があるのに何日目が不明です: {race_code}")
+    else:
+        title = f"{year}年 {course_kubun}コース{course_day}日目 ({baba})"
+    return f"## [{title}]({netkeiba_result_url(race_code)})"
 
 
 def build_dynamics_history(race_info: pd.DataFrame, race_label: str) -> DynamicsHistoryBody:
@@ -322,7 +325,7 @@ def _evaluate_year(
     return _YearEvaluation(
         race_code=race_code,
         year=year,
-        heading=build_section_heading(year, course_kubun, course_day, babajotai_code),
+        heading=build_section_heading(race_code, course_kubun, course_day, babajotai_code),
         win_time=format_race_time(win_times[race_code]),
         passage_time=format_race_time(calc_passage_1000m(context.kyori, laps[race_code])),
         is_good_track=babajotai_code == _GOOD_BABAJOTAI_CODE,
