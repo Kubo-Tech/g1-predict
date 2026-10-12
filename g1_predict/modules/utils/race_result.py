@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 
 import pandas as pd
+from keiba_data_interface.utils.race_code import race_code_to_race_id
 
 from g1_predict.modules.constants import GRADE_CODE_DISPLAY
 
@@ -10,6 +11,8 @@ from g1_predict.modules.constants import GRADE_CODE_DISPLAY
 KYAKUSHITSU_DISPLAY: dict[str, str] = {"1": "逃げ", "2": "先行", "3": "差し", "4": "追込"}
 # 脚質の表示名 → 表で使う1文字の略称
 KYAKUSHITSU_SHORT: dict[str, str] = {"逃げ": "逃", "先行": "先", "差し": "差", "追込": "追"}
+# netkeiba のレース結果ページの URL
+_NETKEIBA_RESULT_URL = "https://race.netkeiba.com/race/result.html?race_id={race_id}"
 # 競走条件コード → 条件名の表示名
 _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "701": "新馬",
@@ -19,6 +22,18 @@ _KYOSO_JOKEN_CODE_DISPLAY: dict[str, str] = {
     "016": "3勝クラス",
     "999": "オープン",
 }
+
+
+def netkeiba_result_url(race_code: str) -> str:
+    """netkeiba のレース結果ページの URL を返す。
+
+    Args:
+        race_code (str): 16桁のレースコード。
+
+    Returns:
+        str: `https://race.netkeiba.com/race/result.html?race_id={12桁のレースID}`。
+    """
+    return _NETKEIBA_RESULT_URL.format(race_id=race_code_to_race_id(race_code))
 
 
 def race_condition_display(race_info: pd.DataFrame) -> str:

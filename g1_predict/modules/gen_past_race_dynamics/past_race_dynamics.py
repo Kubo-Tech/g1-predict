@@ -6,7 +6,6 @@ from datetime import datetime
 import pandas as pd
 from evaluation import RaceDynamicsResult
 from keiba_data_interface import DataInterface
-from keiba_data_interface.utils.race_code import race_code_to_race_id
 from keiba_domain import CENTRAL_KEIBAJO_CODES, RaceShubetsu
 from matplotlib.figure import Figure
 from mykeibadb import RaceGetter
@@ -22,11 +21,14 @@ from g1_predict.modules.utils.race_dynamics import (
     make_past_evaluation_trend_chart,
     make_total_evaluation_chart,
 )
-from g1_predict.modules.utils.race_result import grade_display, race_display_name
+from g1_predict.modules.utils.race_result import (
+    grade_display,
+    netkeiba_result_url,
+    race_display_name,
+)
 
 # 標準化散布図と展開評価値の棒グラフを保存する、記事ディレクトリからの相対ディレクトリ
 _IMAGE_DIR = "img/past_dynamics"
-_NETKEIBA_RESULT_URL = "https://race.netkeiba.com/race/result.html?race_id={race_id}"
 _STRAIGHT_RACE_NOTE = "1000m直線コースのため展開評価の対象外。"
 _NO_PAST_RACE_NOTE = "中央の平地で出走した過去走なし。"
 _SUMMARY_TEXT = "過去走の展開評価を開く"
@@ -330,7 +332,7 @@ def _build_race_title(
             グレードが無いレースは括弧を付けない。
     """
     race_date = datetime.strptime(race_code[0:8], "%Y%m%d")
-    url = _NETKEIBA_RESULT_URL.format(race_id=race_code_to_race_id(race_code))
+    url = netkeiba_result_url(race_code)
     name = race_display_name(race_info, unified_names)
     title = f"{race_date.year}年{race_date.month}月{race_date.day}日 [{name}]({url})"
     grade = grade_display(race_info)

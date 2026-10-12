@@ -9,6 +9,7 @@ from g1_predict.modules.utils.race_result import (
     grade_display,
     halon_rank,
     kyakushitsu_display,
+    netkeiba_result_url,
     race_condition_display,
     race_display_name,
 )
@@ -25,6 +26,14 @@ def _row(**kwargs: object) -> pd.Series:
 
 def _result_df() -> pd.DataFrame:
     return pd.DataFrame({"後3ハロン": [34.5, 35.0, float("nan"), 35.0, 36.0]})
+
+
+# netkeiba_result_url
+def test_netkeiba_result_url_uses_race_id() -> None:
+    """16桁のレースコードを netkeiba の12桁のレースIDに直して結果ページの URL にする。"""
+    assert netkeiba_result_url("2025101908030711") == (
+        "https://race.netkeiba.com/race/result.html?race_id=202508030711"
+    )
 
 
 # kyakushitsu_display
