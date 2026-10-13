@@ -1,6 +1,7 @@
 name: 同年/前年レース実績
 items:
   同年高松宮記念着順:
+    column_name: 着順
     source:
       type: tokubetsu_race_finish
       tokubetsu_kyoso_bango: "0019"
@@ -15,6 +16,7 @@ items:
         - {label: "6着以下", op: ">=", value: 6}
         - {label: "出走無し", op: "==", value: "出走無し"}
   同年桜花賞着順:
+    column_name: 着順
     source:
       type: tokubetsu_race_finish
       tokubetsu_kyoso_bango: "0001"
@@ -32,6 +34,7 @@ items:
         - {label: "10着以下", op: ">=", value: 10}
         - {label: "出走無し", op: "==", value: "出走無し"}
   同年オークス着順:
+    column_name: 着順
     source:
       type: tokubetsu_race_finish
       tokubetsu_kyoso_bango: "0003"

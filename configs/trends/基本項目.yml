@@ -43,6 +43,7 @@ items:
     source: {type: prev_race_col, column: kyakushitsu_hantei}
     rows: *running_style_rows
   4角通過順位:
+    column_name: 通過
     conditionable: true
     uses_race_result: true
     source: {type: corner4_juni}
@@ -54,10 +55,12 @@ items:
         - {label: "6-9番手", op: between, value: [6, 9]}
         - {label: "10番手以下", op: ">=", value: 10}
   前走4角通過順位:
+    column_name: 通過
     conditionable: true
     source: {type: prev_corner4_juni}
     rows: *corner4_rows
   上がり3F順位:
+    column_name: 後3F順位
     conditionable: true
     uses_race_result: true
     source: {type: agari_3f_rank}
@@ -69,6 +72,7 @@ items:
         - {label: "3位", op: "==", value: 3}
         - {label: "4位以下", op: ">=", value: 4}
   前走上がり3F順位:
+    column_name: 前走後3F順位
     conditionable: true
     source: {type: prev_race_col, column: kohan_3f_jun}
     rows: *agari_3f_rank_rows
