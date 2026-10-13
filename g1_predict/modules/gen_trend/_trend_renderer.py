@@ -6,6 +6,7 @@ from keiba_domain import baba_from_code, keibajo_from_code
 from mykeibadb.analytics import EntryFilter
 
 from g1_predict.modules.utils.race_history import TREND_YEARS, TrendContext
+from g1_predict.modules.utils.race_name import to_short_race_name
 
 from ._trend_catalog import TrendCategory, TrendItem
 from ._trend_condition import apply_trend_condition
@@ -13,6 +14,8 @@ from ._trend_entries import find_entry_rows
 from ._trend_models import OTHER_LABEL, RowStats, TrendCondition
 from ._trend_stats import compute_stats, get_juusho_race_names
 
+# 行のラベルがレース名になる source.type（表では短い表記にする）
+_RACE_NAME_SOURCE_TYPE = "prev_race_name"
 # 出走馬の比較表のセクションの見出しと説明文
 COMPARISON_HEADING = "比較表"
 _COMPARISON_DESCRIPTION = (
@@ -51,10 +54,15 @@ class ItemTable:
             label (str): 行のラベル。
 
         Returns:
-            str: display_map にあればその表示名、無ければラベルそのまま。
+            str: display_map にあればその表示名。無ければ、前走レース名の項目は
+                to_short_race_name() の短い表記、それ以外の項目はラベルそのまま。
         """
         display_map: dict[str, str] = self.item.config.get("display_map", {})
-        return display_map.get(label, label)
+        if label in display_map:
+            return display_map[label]
+        if self.item.config.get("source", {}).get("type") == _RACE_NAME_SOURCE_TYPE:
+            return to_short_race_name(label)
+        return label
 
     def row_of_value(self, value: str) -> str:
         """出走馬の値が当たる表の行のラベルを返す。

@@ -309,6 +309,24 @@ def test_format_item_section_uses_display_map_for_row_label() -> None:
     assert "| 内枠 | 1-0-0-3 |" in _format_item_section(table, with_entries=True)
 
 
+def test_item_table_display_name_shortens_race_name() -> None:
+    """前走レース名の項目は、行のラベルを短い表記にする。display_map があればそちらを使う。"""
+    config = {"source": {"type": "prev_race_name"}, "display_map": {"大阪杯": "大阪杯(G1)"}}
+    item = TrendItem(name="前走レース", config=config, condition=None)
+    table = ItemTable(item=item, rows=[], stats={}, entry_rows={}, entry_values={})
+    assert table.display_name("関西テレビ放送賞ローズステークス") == "ローズS"
+    assert table.display_name("紫苑ステークス") == "紫苑S"
+    assert table.display_name("大阪杯") == "大阪杯(G1)"
+    assert table.display_name(OTHER_LABEL) == OTHER_LABEL
+
+
+def test_item_table_display_name_keeps_label_for_other_sources() -> None:
+    """前走レース名以外の項目は、レース名のような行のラベルも短くしない。"""
+    item = TrendItem(name="同年レース", config={"source": {"type": "popularity"}}, condition=None)
+    table = ItemTable(item=item, rows=[], stats={}, entry_rows={}, entry_values={})
+    assert table.display_name("紫苑ステークス") == "紫苑ステークス"
+
+
 # --- build_category_section ---
 
 
