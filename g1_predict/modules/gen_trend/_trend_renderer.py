@@ -95,7 +95,8 @@ def build_item_table(
     """1項目分の表の行と集計値を求める。
 
     rows.type に応じて行を決定し、各行の集計値を求める。dynamic 型は、top_n などで表に出ない値が
-    ある場合と、表に出ていない値の出走馬がいる場合に、最後に「その他」行を追加する。
+    ある場合と、表に出ていない値の出走馬がいる場合に、最後に「その他」行を追加する。ただし、
+    表に出ていない値の集計が0頭で、今回の出走馬も当たらない場合は「その他」行を追加しない。
     項目に開催条件が注入されている場合は、開催条件で絞り込んで集計する。
     entry_race_code を指定した場合は、今回の出走馬が当たる行も求める。
     hide_empty の項目でも、今回の出走馬が当たる行は隠さない。
@@ -175,8 +176,11 @@ def build_item_table(
     stats = {label: stats_map.get(label, RowStats()) for label in labels}
     rows = list(labels)
     if add_other_row:
-        stats[OTHER_LABEL] = _aggregate_other_stats(stats_map, set(labels))
-        rows.append(OTHER_LABEL)
+        other_stats = _aggregate_other_stats(stats_map, set(labels))
+        # 過去にも今回の出走馬にも該当が無い「その他」行は出さない
+        if other_stats.total > 0 or OTHER_LABEL in entry_labels:
+            stats[OTHER_LABEL] = other_stats
+            rows.append(OTHER_LABEL)
     return ItemTable(
         item=item, rows=rows, stats=stats, entry_rows=entry_rows, entry_values=entry_values
     )

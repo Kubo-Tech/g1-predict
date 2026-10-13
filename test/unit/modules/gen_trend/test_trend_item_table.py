@@ -131,6 +131,28 @@ def test_build_item_table_dynamic_other_row_aggregates_stats() -> None:
     assert table.stats[OTHER_LABEL] == RowStats(fourth_plus=5, total=5)
 
 
+def test_build_item_table_dynamic_omits_empty_other_row() -> None:
+    """表に出ていない値の集計が0頭で、出走馬も当たらない「その他」行は出さない。"""
+    stats_map = {
+        "A": RowStats(first=3, total=3),
+        "B": RowStats(first=1, total=1),
+        "C": RowStats(),
+    }
+    table = _build(_make_dynamic_item(), stats_map, {1: ["A"]})
+    assert table is not None
+    assert table.rows == ["A", "B"]
+    assert OTHER_LABEL not in table.stats
+
+
+def test_build_item_table_dynamic_keeps_empty_other_row_with_entry() -> None:
+    """集計が0頭でも、今回の出走馬が当たる「その他」行は出す。"""
+    stats_map = {"A": RowStats(first=3, total=3), "B": RowStats(first=1, total=1)}
+    table = _build(_make_dynamic_item(), stats_map, {1: ["未登場の騎手"]})
+    assert table is not None
+    assert table.rows == ["A", "B", OTHER_LABEL]
+    assert table.stats[OTHER_LABEL] == RowStats()
+
+
 def test_build_item_table_dynamic_without_top_n_adds_other_row_for_unlisted_value() -> None:
     """top_n などの指定が無い dynamic の項目でも、表に出ていない値の馬は「その他」行に入れる。"""
     item = TrendItem(
