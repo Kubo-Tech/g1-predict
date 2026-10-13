@@ -17,7 +17,7 @@
 前走:
   - 前走レース:
       color_rules:
-        - {labels: [優駿牝馬, 関西テレビ放送賞ローズステークス, 紫苑ステークス], color: yellow}
+        - {labels: [優駿牝馬, ローズS, 紫苑S], color: yellow}
   - 前走クラス着順:
       color_rules:
         - {labels: [G1 1着, G1 2着, G1 3着], color: yellow}
