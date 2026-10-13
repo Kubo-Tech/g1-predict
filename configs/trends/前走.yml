@@ -1,5 +1,4 @@
 name: 前走
-description: 出走馬の前走に関する傾向
 items:
   前走レース:
     source: {type: prev_race_name, overseas_label: 海外}

@@ -34,7 +34,6 @@ def _write_category(trends_dir: Path, file_name: str, content: str) -> None:
 
 _CATEGORY_YAML = """
 name: 基本項目
-description: 同じG1レースの過去{years}年における傾向
 items:
   人気:
     hide_entry_column: true
@@ -77,10 +76,9 @@ def _load_race_config(race_name: str) -> dict[str, Any]:
 
 # 正常系
 def test_load_trend_catalog_reads_category(trends_dir: Path) -> None:
-    """カテゴリ名・説明文・項目を読み込む。"""
+    """カテゴリ名・項目を読み込む。"""
     catalog = load_trend_catalog(str(trends_dir))
     category = catalog["基本項目"]
-    assert category.description == "同じG1レースの過去{years}年における傾向"
     assert list(category.items) == ["人気", "枠順", "脚質", "父実績"]
     assert category.items["人気"].conditionable is False
     assert category.items["枠順"].conditionable is True
@@ -105,11 +103,11 @@ def test_load_trend_catalog_duplicate_category_raises(trends_dir: Path) -> None:
 @pytest.mark.parametrize(
     "content, message",
     [
-        ("name: x\nitems: {}\n", "キー"),
-        ("name: x\ndescription: y\nitems: {}\n", "items"),
-        ("name: x\ndescription: y\nitems: {a: {source: {}}}\n", "rows"),
-        ("name: x\ndescription: y\nitems: {a: {rows: {}, condition: {}}}\n", "未対応のキー"),
-        ("name: x\ndescription: y\nitems: {a: 1}\n", "マッピング"),
+        ("name: x\ndescription: y\nitems: {a: {rows: {}}}\n", "キー"),
+        ("name: x\nitems: {}\n", "items"),
+        ("name: x\nitems: {a: {source: {}}}\n", "rows"),
+        ("name: x\nitems: {a: {rows: {}, condition: {}}}\n", "未対応のキー"),
+        ("name: x\nitems: {a: 1}\n", "マッピング"),
     ],
 )
 def test_load_trend_catalog_invalid_definition_raises(
@@ -131,7 +129,6 @@ def test_build_trend_categories_keeps_race_config_order(trends_dir: Path) -> Non
     categories = build_trend_categories({"基本項目": ["枠順", "人気"]}, catalog, "宝塚記念", 2200)
     assert [category.name for category in categories] == ["基本項目"]
     assert [item.name for item in categories[0].items] == ["枠順", "人気"]
-    assert categories[0].description == "同じG1レースの過去{years}年における傾向"
 
 
 def test_build_trend_categories_injects_condition(trends_dir: Path) -> None:

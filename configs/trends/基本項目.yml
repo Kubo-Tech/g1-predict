@@ -1,5 +1,4 @@
 name: 基本項目
-description: 同じG1レースの過去{years}年における傾向
 items:
   人気:
     hide_entry_column: true

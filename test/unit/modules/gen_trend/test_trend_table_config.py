@@ -35,7 +35,6 @@ def _make_categories() -> list[TrendCategory]:
     return [
         TrendCategory(
             name="基本項目",
-            description="d",
             items=[
                 TrendItem(name="枠順", config={}, condition=None),
                 TrendItem(name="脚質", config={}, condition=None, uses_race_result=True),
@@ -44,7 +43,6 @@ def _make_categories() -> list[TrendCategory]:
         ),
         TrendCategory(
             name="前走",
-            description="d",
             items=[
                 TrendItem(name="前走レース", config={}, condition=None),
                 TrendItem(name="前走G1着順", config={}, condition=None, class_label="G1"),

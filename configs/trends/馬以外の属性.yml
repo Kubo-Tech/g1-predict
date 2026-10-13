@@ -1,5 +1,4 @@
 name: 馬以外の属性
-description: 過去{years}年の出走馬の騎手・生産者・血統に関する傾向
 items:
   騎手:
     source: {type: jockey_name}

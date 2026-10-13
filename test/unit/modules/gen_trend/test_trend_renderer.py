@@ -298,43 +298,23 @@ def _make_item(
     return TrendItem(name=name, config=config, condition=condition)
 
 
-def _make_category(
-    items: list[TrendItem] | None = None,
-    description: str = "同じG1レースの過去{years}年における傾向",
-) -> TrendCategory:
+def _make_category(items: list[TrendItem] | None = None) -> TrendCategory:
     """テスト用 TrendCategory を生成する。"""
-    return TrendCategory(
-        name="基本項目", description=description, items=items if items else [_make_item()]
-    )
+    return TrendCategory(name="基本項目", items=items if items else [_make_item()])
 
 
-def test_build_category_section_has_header_and_description() -> None:
-    """## カテゴリ名 の直後にカテゴリの説明文が続く。"""
+def test_build_category_section_starts_with_header_and_first_item() -> None:
+    """## カテゴリ名 の直後に説明文を置かず、最初の項目の表が続く。"""
     with patch(f"{_RENDERER}.compute_stats", return_value={}):
         result = _render_category(_make_category(), _make_context())
-    assert result.startswith("## 基本項目\n\n同じG1レースの過去10年における傾向\n\n### 枠番")
-
-
-def test_build_category_section_embeds_actual_years_in_description() -> None:
-    """説明文の {years} には実際に集計した年数が入る。"""
-    with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = _render_category(_make_category(), _make_context(first_year=2017, years=9))
-    assert "同じG1レースの過去9年における傾向" in result
-
-
-def test_build_category_section_description_without_years() -> None:
-    """{years} を含まない説明文はそのまま出力される。"""
-    category = _make_category(description="調教の内容")
-    with patch(f"{_RENDERER}.compute_stats", return_value={}):
-        result = _render_category(category, _make_context())
-    assert result.startswith("## 基本項目\n\n調教の内容\n\n")
+    assert result.startswith("## 基本項目\n\n### 枠番")
 
 
 def test_build_comparison_section_has_heading_description_and_image() -> None:
     """比較表のセクションは、## 比較表・説明文・画像の順に並ぶ。"""
     assert build_comparison_section("img/trend_table/比較表.png") == (
-        "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。\n"
-        "黄色はプラスデータ、灰色はマイナスデータ。\n"
+        "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。  \n"
+        "黄色はプラスデータ、灰色はマイナスデータ。  \n"
         "「好データ」はプラスデータの該当数を数えたもの。\n\n"
         "![比較表](img/trend_table/比較表.png)"
     )
