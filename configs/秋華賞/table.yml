@@ -36,10 +36,10 @@
         - {labels: [京都], color: yellow}
         - {labels: [中山], color: gray}
 同年/前年レース実績:
-  - 同年桜花賞着順:
+  - 桜花賞着順:
       color_rules:
         - {labels: [1着, 2着, 3着], color: yellow}
-  - 同年オークス着順:
+  - オークス着順:
       color_rules:
         - {labels: [1着, 2着, 3着, 4着, 5着], color: yellow}
 馬以外の属性:

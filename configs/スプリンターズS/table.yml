@@ -33,7 +33,7 @@
       color_rules:
         - {labels: [該当], color: yellow}
 同年/前年レース実績:
-  - 同年高松宮記念着順:
+  - 高松宮記念着順:
       color_rules:
         - {labels: [3着以内], color: yellow}
 馬以外の属性:
