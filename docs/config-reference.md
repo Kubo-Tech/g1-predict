@@ -41,15 +41,15 @@ configs/
 name: 基本項目                                   # "## 基本項目" になるカテゴリ名
 items:
   人気:                                          # 項目名。"### 人気" と表の1列目見出しになる
-  4角通過順位:
-    column_name: 通過                            # 表の1列目見出しだけを短くする（"### 4角通過順位" はそのまま）
-    source: {...}
-    rows: {...}
     source: {type: popularity}                   # 何を集計するか
     rows: {...}                                  # どう行に分けるか
   枠順:
     conditionable: true                          # 開催条件を注入できる項目
     source: {type: gate_number}
+    rows: {...}
+  4角通過順位:
+    column_name: 通過                            # 表の1列目見出しだけを短くする（"### 4角通過順位" はそのまま）
+    source: {type: corner4_juni}
     rows: {...}
 ```
 
