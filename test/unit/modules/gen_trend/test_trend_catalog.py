@@ -22,7 +22,13 @@ _CONFIGS_DIR = os.path.abspath(
 )
 _TRENDS_DIR = os.path.join(_CONFIGS_DIR, "trends")
 # レースの設定ファイルのディレクトリ名（{特別競走番号}_{レース名}）
-_RACE_DIRS = ["0004_東京優駿", "0010_安田記念", "0009_宝塚記念", "0016_スプリンターズS"]
+_RACE_DIRS = [
+    "0004_東京優駿",
+    "0010_安田記念",
+    "0009_宝塚記念",
+    "0016_スプリンターズS",
+    "0018_秋華賞",
+]
 _ROW_KEYS = frozenset(
     {"type", "items", "top_n", "always_include_grades", "hide_empty", "exclude_no_top3"}
 )
@@ -230,7 +236,7 @@ def test_shared_catalog_rows_use_known_keys() -> None:
 
 @pytest.mark.parametrize("race_dir", _RACE_DIRS)
 def test_race_trends_yml_expands_with_shared_catalog(race_dir: str) -> None:
-    """4レースの trends.yml が共有定義に対して欠損なく展開できる。"""
+    """各レースの trends.yml が共有定義に対して欠損なく展開できる。"""
     catalog = load_trend_catalog(_TRENDS_DIR)
     categories = build_trend_categories(
         _load_race_config(race_dir), catalog, race_dir.split("_", 1)[1], 2000
@@ -240,7 +246,7 @@ def test_race_trends_yml_expands_with_shared_catalog(race_dir: str) -> None:
 
 @pytest.mark.parametrize("race_dir", _RACE_DIRS)
 def test_race_trends_yml_items_have_supported_source_types(race_dir: str) -> None:
-    """4レースの全項目が、compute_stats の対応する source.type だけを使う。"""
+    """各レースの全項目が、compute_stats の対応する source.type だけを使う。"""
     catalog = load_trend_catalog(_TRENDS_DIR)
     categories = build_trend_categories(
         _load_race_config(race_dir), catalog, race_dir.split("_", 1)[1], 2000

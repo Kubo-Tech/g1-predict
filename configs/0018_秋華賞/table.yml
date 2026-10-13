@@ -32,7 +32,7 @@
         - {labels: [2勝以上], color: yellow}
 世代戦:
   - デビュー競馬場:
-    color_rules:
+      color_rules:
         - {labels: [京都], color: yellow}
         - {labels: [中山], color: gray}
 同年/前年レース実績:
@@ -47,7 +47,7 @@
       color_rules:
         - {metric: 3着内数, op: ">=", value: 2, color: yellow}
   - 継続騎乗:
-    color_rules:
+      color_rules:
         - {labels: [継続騎乗], color: yellow}
         - {labels: [乗り戻り], color: gray}
   - 生産者:
