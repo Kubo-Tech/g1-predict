@@ -71,7 +71,7 @@ def make_comparison_table(
 ) -> Figure:
     """今回の出走馬を項目ごとに見比べる表を、画像にするためのFigureとして生成する。
 
-    行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名の列を置き、続けて shown の順に
+    行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名・好データの列を置き、続けて shown の順に
     項目の列を置く。各セルには、その馬の値（display_map があれば表示名）を書く。dynamic の項目で
     記事の表では「その他」にまとめた値も、騎手名などの値そのものを書く。
     複数の行に当たる場合は「・」でつなぎ、当たる行が無い場合は「-」と書く。ただし fixed の項目
@@ -79,7 +79,7 @@ def make_comparison_table(
     「前走クラス着順」の列は、まとめた項目の値の前にクラスの略称を付けて「G1 1着」のように書く。
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
-    右端には「好データ」の列を置き、その馬の項目の列のうち黄色で塗ったセルの数を書く。
+    「好データ」の列には、その馬の項目の列のうち黄色で塗ったセルの数を書く。
     好データの数が多い順に1位から3位までを、展開評価値のグラフの順位と同じ色
     （netkeiba の人気・上がり順位の色）で塗る。同じ数の馬は同じ順位とし、次の数を次の順位とする
     （7・5・5・4 なら 7 が1位、5 が2位、4 が3位）。0 は塗らない。
@@ -93,10 +93,12 @@ def make_comparison_table(
     Returns:
         Figure: 比較表。
     """
-    header = [_Cell(text, _HEADER_COLOR, bold=True, centered=True) for text in _FIXED_HEADERS]
+    header = [
+        _Cell(text, _HEADER_COLOR, bold=True, centered=True)
+        for text in (*_FIXED_HEADERS, _GOOD_HEADER)
+    ]
     for column, _ in shown:
         header.append(_Cell(column.item_name, _HEADER_COLOR, bold=True, centered=True))
-    header.append(_Cell(_GOOD_HEADER, _HEADER_COLOR, bold=True, centered=True))
     body: list[list[_Cell]] = []
     good_counts: list[int] = []
     for horse in horses.to_dict("records"):
@@ -123,7 +125,8 @@ def make_comparison_table(
     rank_colors = _good_rank_colors(good_counts)
     for row, good_count in zip(body, good_counts, strict=True):
         fill = rank_colors.get(good_count, _BODY_COLOR)
-        row.append(_Cell(str(good_count), fill, centered=True))
+        # 好データの列は馬名の右に置く
+        row.insert(len(_FIXED_HEADERS), _Cell(str(good_count), fill, centered=True))
     return _draw_table(header, body)
 
 
