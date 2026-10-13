@@ -48,7 +48,7 @@
         - {metric: 3着内数, op: ">=", value: 2, color: yellow}
   - 継続騎乗:
       color_rules:
-        - {labels: [継続], color: yellow}
+        - {labels: [継続騎乗], color: yellow}
         - {labels: [乗り戻り], color: gray}
   - 生産者:
       color_rules:
