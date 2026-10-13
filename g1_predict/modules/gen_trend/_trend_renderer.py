@@ -351,6 +351,7 @@ def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int 
     並べず「その他」と書く。
     項目に開催条件が注入されている場合は、表の直下に開催条件の注記を出力する。
     項目に note がある場合は、その直下に出力する。
+    表の1列目の見出しは、項目に column_name があればそれを、無ければ項目名を使う。
 
     Args:
         table (ItemTable): 出力する項目の表。
@@ -361,7 +362,9 @@ def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int 
         str: ### ヘッダーから始まる Markdown テーブル文字列。
     """
     item = table.item
-    header_cells = [item.name, "着度数", "勝率", "複率", "単回", "複回"]
+    # 表の1列目の見出しは column_name があればそれを使い、無ければ項目名にする
+    column_name = item.config.get("column_name", item.name)
+    header_cells = [column_name, "着度数", "勝率", "複率", "単回", "複回"]
     if with_entries:
         header_cells.append("該当馬")
     lines = [

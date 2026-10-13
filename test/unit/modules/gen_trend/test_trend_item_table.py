@@ -299,6 +299,23 @@ def test_format_item_section_writes_other_for_crowded_row(
     assert [line.rsplit("|", 2)[1].strip() for line in lines[4:7]] == expected
 
 
+def test_format_item_section_uses_column_name_for_first_header() -> None:
+    """column_name がある項目は、h3 は項目名のまま、表の1列目の見出しだけを column_name にする。"""
+    table = _build(_make_fixed_item(column_name="枠"), _STATS, {1: ["1-4枠"]})
+    assert table is not None
+    lines = _format_item_section(table, with_entries=False).split("\n")
+    assert lines[0] == "### 枠順"
+    assert lines[2] == "| 枠 | 着度数 | 勝率 | 複率 | 単回 | 複回 |"
+
+
+def test_format_item_section_uses_item_name_without_column_name() -> None:
+    """column_name が無い項目は、表の1列目の見出しを項目名にする。"""
+    table = _build(_make_fixed_item(), _STATS, {1: ["1-4枠"]})
+    assert table is not None
+    lines = _format_item_section(table, with_entries=False).split("\n")
+    assert lines[2] == "| 枠順 | 着度数 | 勝率 | 複率 | 単回 | 複回 |"
+
+
 def test_format_item_section_uses_display_map_for_row_label() -> None:
     """行の見出しには display_map の表示名を使う。"""
     item = _make_fixed_item(display_map={"1-4枠": "内枠"})

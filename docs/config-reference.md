@@ -41,6 +41,10 @@ configs/
 name: 基本項目                                   # "## 基本項目" になるカテゴリ名
 items:
   人気:                                          # 項目名。"### 人気" と表の1列目見出しになる
+  4角通過順位:
+    column_name: 通過                            # 表の1列目見出しだけを短くする（"### 4角通過順位" はそのまま）
+    source: {...}
+    rows: {...}
     source: {type: popularity}                   # 何を集計するか
     rows: {...}                                  # どう行に分けるか
   枠順:
@@ -49,11 +53,12 @@ items:
     rows: {...}
 ```
 
-- 項目に書けるキーは `source` / `rows` / `display_map` / `conditionable` / `uses_race_result` / `hide_entry_column` / `class_label` / `note` / `hide_if_empty` で、`rows` は必須。
+- 項目に書けるキーは `source` / `rows` / `display_map` / `column_name` / `conditionable` / `uses_race_result` / `hide_entry_column` / `class_label` / `note` / `hide_if_empty` で、`rows` は必須。
 - `conditionable: true` の項目だけが、レースの `trends.yml` から開催条件を注入できる。
 - `uses_race_result: true` は、今走の結果で値が決まる項目（脚質・4角通過順位・上がり3F順位）に付ける。出走馬の確定後でもレース前には値が無いため、`--with-entries` でも該当馬列を付けず、table.yml にも載せられない。
 - `hide_entry_column: true` を書くと、`--with-entries` でも記事の表に該当馬列を付けない（人気・枠順で使う）。table.yml には載せられる。
 - `class_label` は、前走のクラス別の着順の項目（前走G1着順〜前走新馬着順、前走非重賞着順）に付けるクラスの略称（`G1` / `L` / `OP` / `3勝` / `未勝利` / `非重賞` など）。比較表の「前走クラス着順」列で値の前に付ける（[table.yml](#tableyml--出走馬の比較表)）。
+- `column_name` を書くと、表の1列目の見出しをその文字列にする。h3 の見出しと、table.yml や比較表で使う項目名は変わらない。はてなブログの狭い横幅に収めるため、長い項目名に付ける（例: 前走G1着順 → 着順、デビュー競馬場 → 競馬場）。
 - `note` を書くと、表の直下にその文字列を出す。
 - `hide_if_empty: true` を書くと、集計対象にも今回の出走馬にも該当馬が1頭もいない場合は表を見出しごと出さない（前走{クラス}着順で使う）。
 - ファイル名はカテゴリ名から `/` を除いたもの（`同年/前年レース実績` → `同年前年レース実績.yml`）にする。
