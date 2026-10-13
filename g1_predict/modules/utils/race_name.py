@@ -1,5 +1,7 @@
 """競走名本題から記事・ファイルで使うレース名を導出するモジュール。"""
 
+import re
+
 RACE_NAME_ABBREVIATIONS: dict[str, str] = {
     "スプリンターズステークス": "スプリンターズS",
 }
@@ -42,6 +44,8 @@ SHORT_RACE_NAMES: dict[str, str] = {
     "サウジアラビアロイヤルカップ": "サウジアラビアRC",
     "ラジオＮＩＫＫＥＩ杯京都２歳ステークス": "京都2歳S",
 }
+# 地方との交流重賞の競走名に付く「（中央交流）」と、末尾の格付け（例: 「　Ｊｐｎ３」「　Ｇ１」）
+_EXCHANGE_RACE_MARKS = re.compile(r"（中央交流）|　(?:Ｊｐｎ|Ｇ)[１２３]$")
 # 競走名の末尾の語 -> 略記
 _SUFFIX_ABBREVIATIONS: tuple[tuple[str, str], ...] = (
     ("ステークス", "S"),
@@ -77,7 +81,8 @@ def to_short_race_name(kyosomei_hondai: str) -> str:
     """競走名本題を、横幅の狭い表に書くための短い表記に変換する。
 
     `SHORT_RACE_NAMES` に登録されているレースはその表記にする。登録されていないレースは、
-    末尾の「ステークス」「カップ」「トロフィー」を「S」「C」「T」にし、全角英数字を半角にする。
+    地方との交流重賞の「（中央交流）」と末尾の格付けを除き、末尾の「ステークス」「カップ」
+    「トロフィー」を「S」「C」「T」にし、全角英数字を半角にする。
 
     Args:
         kyosomei_hondai (str): 競走名本題。
@@ -87,7 +92,7 @@ def to_short_race_name(kyosomei_hondai: str) -> str:
     """
     if kyosomei_hondai in SHORT_RACE_NAMES:
         return SHORT_RACE_NAMES[kyosomei_hondai]
-    name = kyosomei_hondai
+    name = _EXCHANGE_RACE_MARKS.sub("", kyosomei_hondai)
     for suffix, abbreviation in _SUFFIX_ABBREVIATIONS:
         if name.endswith(suffix):
             name = name[: -len(suffix)] + abbreviation

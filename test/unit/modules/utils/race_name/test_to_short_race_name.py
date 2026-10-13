@@ -26,9 +26,11 @@ def test_to_short_race_name_uses_registered_name() -> None:
         ("京王杯２歳ステークス", "京王杯2歳S"),
         ("天皇賞（春）", "天皇賞（春）"),
         ("ステークス特別", "ステークス特別"),
+        ("マリーンカップ（中央交流）　Ｊｐｎ３", "マリーンC"),
+        ("東京大賞典（中央交流）　Ｇ１", "東京大賞典"),
     ],
 )
 def test_to_short_race_name_abbreviates_suffix_and_fullwidth(name: str, expected: str) -> None:
-    """対応表に無いレースは、末尾の語を略記し、全角英数字を半角にする。"""
+    """対応表に無いレースは、交流重賞の印を除き、末尾の語を略記し、全角英数字を半角にする。"""
     with patch.dict(f"{_MODULE}.SHORT_RACE_NAMES", {}, clear=True):
         assert to_short_race_name(name) == expected
