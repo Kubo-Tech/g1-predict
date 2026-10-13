@@ -28,6 +28,7 @@ items:
         - {label: "同距離", op: "==", value: 0}
         - {label: "距離短縮", op: ">", value: 0}
   前走クラス:
+    column_name: クラス
     source: {type: prev_race_class}
     rows:
       type: fixed
@@ -36,11 +37,11 @@ items:
         - {label: "G1", op: "==", value: "G1"}
         - {label: "G2", op: "==", value: "G2"}
         - {label: "G3", op: "==", value: "G3"}
-        - {label: "リステッド", op: "==", value: "リステッド"}
-        - {label: "オープン", op: "==", value: "オープン"}
-        - {label: "3勝クラス", op: "==", value: "3勝クラス"}
-        - {label: "2勝クラス", op: "==", value: "2勝クラス"}
-        - {label: "1勝クラス", op: "==", value: "1勝クラス"}
+        - {label: "L", op: "==", value: "リステッド"}
+        - {label: "OP", op: "==", value: "オープン"}
+        - {label: "3勝", op: "==", value: "3勝クラス"}
+        - {label: "2勝", op: "==", value: "2勝クラス"}
+        - {label: "1勝", op: "==", value: "1勝クラス"}
         - {label: "未勝利", op: "==", value: "未勝利"}
         - {label: "新馬", op: "==", value: "新馬"}
         - {label: "地方", op: "==", value: "地方"}
