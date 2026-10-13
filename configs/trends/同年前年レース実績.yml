@@ -1,11 +1,11 @@
 name: 同年/前年レース実績
 items:
-  同年高松宮記念着順:
+  高松宮記念着順:
+    column_name: 着順
     source:
       type: tokubetsu_race_finish
       tokubetsu_kyoso_bango: "0019"
       year_offset: 0
-      absent_label: 出走無し
     rows:
       type: fixed
       items:
@@ -13,13 +13,12 @@ items:
         - {label: "4着以内", op: "<=", value: 4}
         - {label: "5着以内", op: "<=", value: 5}
         - {label: "6着以下", op: ">=", value: 6}
-        - {label: "出走無し", op: "==", value: "出走無し"}
-  同年桜花賞着順:
+  桜花賞着順:
+    column_name: 着順
     source:
       type: tokubetsu_race_finish
       tokubetsu_kyoso_bango: "0001"
       year_offset: 0
-      absent_label: 出走無し
     rows: &classic_finish_rows
       type: fixed
       items:
@@ -30,11 +29,24 @@ items:
         - {label: "5着", op: "==", value: 5}
         - {label: "6-9着", op: "in", value: [6, 7, 8, 9]}
         - {label: "10着以下", op: ">=", value: 10}
-        - {label: "出走無し", op: "==", value: "出走無し"}
-  同年オークス着順:
+  オークス着順:
+    column_name: 着順
     source:
       type: tokubetsu_race_finish
       tokubetsu_kyoso_bango: "0003"
       year_offset: 0
-      absent_label: 出走無し
+    rows: *classic_finish_rows
+  ローズS着順:
+    column_name: 着順
+    source:
+      type: tokubetsu_race_finish
+      tokubetsu_kyoso_bango: "0052"
+      year_offset: 0
+    rows: *classic_finish_rows
+  紫苑S着順:
+    column_name: 着順
+    source:
+      type: tokubetsu_race_finish
+      tokubetsu_kyoso_bango: "0208"
+      year_offset: 0
     rows: *classic_finish_rows

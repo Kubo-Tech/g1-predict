@@ -7,7 +7,7 @@
 1. [architecture.md](architecture.md) — 何が何を作っているのか、全体像とデータの流れ
 2. [workflow.md](workflow.md) — レース1本を記事にするまでの実作業手順
 3. [scripts.md](scripts.md) — 各スクリプトの引数・入出力・処理内容
-4. [config-reference.md](config-reference.md) — `configs/{レース名}/` の全項目リファレンス
+4. [config-reference.md](config-reference.md) — `configs/{特別競走番号}_{レース名}/` の全項目リファレンス
 
 ## 目的別
 

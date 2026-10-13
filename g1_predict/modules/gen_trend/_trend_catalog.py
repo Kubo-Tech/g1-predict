@@ -20,6 +20,7 @@ _ITEM_KEYS = frozenset(
         "source",
         "rows",
         "display_map",
+        "column_name",
         "hide_if_empty",
     }
 )
@@ -34,7 +35,8 @@ class CatalogItem:
     """共有定義の1項目。
 
     Attributes:
-        config (dict[str, Any]): source・rows・display_map・note・hide_if_empty の定義。
+        config (dict[str, Any]): source・rows・display_map・column_name・note・hide_if_empty の
+            定義。
         conditionable (bool): 開催条件を注入できる項目か。
         uses_race_result (bool): 今走の結果で値が決まる項目か。
         hide_entry_column (bool): 記事の表に該当馬列を付けない項目か。
@@ -68,7 +70,8 @@ class TrendItem:
 
     Attributes:
         name (str): 項目名。
-        config (dict[str, Any]): 対象レースの値を埋め込み済みの source・rows・display_map・note。
+        config (dict[str, Any]): 対象レースの値を埋め込み済みの source・rows・display_map・
+            column_name・note。
         condition (TrendCondition | None): 注入された開催条件。
         uses_race_result (bool): 今走の結果で値が決まる項目か。
         hide_entry_column (bool): 記事の表に該当馬列を付けない項目か。

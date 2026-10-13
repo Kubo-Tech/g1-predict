@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    A[configs/レース名/<br/>templates/points/] --> B[gen_trend<br/>過去の傾向.md]
+    A[configs/特別競走番号_レース名/<br/>templates/points/] --> B[gen_trend<br/>過去の傾向.md]
     A --> V[gen_dynamics_history<br/>過去の展開.md]
     B --> C[gen_trend --with-entries<br/>該当馬列・比較表]
     C --> D[TARGET で印を付ける]
@@ -20,7 +20,7 @@ flowchart LR
 
 ## 0. 事前準備（そのレースを初めて扱うとき）
 
-- `configs/{レース名}/trends.yml`（`configs/trends/` の項目名を並べる）と `table.yml`（比較表に載せる項目と色付けの基準）を用意する → [config-reference.md](config-reference.md)
+- `configs/{特別競走番号}_{レース名}/trends.yml`（`configs/trends/` の項目名を並べる）と `table.yml`（比較表に載せる項目と色付けの基準）を用意する → [config-reference.md](config-reference.md)
 - `templates/points/{レース名}.md` にそのレースの狙い・格言を見出し無しの本文で書く（`gen_predict` の `## ポイント` 見出しの下に流し込まれる）
 
 ## 1. 傾向分析（週の前半）

@@ -7,6 +7,7 @@ items:
       top_n: 5
       always_include_grades: ["A", "B", "C"]
   前走着順:
+    column_name: 着順
     source: {type: prev_race_finish}
     rows: &prev_finish_rows
       type: fixed
@@ -27,6 +28,7 @@ items:
         - {label: "同距離", op: "==", value: 0}
         - {label: "距離短縮", op: ">", value: 0}
   前走クラス:
+    column_name: クラス
     source: {type: prev_race_class}
     rows:
       type: fixed
@@ -35,66 +37,77 @@ items:
         - {label: "G1", op: "==", value: "G1"}
         - {label: "G2", op: "==", value: "G2"}
         - {label: "G3", op: "==", value: "G3"}
-        - {label: "リステッド", op: "==", value: "リステッド"}
-        - {label: "オープン", op: "==", value: "オープン"}
-        - {label: "3勝クラス", op: "==", value: "3勝クラス"}
-        - {label: "2勝クラス", op: "==", value: "2勝クラス"}
-        - {label: "1勝クラス", op: "==", value: "1勝クラス"}
+        - {label: "L", op: "==", value: "リステッド"}
+        - {label: "OP", op: "==", value: "オープン"}
+        - {label: "3勝", op: "==", value: "3勝クラス"}
+        - {label: "2勝", op: "==", value: "2勝クラス"}
+        - {label: "1勝", op: "==", value: "1勝クラス"}
         - {label: "未勝利", op: "==", value: "未勝利"}
         - {label: "新馬", op: "==", value: "新馬"}
         - {label: "地方", op: "==", value: "地方"}
         - {label: "海外", op: "==", value: "海外"}
   前走G1着順:
+    column_name: 着順
     class_label: G1
     hide_if_empty: true
     source: {type: prev_race_finish_by_grade, grade_codes: ["A"]}
     rows: *prev_finish_rows
   前走G2着順:
+    column_name: 着順
     class_label: G2
     hide_if_empty: true
     source: {type: prev_race_finish_by_grade, grade_codes: ["B"]}
     rows: *prev_finish_rows
   前走G3着順:
+    column_name: 着順
     class_label: G3
     hide_if_empty: true
     source: {type: prev_race_finish_by_grade, grade_codes: ["C"]}
     rows: *prev_finish_rows
   前走リステッド着順:
+    column_name: 着順
     class_label: L
     hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: リステッド}
     rows: *prev_finish_rows
   前走オープン着順:
+    column_name: 着順
     class_label: OP
     hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: オープン}
     rows: *prev_finish_rows
   前走3勝クラス着順:
+    column_name: 着順
     class_label: 3勝
     hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 3勝クラス}
     rows: *prev_finish_rows
   前走2勝クラス着順:
+    column_name: 着順
     class_label: 2勝
     hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 2勝クラス}
     rows: *prev_finish_rows
   前走1勝クラス着順:
+    column_name: 着順
     class_label: 1勝
     hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 1勝クラス}
     rows: *prev_finish_rows
   前走未勝利着順:
+    column_name: 着順
     class_label: 未勝利
     hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 未勝利}
     rows: *prev_finish_rows
   前走新馬着順:
+    column_name: 着順
     class_label: 新馬
     hide_if_empty: true
     source: {type: prev_race_finish_by_class, race_class: 新馬}
     rows: *prev_finish_rows
   前走非重賞着順:
+    column_name: 着順
     class_label: 非重賞
     hide_if_empty: true
     source: {type: prev_race_finish_by_grade, exclude_grade_codes: ["A", "B", "C"]}

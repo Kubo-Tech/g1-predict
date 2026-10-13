@@ -6,6 +6,7 @@ from keiba_domain import baba_from_code, keibajo_from_code
 from mykeibadb.analytics import EntryFilter
 
 from g1_predict.modules.utils.race_history import TREND_YEARS, TrendContext
+from g1_predict.modules.utils.race_name import to_short_race_name
 
 from ._trend_catalog import TrendCategory, TrendItem
 from ._trend_condition import apply_trend_condition
@@ -13,6 +14,8 @@ from ._trend_entries import find_entry_rows
 from ._trend_models import OTHER_LABEL, RowStats, TrendCondition
 from ._trend_stats import compute_stats, get_juusho_race_names
 
+# 行のラベルがレース名になる source.type（表では短い表記にする）
+_RACE_NAME_SOURCE_TYPE = "prev_race_name"
 # 出走馬の比較表のセクションの見出しと説明文
 COMPARISON_HEADING = "比較表"
 _COMPARISON_DESCRIPTION = (
@@ -51,10 +54,15 @@ class ItemTable:
             label (str): 行のラベル。
 
         Returns:
-            str: display_map にあればその表示名、無ければラベルそのまま。
+            str: display_map にあればその表示名。無ければ、前走レース名の項目は
+                to_short_race_name() の短い表記、それ以外の項目はラベルそのまま。
         """
         display_map: dict[str, str] = self.item.config.get("display_map", {})
-        return display_map.get(label, label)
+        if label in display_map:
+            return display_map[label]
+        if self.item.config.get("source", {}).get("type") == _RACE_NAME_SOURCE_TYPE:
+            return to_short_race_name(label)
+        return label
 
     def row_of_value(self, value: str) -> str:
         """出走馬の値が当たる表の行のラベルを返す。
@@ -87,7 +95,8 @@ def build_item_table(
     """1項目分の表の行と集計値を求める。
 
     rows.type に応じて行を決定し、各行の集計値を求める。dynamic 型は、top_n などで表に出ない値が
-    ある場合と、表に出ていない値の出走馬がいる場合に、最後に「その他」行を追加する。
+    ある場合と、表に出ていない値の出走馬がいる場合に、最後に「その他」行を追加する。ただし、
+    表に出ていない値の集計が0頭で、今回の出走馬も当たらない場合は「その他」行を追加しない。
     項目に開催条件が注入されている場合は、開催条件で絞り込んで集計する。
     entry_race_code を指定した場合は、今回の出走馬が当たる行も求める。
     hide_empty の項目でも、今回の出走馬が当たる行は隠さない。
@@ -167,8 +176,11 @@ def build_item_table(
     stats = {label: stats_map.get(label, RowStats()) for label in labels}
     rows = list(labels)
     if add_other_row:
-        stats[OTHER_LABEL] = _aggregate_other_stats(stats_map, set(labels))
-        rows.append(OTHER_LABEL)
+        other_stats = _aggregate_other_stats(stats_map, set(labels))
+        # 過去にも今回の出走馬にも該当が無い「その他」行は出さない
+        if other_stats.total > 0 or OTHER_LABEL in entry_labels:
+            stats[OTHER_LABEL] = other_stats
+            rows.append(OTHER_LABEL)
     return ItemTable(
         item=item, rows=rows, stats=stats, entry_rows=entry_rows, entry_values=entry_values
     )
@@ -343,6 +355,7 @@ def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int 
     並べず「その他」と書く。
     項目に開催条件が注入されている場合は、表の直下に開催条件の注記を出力する。
     項目に note がある場合は、その直下に出力する。
+    表の1列目の見出しは、項目に column_name があればそれを、無ければ項目名を使う。
 
     Args:
         table (ItemTable): 出力する項目の表。
@@ -353,7 +366,9 @@ def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int 
         str: ### ヘッダーから始まる Markdown テーブル文字列。
     """
     item = table.item
-    header_cells = [item.name, "着度数", "勝率", "複率", "単回", "複回"]
+    # 表の1列目の見出しは column_name があればそれを使い、無ければ項目名にする
+    column_name = item.config.get("column_name", item.name)
+    header_cells = [column_name, "着度数", "勝率", "複率", "単回", "複回"]
     if with_entries:
         header_cells.append("該当馬")
     lines = [

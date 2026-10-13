@@ -131,6 +131,28 @@ def test_build_item_table_dynamic_other_row_aggregates_stats() -> None:
     assert table.stats[OTHER_LABEL] == RowStats(fourth_plus=5, total=5)
 
 
+def test_build_item_table_dynamic_omits_empty_other_row() -> None:
+    """表に出ていない値の集計が0頭で、出走馬も当たらない「その他」行は出さない。"""
+    stats_map = {
+        "A": RowStats(first=3, total=3),
+        "B": RowStats(first=1, total=1),
+        "C": RowStats(),
+    }
+    table = _build(_make_dynamic_item(), stats_map, {1: ["A"]})
+    assert table is not None
+    assert table.rows == ["A", "B"]
+    assert OTHER_LABEL not in table.stats
+
+
+def test_build_item_table_dynamic_keeps_empty_other_row_with_entry() -> None:
+    """集計が0頭でも、今回の出走馬が当たる「その他」行は出す。"""
+    stats_map = {"A": RowStats(first=3, total=3), "B": RowStats(first=1, total=1)}
+    table = _build(_make_dynamic_item(), stats_map, {1: ["未登場の騎手"]})
+    assert table is not None
+    assert table.rows == ["A", "B", OTHER_LABEL]
+    assert table.stats[OTHER_LABEL] == RowStats()
+
+
 def test_build_item_table_dynamic_without_top_n_adds_other_row_for_unlisted_value() -> None:
     """top_n などの指定が無い dynamic の項目でも、表に出ていない値の馬は「その他」行に入れる。"""
     item = TrendItem(
@@ -299,6 +321,23 @@ def test_format_item_section_writes_other_for_crowded_row(
     assert [line.rsplit("|", 2)[1].strip() for line in lines[4:7]] == expected
 
 
+def test_format_item_section_uses_column_name_for_first_header() -> None:
+    """column_name がある項目は、h3 は項目名のまま、表の1列目の見出しだけを column_name にする。"""
+    table = _build(_make_fixed_item(column_name="枠"), _STATS, {1: ["1-4枠"]})
+    assert table is not None
+    lines = _format_item_section(table, with_entries=False).split("\n")
+    assert lines[0] == "### 枠順"
+    assert lines[2] == "| 枠 | 着度数 | 勝率 | 複率 | 単回 | 複回 |"
+
+
+def test_format_item_section_uses_item_name_without_column_name() -> None:
+    """column_name が無い項目は、表の1列目の見出しを項目名にする。"""
+    table = _build(_make_fixed_item(), _STATS, {1: ["1-4枠"]})
+    assert table is not None
+    lines = _format_item_section(table, with_entries=False).split("\n")
+    assert lines[2] == "| 枠順 | 着度数 | 勝率 | 複率 | 単回 | 複回 |"
+
+
 def test_format_item_section_uses_display_map_for_row_label() -> None:
     """行の見出しには display_map の表示名を使う。"""
     item = _make_fixed_item(display_map={"1-4枠": "内枠"})
@@ -307,6 +346,24 @@ def test_format_item_section_uses_display_map_for_row_label() -> None:
     assert table.display_name("1-4枠") == "内枠"
     assert table.display_name("5-8枠") == "5-8枠"
     assert "| 内枠 | 1-0-0-3 |" in _format_item_section(table, with_entries=True)
+
+
+def test_item_table_display_name_shortens_race_name() -> None:
+    """前走レース名の項目は、行のラベルを短い表記にする。display_map があればそちらを使う。"""
+    config = {"source": {"type": "prev_race_name"}, "display_map": {"大阪杯": "大阪杯(G1)"}}
+    item = TrendItem(name="前走レース", config=config, condition=None)
+    table = ItemTable(item=item, rows=[], stats={}, entry_rows={}, entry_values={})
+    assert table.display_name("関西テレビ放送賞ローズステークス") == "ローズS"
+    assert table.display_name("紫苑ステークス") == "紫苑S"
+    assert table.display_name("大阪杯") == "大阪杯(G1)"
+    assert table.display_name(OTHER_LABEL) == OTHER_LABEL
+
+
+def test_item_table_display_name_keeps_label_for_other_sources() -> None:
+    """前走レース名以外の項目は、レース名のような行のラベルも短くしない。"""
+    item = TrendItem(name="同年レース", config={"source": {"type": "popularity"}}, condition=None)
+    table = ItemTable(item=item, rows=[], stats={}, entry_rows={}, entry_values={})
+    assert table.display_name("紫苑ステークス") == "紫苑ステークス"
 
 
 # --- build_category_section ---

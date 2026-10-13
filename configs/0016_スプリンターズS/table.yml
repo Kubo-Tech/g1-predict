@@ -18,8 +18,8 @@
 前走:
   - 前走レース:
       color_rules:
-        - {labels: [産経賞セントウルステークス, キーンランドカップ, テレビ西日本賞北九州記念, 安田記念, ＣＢＣ賞], color: yellow}
-        - {labels: [アイビスサマーダッシュ], color: gray}
+        - {labels: [セントウルS, キーンランドC, 北九州記念, 安田記念, CBC賞], color: yellow}
+        - {labels: [アイビスSD], color: gray}
   - 前走距離:
       color_rules:
         - {labels: [距離短縮], color: yellow}
@@ -33,7 +33,7 @@
       color_rules:
         - {labels: [該当], color: yellow}
 同年/前年レース実績:
-  - 同年高松宮記念着順:
+  - 高松宮記念着順:
       color_rules:
         - {labels: [3着以内], color: yellow}
 馬以外の属性:
