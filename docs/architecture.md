@@ -31,7 +31,7 @@ JRA の G1 レースについて、
 
 コード（競馬場コード、馬場状態コード）から名称への変換は、どちらのライブラリにも同等の関数があるが、**`keiba-domain` に一本化している**。定義が3箇所に散らばると不整合に気づけないため。表示名も `keiba-domain` の値をそのまま使う（馬場状態は「良」「稍」「重」「不」）。
 
-`configs/{レース名}/*.yml` の `filters` や `field` で指定するカラム名は、**どちら側の API を使う機能なのかで表記が変わる**。詳細は [config-reference.md](config-reference.md) を参照。
+`configs/{特別競走番号}_{レース名}/*.yml` の `filters` や `field` で指定するカラム名は、**どちら側の API を使う機能なのかで表記が変わる**。詳細は [config-reference.md](config-reference.md) を参照。
 
 ## 全体のデータフロー
 
@@ -42,7 +42,7 @@ flowchart TD
         TFJV[TARGET frontier JV<br/>UM*.DAT / KEK_COM]
     end
 
-    CFG[configs/レース名/]
+    CFG[configs/特別競走番号_レース名/]
     TPL[templates/]
 
     DB --> GT[gen_trend]
@@ -146,11 +146,11 @@ JRA-VAN のレースコード。すべてのスクリプトが `--race-code` で
 
 競馬場コード: `01` 札幌 / `02` 函館 / `03` 福島 / `04` 新潟 / `05` 東京 / `06` 中山 / `07` 中京 / `08` 京都 / `09` 阪神 / `10` 小倉。
 
-`public/` の出力先ディレクトリ名は `{race_code}_{レース名}` で固定されており、レース名は DB の `kyosomei_hondai` から取得する。`configs/{レース名}/` のディレクトリ名もこのレース名と一致している必要がある。ここでのレース名は競走名本題そのものが基本だが、`g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録されているレースは略称を使う（例: 「スプリンターズステークス」→「スプリンターズS」）。DB照合には競走名本題（変換前の値）が必要なので、DB を引く箇所には略称ではなく競走名本題を渡す。
+`public/` の出力先ディレクトリ名は `{race_code}_{レース名}` で固定されており、レース名は DB の `kyosomei_hondai` から取得する。`configs/{特別競走番号}_{レース名}/` のディレクトリ名のレース名部分も、このレース名と一致している必要がある。ここでのレース名は競走名本題そのものが基本だが、`g1_predict/modules/utils/race_name.py` の `RACE_NAME_ABBREVIATIONS` に登録されているレースは略称を使う（例: 「スプリンターズステークス」→「スプリンターズS」）。DB照合には競走名本題（変換前の値）が必要なので、DB を引く箇所には略称ではなく競走名本題を渡す。
 
 ## 設計方針
 
-- **YAML 駆動**: 傾向表の項目も比較表の列も、Python を変更せず `configs/{レース名}/` の YAML の追加・修正で表現できることを優先する。表現できない集計が出てきたときだけ `source.type` を新設する。
+- **YAML 駆動**: 傾向表の項目も比較表の列も、Python を変更せず `configs/{特別競走番号}_{レース名}/` の YAML の追加・修正で表現できることを優先する。表現できない集計が出てきたときだけ `source.type` を新設する。
 - **フォールバックしない**: 未対応の `source.type` / `rows.type` / `op` は握りつぶさず `ValueError` を送出する。設定ミスに気づけることを、動き続けることより優先する。
 - **後方互換より整理**: レースが変わるたびに要件が変わるため、破壊的変更を許容する。旧 `source.type` の互換分岐は残さず、既存 YAML の側を修正して追従させる（例: `past_finish_count` / `past_count` → `past_race_top_n_count` への統合）。
 - **集計と出走馬の判定で定義を共有する**: 出走馬が表のどの行に当たるかは、過去の集計と同じ `GroupBy` と行の割り当てで決める（`_trend_stats.py` の `build_item_grouping()`）。判定ごとに別の求め方を書くと、前走の定義などが集計とずれるため。

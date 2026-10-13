@@ -22,7 +22,7 @@ from g1_predict.modules.gen_trend.trend_section import (
 from g1_predict.modules.utils.image_output import save_images
 from g1_predict.modules.utils.output_path import build_race_dir, validate_race_code
 from g1_predict.modules.utils.race_info import load_race_info
-from g1_predict.modules.utils.race_name import to_race_label
+from g1_predict.modules.utils.race_name import to_config_dir_name, to_race_label
 
 load_dotenv(find_dotenv())
 
@@ -60,8 +60,12 @@ def generate_trend(
     race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
     race_label = to_race_label(race_name)
     year = str(race_shosai["kaisai_nen"].iloc[0]).strip()
+    tokubetsu = str(race_shosai["tokubetsu_kyoso_bango"].iloc[0]).strip()
+    config_dir = os.path.join(_CONFIGS_DIR, to_config_dir_name(tokubetsu, race_label))
 
-    trend_sections = _build_trend_sections(race_label, race_shosai, race_code, with_entries)
+    trend_sections = _build_trend_sections(
+        race_label, config_dir, race_shosai, race_code, with_entries
+    )
     content = _render_trend_content(race_label, year, trend_sections)
 
     race_dir = build_race_dir(_PUBLIC_DIR, year, race_code, race_label)
@@ -92,6 +96,7 @@ def main() -> None:
 
 def _build_trend_sections(
     race_label: str,
+    config_dir: str,
     race_info: pd.DataFrame,
     race_code: str,
     with_entries: bool,
@@ -99,7 +104,8 @@ def _build_trend_sections(
     """傾向セクション群を生成する。
 
     Args:
-        race_label (str): configディレクトリ名に使うレース名。
+        race_label (str): 記事に出力するレース名。
+        config_dir (str): レースの trends.yml・table.yml を置くディレクトリのパス。
         race_info (pd.DataFrame): レース基本情報DataFrame。
         race_code (str): 16桁 JRA-VAN 形式の race_code。
         with_entries (bool): 出走馬の確定後の情報を載せるか。
@@ -115,11 +121,11 @@ def _build_trend_sections(
     # 出走馬の確定後の情報に必要な table.yml と出走馬は、trends.yml の有無によらず先に確かめる
     entries: EntrySettings | None = None
     if with_entries:
-        table_path = os.path.join(_CONFIGS_DIR, race_label, "table.yml")
+        table_path = os.path.join(config_dir, "table.yml")
         with open(table_path, encoding="utf-8") as f:
             entries = EntrySettings(race_code=race_code, table_config=yaml.safe_load(f))
         check_race_entries(race_code)
-    config_path = os.path.join(_CONFIGS_DIR, race_label, "trends.yml")
+    config_path = os.path.join(config_dir, "trends.yml")
     if not os.path.isfile(config_path):
         return TrendSections(scope_note="", sections={})
     with open(config_path, encoding="utf-8") as f:

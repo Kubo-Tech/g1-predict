@@ -21,7 +21,8 @@ _CONFIGS_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "configs")
 )
 _TRENDS_DIR = os.path.join(_CONFIGS_DIR, "trends")
-_RACE_NAMES = ["東京優駿", "安田記念", "宝塚記念", "スプリンターズS"]
+# レースの設定ファイルのディレクトリ名（{特別競走番号}_{レース名}）
+_RACE_DIRS = ["0004_東京優駿", "0010_安田記念", "0009_宝塚記念", "0016_スプリンターズS"]
 _ROW_KEYS = frozenset(
     {"type", "items", "top_n", "always_include_grades", "hide_empty", "exclude_no_top3"}
 )
@@ -65,9 +66,9 @@ def trends_dir(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _load_race_config(race_name: str) -> dict[str, Any]:
+def _load_race_config(race_dir: str) -> dict[str, Any]:
     """レースの trends.yml を読み込む。"""
-    with open(os.path.join(_CONFIGS_DIR, race_name, "trends.yml"), encoding="utf-8") as f:
+    with open(os.path.join(_CONFIGS_DIR, race_dir, "trends.yml"), encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -227,19 +228,23 @@ def test_shared_catalog_rows_use_known_keys() -> None:
             assert set(item.config["rows"]) <= _ROW_KEYS
 
 
-@pytest.mark.parametrize("race_name", _RACE_NAMES)
-def test_race_trends_yml_expands_with_shared_catalog(race_name: str) -> None:
+@pytest.mark.parametrize("race_dir", _RACE_DIRS)
+def test_race_trends_yml_expands_with_shared_catalog(race_dir: str) -> None:
     """4レースの trends.yml が共有定義に対して欠損なく展開できる。"""
     catalog = load_trend_catalog(_TRENDS_DIR)
-    categories = build_trend_categories(_load_race_config(race_name), catalog, race_name, 2000)
-    assert [category.name for category in categories] == list(_load_race_config(race_name))
+    categories = build_trend_categories(
+        _load_race_config(race_dir), catalog, race_dir.split("_", 1)[1], 2000
+    )
+    assert [category.name for category in categories] == list(_load_race_config(race_dir))
 
 
-@pytest.mark.parametrize("race_name", _RACE_NAMES)
-def test_race_trends_yml_items_have_supported_source_types(race_name: str) -> None:
+@pytest.mark.parametrize("race_dir", _RACE_DIRS)
+def test_race_trends_yml_items_have_supported_source_types(race_dir: str) -> None:
     """4レースの全項目が、compute_stats の対応する source.type だけを使う。"""
     catalog = load_trend_catalog(_TRENDS_DIR)
-    categories = build_trend_categories(_load_race_config(race_name), catalog, race_name, 2000)
+    categories = build_trend_categories(
+        _load_race_config(race_dir), catalog, race_dir.split("_", 1)[1], 2000
+    )
     manager = MagicMock()
     manager.fetch_dataframe.return_value = pd.DataFrame(
         {"race_code": ["2025092806040911"], "sire_name": ["ディープインパクト"]}

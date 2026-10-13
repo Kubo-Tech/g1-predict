@@ -98,3 +98,23 @@ def to_short_race_name(kyosomei_hondai: str) -> str:
             name = name[: -len(suffix)] + abbreviation
             break
     return name.translate(_FULLWIDTH_ALNUM)
+
+
+def to_config_dir_name(tokubetsu_kyoso_bango: str, race_label: str) -> str:
+    """レースの設定ファイルを置くディレクトリ名を返す。
+
+    Args:
+        tokubetsu_kyoso_bango (str): 4桁の特別競走番号。
+        race_label (str): to_race_label() で変換したレース名。
+
+    Returns:
+        str: `{特別競走番号}_{レース名}` の形式のディレクトリ名（例: `0018_秋華賞`）。
+
+    Raises:
+        ValueError: 特別競走番号が4桁の数字でない、または 0000（特別競走でない）の場合。
+    """
+    if len(tokubetsu_kyoso_bango) != 4 or not tokubetsu_kyoso_bango.isdigit():
+        raise ValueError(f"特別競走番号は4桁の数字で指定してください: {tokubetsu_kyoso_bango!r}")
+    if tokubetsu_kyoso_bango == "0000":
+        raise ValueError(f"特別競走番号が無いレースです: {race_label}")
+    return f"{tokubetsu_kyoso_bango}_{race_label}"

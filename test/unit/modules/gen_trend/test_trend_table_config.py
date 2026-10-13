@@ -23,7 +23,13 @@ from g1_predict.modules.gen_trend._trend_table_config import (
 _CONFIGS_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "configs")
 )
-_RACES = {"東京優駿": 2400, "安田記念": 1600, "宝塚記念": 2200, "スプリンターズS": 1200}
+# レースの設定ファイルのディレクトリ名（{特別競走番号}_{レース名}） -> 距離
+_RACES = {
+    "0004_東京優駿": 2400,
+    "0010_安田記念": 1600,
+    "0009_宝塚記念": 2200,
+    "0016_スプリンターズS": 1200,
+}
 
 
 def _make_categories() -> list[TrendCategory]:
@@ -230,14 +236,15 @@ def test_labels_rule_matches_by_label_regardless_of_stats() -> None:
 # --- 実際の table.yml ---
 
 
-@pytest.mark.parametrize("race_name", list(_RACES))
-def test_parse_table_config_accepts_race_table_yml(race_name: str) -> None:
+@pytest.mark.parametrize("race_dir", list(_RACES))
+def test_parse_table_config_accepts_race_table_yml(race_dir: str) -> None:
     """各レースの table.yml は、そのレースの trends.yml の項目だけで構成されている。"""
-    with open(os.path.join(_CONFIGS_DIR, race_name, "trends.yml"), encoding="utf-8") as f:
+    with open(os.path.join(_CONFIGS_DIR, race_dir, "trends.yml"), encoding="utf-8") as f:
         trends = yaml.safe_load(f)
-    with open(os.path.join(_CONFIGS_DIR, race_name, "table.yml"), encoding="utf-8") as f:
+    with open(os.path.join(_CONFIGS_DIR, race_dir, "table.yml"), encoding="utf-8") as f:
         table = yaml.safe_load(f)
     catalog = load_trend_catalog(os.path.join(_CONFIGS_DIR, "trends"))
-    categories = build_trend_categories(trends, catalog, race_name, _RACES[race_name])
+    race_name = race_dir.split("_", 1)[1]
+    categories = build_trend_categories(trends, catalog, race_name, _RACES[race_dir])
     columns = parse_table_config(table, categories)
     assert list(columns) == list(table)
