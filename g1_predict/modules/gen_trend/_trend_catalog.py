@@ -9,7 +9,7 @@ import yaml
 from ._trend_condition import parse_trend_condition
 from ._trend_models import TrendCondition
 
-_CATEGORY_KEYS = frozenset({"name", "description", "items"})
+_CATEGORY_KEYS = frozenset({"name", "items"})
 _ITEM_KEYS = frozenset(
     {
         "conditionable",
@@ -55,12 +55,10 @@ class CatalogCategory:
 
     Attributes:
         name (str): カテゴリ名。
-        description (str): カテゴリの説明文。`{years}` は集計した年数に置き換える。
         items (dict[str, CatalogItem]): 項目名 -> 項目の定義。
     """
 
     name: str
-    description: str
     items: dict[str, CatalogItem]
 
 
@@ -103,12 +101,10 @@ class TrendCategory:
 
     Attributes:
         name (str): カテゴリ名。
-        description (str): カテゴリの説明文。`{years}` は集計した年数に置き換える。
         items (list[TrendItem]): レースの trends.yml に書かれた順の項目。
     """
 
     name: str
-    description: str
     items: list[TrendItem]
 
 
@@ -173,9 +169,7 @@ def build_trend_categories(
         catalog_category = catalog[category_name]
         items = [_build_item(entry, catalog_category, placeholders) for entry in entries]
         categories.append(
-            TrendCategory(
-                name=category_name, description=catalog_category.description, items=items
-            )
+            TrendCategory(name=category_name, items=items)
         )
     return categories
 
@@ -217,7 +211,7 @@ def _parse_category(raw: Any, file_name: str) -> CatalogCategory:
             hide_entry_column=bool(raw_item.get("hide_entry_column", False)),
             class_label=_parse_class_label(raw_item.get("class_label"), file_name, item_name),
         )
-    return CatalogCategory(name=raw["name"], description=raw["description"], items=items)
+    return CatalogCategory(name=raw["name"], items=items)
 
 
 def _parse_class_label(raw: Any, file_name: str, item_name: str) -> str | None:

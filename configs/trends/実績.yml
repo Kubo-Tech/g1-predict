@@ -1,5 +1,4 @@
 name: 実績
-description: 出走馬の過去の実績に関する傾向
 items:
   勝利数:
     source: {type: past_race_top_n_count, top_n: 1}

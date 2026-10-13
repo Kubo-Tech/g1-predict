@@ -16,8 +16,8 @@ from ._trend_stats import compute_stats, get_juusho_race_names
 # 出走馬の比較表のセクションの見出しと説明文
 COMPARISON_HEADING = "比較表"
 _COMPARISON_DESCRIPTION = (
-    "複勝率に差が出る項目を並べて比較した表。\n"
-    "黄色はプラスデータ、灰色はマイナスデータ。\n"
+    "複勝率に差が出る項目を並べて比較した表。  \n"
+    "黄色はプラスデータ、灰色はマイナスデータ。  \n"
     "「好データ」はプラスデータの該当数を数えたもの。"
 )
 
@@ -204,7 +204,7 @@ def build_category_section(
 ) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
 
-    ## カテゴリ名 とカテゴリの説明文から始まり、各項目の h3 テーブルを含む文字列を返す。
+    ## カテゴリ名 から始まり、各項目の h3 テーブルを含む文字列を返す。
     with_entries が True の場合は、各テーブルの右端に今回の出走馬のうち行に当たる馬の馬番を
     書く「該当馬」列を付ける。ただし、今走の結果で値が決まる項目と hide_entry_column の項目には
     付けない。
@@ -219,8 +219,7 @@ def build_category_section(
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
     """
-    description = category.description.replace("{years}", str(context.years))
-    header = f"## {category.name}\n\n{description}"
+    header = f"## {category.name}"
 
     sections = [
         _format_item_section(

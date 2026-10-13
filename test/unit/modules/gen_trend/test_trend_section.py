@@ -22,8 +22,8 @@ def test_build_trend_sections_returns_scope_note_and_sections_in_race_config_ord
     """集計対象の注記と、カテゴリ名 -> セクションを trends.yml の並び順で返す。"""
     context = MagicMock(race_name="東京優駿", kyori=2400)
     categories = [
-        TrendCategory(name="基本項目", description="d1", items=[]),
-        TrendCategory(name="前走", description="d2", items=[]),
+        TrendCategory(name="基本項目", items=[]),
+        TrendCategory(name="前走", items=[]),
     ]
     with (
         patch(f"{_SECTION}.load_trend_catalog", return_value={}) as mock_catalog,
@@ -51,11 +51,10 @@ def _make_categories() -> list[TrendCategory]:
     """テスト用のカテゴリ（基本項目: 枠順、同年/前年レース実績: 同年高松宮記念着順）。"""
     return [
         TrendCategory(
-            name="基本項目", description="d1", items=[TrendItem("枠順", {}, None)]
+            name="基本項目", items=[TrendItem("枠順", {}, None)]
         ),
         TrendCategory(
             name="同年/前年レース実績",
-            description="d2",
             items=[TrendItem("同年高松宮記念着順", {}, None)],
         ),
     ]
@@ -133,8 +132,8 @@ def test_build_trend_sections_with_entries_adds_comparison_section_at_end() -> N
 
     assert list(result.sections) == ["基本項目", "同年/前年レース実績", "比較表"]
     assert result.sections["比較表"] == (
-        "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。\n"
-        "黄色はプラスデータ、灰色はマイナスデータ。\n"
+        "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。  \n"
+        "黄色はプラスデータ、灰色はマイナスデータ。  \n"
         "「好データ」はプラスデータの該当数を数えたもの。\n\n"
         "![比較表](img/trend_table/比較表.png)"
     )
