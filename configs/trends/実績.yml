@@ -43,6 +43,27 @@ items:
     column_name: 勝利数
     source: {type: past_race_top_n_count, keibajo_codes: ["09"], top_n: 1}
     rows: *venue_win_rows
+  芝2000m勝利数:
+    column_name: 勝利数
+    source:
+      type: past_race_top_n_count
+      top_n: 1
+      filters:
+        - {field: 芝ダ, op: "==", value: 芝}
+        - {field: 距離, op: "==", value: 2000}
+    rows: *venue_win_rows
+  芝2000m以上経験:
+    column_name: 経験
+    source:
+      type: past_race_top_n_count
+      filters:
+        - {field: 芝ダ, op: "==", value: 芝}
+        - {field: 距離, op: ">=", value: 2000}
+    rows:
+      type: fixed
+      items:
+        - {label: "あり", op: ">=", value: 1}
+        - {label: "なし", op: "==", value: 0}
   中山重賞好走実績:
     column_name: 好走回数
     source: {type: past_race_top_n_count, keibajo_codes: ["06"], grade_codes: ["A", "B", "C"], top_n: 3}

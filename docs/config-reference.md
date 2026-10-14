@@ -261,6 +261,7 @@ rows:
 | `グレードコード` | `grade_code` |
 | `競馬場コード` | `keibajo_code` |
 | `距離` | `kyori_int` |
+| `芝ダ` | `shiba_da`（平地の芝は `芝`、ダートは `ダ`。障害は該当なし） |
 | `脚質判定コード` | `kyakushitsu_hantei` |
 | `特別競走番号` | `tokubetsu_kyoso_bango` |
 
