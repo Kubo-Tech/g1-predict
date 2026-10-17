@@ -40,7 +40,7 @@ flowchart TD
 - `http` で始まる URL はそのまま残る。
 - `public/` の外を指す画像は置換されない（そのまま出力される）。
 - ファイルが存在しない場合は `FileNotFoundError` で失敗する。
-- 一度アップロードした画像は状態ファイルの `images` に記録され、次回以降は再アップロードせずに同じ URL を使う。
+- アップロードした画像は、URL を状態ファイルの `images` に、中身の SHA-256 を `image_hashes` に記録する。次回以降は、中身が同じなら再アップロードせずに同じ URL を使い、中身が変わっていればアップロードし直して記録を更新する。`image_hashes` に記録の無い画像もアップロードし直す。
 - Fotolife 側の `dc:subject`（フォルダ）は `KeibaAI` 固定。
 
 ## カテゴリ
@@ -80,7 +80,8 @@ blog_url: https://kubotech.hatenadiary.com
 ```json
 {
   "entries": { "2026/2026061409030411_宝塚記念/予想.md": "エントリID" },
-  "images":  { "2026/2026061409030411_宝塚記念/img/result/大雨.png": "https://cdn-ak.f.st-hatena.com/..." }
+  "images":  { "2026/2026061409030411_宝塚記念/img/result/大雨.png": "https://cdn-ak.f.st-hatena.com/..." },
+  "image_hashes": { "2026/2026061409030411_宝塚記念/img/result/大雨.png": "SHA-256の16進文字列" }
 }
 ```
 
