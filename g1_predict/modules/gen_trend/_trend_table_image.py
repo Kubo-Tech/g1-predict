@@ -36,6 +36,8 @@ _FIXED_HEADERS = ("枠", "馬番", "馬名")
 # 右端に置く、黄色で塗ったセルの数を書く列
 _GOOD_HEADER = "好データ"
 _GOOD_COLOR = "yellow"
+# 黄色と同様に、見比べる材料として列を残す灰色
+_MINUS_COLOR = "gray"
 _FONT = FontProperties(family="Noto Sans CJK JP", size=10)
 _BOLD_FONT = FontProperties(family="Noto Sans CJK JP", size=10, weight="bold")
 # セルの寸法（インチ）
@@ -68,7 +70,7 @@ class _Cell:
 def make_comparison_table(
     horses: pd.DataFrame,
     shown: list[tuple[TableColumn, list[ItemTable]]],
-) -> Figure:
+) -> Figure | None:
     """今回の出走馬を項目ごとに見比べる表を、画像にするためのFigureとして生成する。
 
     行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名・好データの列を置き、続けて shown の順に
@@ -79,6 +81,7 @@ def make_comparison_table(
     「前走クラス着順」の列は、まとめた項目の値の前にクラスの略称を付けて「G1 1着」のように書く。
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
+    黄色にも灰色にも塗ったセルが無い項目の列は載せない。枠・馬番・馬名・好データの列は常に載せる。
     「好データ」の列には、その馬の項目の列のうち黄色で塗ったセルの数を書く。
     好データの数が多い順に1位から3位までを、展開評価値のグラフの順位と同じ色
     （netkeiba の人気・上がり順位の色）で塗る。同じ数の馬は同じ順位とし、次の数を次の順位とする
@@ -91,14 +94,14 @@ def make_comparison_table(
             記事の表。
 
     Returns:
-        Figure: 比較表。
+        Figure | None: 比較表。載せる項目の列が1つも無い場合は None。
     """
     header = [
         _Cell(text, _HEADER_COLOR, bold=True, centered=True)
         for text in (*_FIXED_HEADERS, _GOOD_HEADER)
     ]
-    for column, _ in shown:
-        header.append(_Cell(column.item_name, _HEADER_COLOR, bold=True, centered=True))
+    marked_fills = {_FILL_COLORS[_GOOD_COLOR], _FILL_COLORS[_MINUS_COLOR]}
+    column_marked = [False] * len(shown)
     body: list[list[_Cell]] = []
     good_counts: list[int] = []
     for horse in horses.to_dict("records"):
@@ -111,7 +114,7 @@ def make_comparison_table(
             _Cell(str(horse["bamei"]), _BODY_COLOR),
         ]
         good_count = 0
-        for column, tables in shown:
+        for index, (column, tables) in enumerate(shown):
             entries = [
                 entry for table in tables for entry in _cell_entries(column, table, umaban)
             ]
@@ -119,14 +122,25 @@ def make_comparison_table(
             fill = _find_fill_color(column, entries)
             if fill == _FILL_COLORS[_GOOD_COLOR]:
                 good_count += 1
+            if fill in marked_fills:
+                column_marked[index] = True
             row.append(_Cell(names or _NO_ROW_TEXT, fill))
         body.append(row)
         good_counts.append(good_count)
+    if not any(column_marked):
+        return None
+    fixed_count = len(_FIXED_HEADERS) + 1
+    kept = [True] * fixed_count + column_marked
+    header.extend(
+        _Cell(column.item_name, _HEADER_COLOR, bold=True, centered=True) for column, _ in shown
+    )
+    header = [cell for cell, keep in zip(header, kept, strict=True) if keep]
     rank_colors = _good_rank_colors(good_counts)
-    for row, good_count in zip(body, good_counts, strict=True):
+    for index, (row, good_count) in enumerate(zip(body, good_counts, strict=True)):
         fill = rank_colors.get(good_count, _BODY_COLOR)
         # 好データの列は馬名の右に置く
         row.insert(len(_FIXED_HEADERS), _Cell(str(good_count), fill, centered=True))
+        body[index] = [cell for cell, keep in zip(row, kept, strict=True) if keep]
     return _draw_table(header, body)
 
 

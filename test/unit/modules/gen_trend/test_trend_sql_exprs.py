@@ -12,6 +12,7 @@ from g1_predict.modules.gen_trend._trend_sql_exprs import (
     build_good_baba_top3_count_expr,
     build_prev_corner4_juni_expr,
     build_prev_distance_diff_expr,
+    build_prev_interval_weeks_expr,
     build_prev_race_class_expr,
     build_prev_race_finish_by_class_expr,
     build_soft_baba_top3_count_expr,
@@ -24,6 +25,7 @@ _DANGEROUS_TOKENS = (";", "--", "/*", "%")
 _HISTORY_BUILDERS = [
     build_prev_corner4_juni_expr,
     build_prev_distance_diff_expr,
+    build_prev_interval_weeks_expr,
     build_prev_race_class_expr,
     build_transport_expr,
     build_good_baba_top3_count_expr,
@@ -63,6 +65,14 @@ def test_history_expr_looks_up_by_target_race_and_horse(
 def test_simple_expr_is_parenthesized(expr: str) -> None:
     """::TEXT へのキャストと結合しても評価順が変わらないよう、括弧で囲まれている。"""
     assert expr.startswith("(") and expr.endswith(")")
+
+
+def test_prev_interval_weeks_expr_computes_weeks_from_latest_started_run() -> None:
+    """間隔は前走（出走取消などを除く直近の過去走）との日数差を週に直して1を引く。"""
+    expr = build_prev_interval_weeks_expr(_RACE_CODES)
+    assert "(TO_DATE(d3, 'YYYYMMDD') - TO_DATE(d2, 'YYYYMMDD')) / 7) - 1" in expr
+    assert "TRIM(ijo_kubun) NOT IN ('1', '2', '3')" in expr
+    assert "ORDER BY ketto, rc, d2 DESC" in expr
 
 
 def test_prev_race_class_expr_contains_all_classes() -> None:

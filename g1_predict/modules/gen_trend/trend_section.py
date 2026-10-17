@@ -86,6 +86,8 @@ def build_trend_sections(
 
     entries を指定した場合は、各表に今回の出走馬が当たる行を「該当馬」列として書き、
     最後に table.yml の項目を並べた出走馬の比較表の画像を載せるセクションを足す。
+    比較表には黄色にも灰色にも塗ったセルが無い項目の列を載せず、項目の列が1つも残らない場合は
+    比較表の画像もセクションも足さない。
     馬体重の項目の出走馬は、当日の馬体重・調教後馬体重・前走の馬体重のうち手に入るもので判定し、
     当日の馬体重以外を使った場合は表の下にその旨を注記する。
     今回の出走馬が1頭も当たらない表と、全頭が同じ1つの行だけに当たる表は、記事にも比較表にも
@@ -150,8 +152,9 @@ def build_trend_sections(
             ]
             if tables:
                 shown.append((column, tables))
-    if shown:
-        images[_TABLE_IMAGE_PATH] = make_comparison_table(horses, shown)
+    comparison_table = make_comparison_table(horses, shown) if shown else None
+    if comparison_table is not None:
+        images[_TABLE_IMAGE_PATH] = comparison_table
         sections[COMPARISON_HEADING] = build_comparison_section(_TABLE_IMAGE_PATH)
     return TrendSections(
         scope_note=format_scope_note(context, race_label),

@@ -124,3 +124,15 @@ items:
         - {label: "輸送なし", op: "==", value: "輸送なし"}
         - {label: "輸送あり", op: "==", value: "輸送あり"}
         - {label: "初輸送", op: "==", value: "初輸送"}
+  間隔:
+    source: {type: prev_interval_weeks}
+    rows:
+      type: fixed
+      hide_empty: true
+      items:
+        - {label: "連闘", op: "==", value: 0}
+        - {label: "中1-2週", op: between, value: [1, 2]}
+        - {label: "中3週", op: "==", value: 3}
+        - {label: "中4-5週", op: between, value: [4, 5]}
+        - {label: "中6-9週", op: between, value: [6, 9]}
+        - {label: "中10週以上", op: ">=", value: 10}

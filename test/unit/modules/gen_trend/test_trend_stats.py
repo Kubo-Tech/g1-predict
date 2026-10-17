@@ -805,6 +805,7 @@ def _make_past_races_manager(race_codes: list[str]) -> MagicMock:
     [
         {"type": "prev_corner4_juni"},
         {"type": "prev_distance_diff"},
+        {"type": "prev_interval_weeks"},
         {"type": "prev_race_class"},
         {"type": "prev_race_finish_by_class", "race_class": "オープン"},
         {"type": "transport"},

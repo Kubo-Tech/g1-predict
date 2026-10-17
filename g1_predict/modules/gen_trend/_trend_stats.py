@@ -29,6 +29,7 @@ from ._trend_sql_exprs import (
     build_good_baba_top3_count_expr,
     build_prev_corner4_juni_expr,
     build_prev_distance_diff_expr,
+    build_prev_interval_weeks_expr,
     build_prev_race_class_expr,
     build_prev_race_finish_by_class_expr,
     build_soft_baba_top3_count_expr,
@@ -66,6 +67,7 @@ _RACE_COL_MAP: dict[str, str] = {
 _HISTORY_EXPR_BUILDERS: dict[str, Callable[[list[str]], str]] = {
     "prev_corner4_juni": build_prev_corner4_juni_expr,
     "prev_distance_diff": build_prev_distance_diff_expr,
+    "prev_interval_weeks": build_prev_interval_weeks_expr,
     "prev_race_class": build_prev_race_class_expr,
     "transport": build_transport_expr,
     "good_baba_top3_count": build_good_baba_top3_count_expr,
@@ -92,6 +94,10 @@ _HIST_FILTER_FIELD_MAP: dict[str, str] = {
     "芝ダ": "shiba_da",
     "脚質判定コード": "kyakushitsu_hantei",
     "特別競走番号": "tokubetsu_kyoso_bango",
+    "回り": "mawari",
+    "牝馬限定": "hinba_gentei",
+    "世代限定": "sedai_gentei",
+    "スタンド前発走": "stand_mae_hasso",
 }
 
 
