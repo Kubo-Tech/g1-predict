@@ -28,7 +28,7 @@ from ._trend_table_image import make_comparison_table
 _TABLE_IMAGE_PATH = "img/trend_table/比較表.png"
 # 調教後馬体重で出走馬を判定する項目の source.type と、その表の下に書く注記
 _HORSE_WEIGHT_SOURCE_TYPE = "horse_weight"
-_CHOKYO_BATAIJU_NOTE = "※調教後馬体重"
+_CHOKYO_BATAIJU_NOTE = "※該当馬は調教後馬体重"
 
 
 def check_race_entries(race_code: str) -> None:

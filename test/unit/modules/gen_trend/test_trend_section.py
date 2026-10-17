@@ -203,7 +203,7 @@ def test_build_trend_sections_with_chokyo_bataiju_judges_horse_weight_by_it() ->
     mock_item = _build_with_chokyo_bataiju(horses, {"A": 480, "B": 502, "取消馬": 450})
 
     weight_call, gate_call = mock_item.call_args_list
-    assert weight_call[0][0].config["note"] == "※調教後馬体重"
+    assert weight_call[0][0].config["note"] == "※該当馬は調教後馬体重"
     assert weight_call[0][3] == {1: "480", 3: "502"}
     assert "note" not in gate_call[0][0].config
     assert gate_call[0][3] is None
