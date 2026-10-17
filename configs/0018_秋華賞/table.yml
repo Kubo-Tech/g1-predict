@@ -2,9 +2,6 @@
   - 前走脚質:
       color_rules:
         - {labels: [差し], color: yellow}
-  - 前走4角通過順位:
-      color_rules:
-        - {labels: [5-7番手, 8-10番手, 11番手以下], color: yellow}
   - 前走上がり3F順位:
       color_rules:
         - {labels: [1位, 2位], color: yellow}
@@ -17,6 +14,9 @@
   - 輸送:
       color_rules:
         - {labels: [初輸送], color: gray}
+  - 間隔:
+      color_rules:
+        - {labels: [連闘, 中1-2週], color: gray}
 前走:
   - 前走レース:
       color_rules:
@@ -36,6 +36,9 @@
   - 芝2000m以上経験:
       color_rules:
         - {labels: [なし], color: gray}
+  - 右回り好走実績:
+      color_rules:
+        - {labels: [0回, 1回], color: gray}
 同年/前年レース実績:
   - 桜花賞着順:
       color_rules:
@@ -54,6 +57,9 @@
   - 誕生月:
       color_rules:
         - {labels: [1月, 2月], color: yellow}
+  - スタンド前発走経験:
+      color_rules:
+        - {labels: [なし], color: gray}
 馬以外の属性:
   - 騎手:
       color_rules:
