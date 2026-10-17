@@ -1,5 +1,6 @@
 """generate_trend の単体テスト。"""
 
+import datetime
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -373,12 +374,20 @@ def test_build_trend_sections_with_entries_without_entries_raises(tmp_path: Path
 def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Path) -> None:
     """--chokyo-bataiju の場合は、race.yml の G1 特設ページから取得した調教後馬体重を渡す。
 
+    計量日がレース日（2026-05-03）の7日前から前日までなら今回の開催の値として使う。
+
     Args:
         config_dir (Path): レースの設定ファイルのディレクトリ。
     """
     (config_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
     (config_dir / "race.yml").write_text("jra_g1_page: tenno_haru\n", encoding="utf-8")
-    weights = pd.DataFrame({"馬名": ["A", "B"], "馬体重": [480, 502]})
+    weights = pd.DataFrame(
+        {
+            "馬名": ["A", "B"],
+            "馬体重": [480, 502],
+            "計量日": [datetime.date(2026, 5, 2), datetime.date(2026, 4, 26)],
+        }
+    )
     with (
         patch("scripts.gen_trend.check_race_entries"),
         patch("scripts.gen_trend.JraChokyoBataijuScraper") as mock_scraper,
@@ -389,11 +398,11 @@ def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Pat
     ):
         mock_scraper.return_value.get_chokyo_bataiju.return_value = weights
         _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True, True
+            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True, True
         )
     mock_scraper.assert_called_once_with("tenno_haru")
     assert mock_build.call_args[0][4] == EntrySettings(
-        race_code="2026013105010110",
+        race_code="2026050308030811",
         table_config={"基本項目": ["人気"]},
         chokyo_bataiju={"A": 480, "B": 502},
     )
@@ -416,3 +425,32 @@ def test_build_trend_sections_with_chokyo_bataiju_without_race_yml_raises(
         _build_trend_sections(
             "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True, True
         )
+
+
+@pytest.mark.parametrize(
+    "weigh_date",
+    [datetime.date(2026, 4, 25), datetime.date(2026, 5, 3), datetime.date(2025, 4, 30)],
+)
+def test_build_trend_sections_with_chokyo_bataiju_of_other_meeting_raises(
+    config_dir: Path, weigh_date: datetime.date
+) -> None:
+    """計量日がレース日（2026-05-03）の前の1週間に入らない調教後馬体重は ValueError になる。
+
+    Args:
+        config_dir (Path): レースの設定ファイルのディレクトリ。
+        weigh_date (datetime.date): 計量日。
+    """
+    (config_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
+    (config_dir / "race.yml").write_text("jra_g1_page: tenno_haru\n", encoding="utf-8")
+    weights = pd.DataFrame({"馬名": ["A"], "馬体重": [480], "計量日": [weigh_date]})
+    with (
+        patch("scripts.gen_trend.check_race_entries"),
+        patch("scripts.gen_trend.JraChokyoBataijuScraper") as mock_scraper,
+        patch("scripts.gen_trend.build_trend_sections") as mock_build,
+        pytest.raises(ValueError, match="前の1週間に入らない"),
+    ):
+        mock_scraper.return_value.get_chokyo_bataiju.return_value = weights
+        _build_trend_sections(
+            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True, True
+        )
+    mock_build.assert_not_called()

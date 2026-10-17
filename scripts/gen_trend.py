@@ -7,6 +7,7 @@ python -m scripts.gen_trend --race-code <16桁 race_code> --tokubetsu-kyoso-bang
 """
 
 import argparse
+import datetime
 import os
 
 import pandas as pd
@@ -31,6 +32,8 @@ _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PUBLIC_DIR = os.path.join(_REPO_DIR, "public")
 _CONFIGS_DIR = os.path.join(_REPO_DIR, "configs")
 _TRENDS_DIR = os.path.join(_CONFIGS_DIR, "trends")
+# 調教後馬体重はレース週に計量する。計量日がレース日の何日前までなら今回の開催の値とみなすか
+_CHOKYO_BATAIJU_MAX_DAYS_BEFORE = 7
 
 
 def generate_trend(
@@ -143,7 +146,7 @@ def _build_trend_sections(
         with open(table_path, encoding="utf-8") as f:
             table_config = yaml.safe_load(f)
         check_race_entries(race_code)
-        weights = _fetch_chokyo_bataiju(config_dir) if chokyo_bataiju else None
+        weights = _fetch_chokyo_bataiju(config_dir, race_code) if chokyo_bataiju else None
         entries = EntrySettings(
             race_code=race_code, table_config=table_config, chokyo_bataiju=weights
         )
@@ -157,11 +160,15 @@ def _build_trend_sections(
     return build_trend_sections(race_info, race_label, trends_config, _TRENDS_DIR, entries)
 
 
-def _fetch_chokyo_bataiju(config_dir: str) -> dict[str, int]:
+def _fetch_chokyo_bataiju(config_dir: str, race_code: str) -> dict[str, int]:
     """race.yml の G1 特設ページ名から、出走馬の調教後馬体重を取得する。
+
+    特設ページは同じ G1 で毎年使われるため、計量日がすべてレース日の前の1週間に入っているかを
+    確かめ、今回の開催の値であることを保証する。
 
     Args:
         config_dir (str): レースの race.yml を置くディレクトリのパス。
+        race_code (str): 16桁 JRA-VAN 形式の race_code。先頭8桁がレース日。
 
     Returns:
         dict[str, int]: 馬名 -> 調教後馬体重（kg）。
@@ -169,10 +176,19 @@ def _fetch_chokyo_bataiju(config_dir: str) -> dict[str, int]:
     Raises:
         FileNotFoundError: race.yml が無い場合。
         ScrapingError: 調教後馬体重を取得できない場合。
+        ValueError: 計量日がレース日の前の1週間に入らない馬がいる場合。
     """
     with open(os.path.join(config_dir, "race.yml"), encoding="utf-8") as f:
         race_config = yaml.safe_load(f)
     weights = JraChokyoBataijuScraper(race_config["jra_g1_page"]).get_chokyo_bataiju()
+    race_date = datetime.datetime.strptime(race_code[:8], "%Y%m%d").date()
+    earliest = race_date - datetime.timedelta(days=_CHOKYO_BATAIJU_MAX_DAYS_BEFORE)
+    stale = weights[~weights["計量日"].map(lambda day: earliest <= day < race_date)]
+    if not stale.empty:
+        raise ValueError(
+            f"計量日が {race_date} の前の1週間に入らない調教後馬体重があります: "
+            f"{dict(zip(stale['馬名'], stale['計量日'], strict=True))}"
+        )
     return dict(zip(weights["馬名"], weights["馬体重"].astype(int), strict=True))
 
 
