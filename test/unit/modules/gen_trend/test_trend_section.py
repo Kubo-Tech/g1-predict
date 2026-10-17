@@ -197,6 +197,51 @@ def test_build_trend_sections_with_entries_drops_uninformative_tables() -> None:
     assert [tables for _, tables in mock_table.call_args[0][1]] == [[kept]]
 
 
+def test_build_trend_sections_with_chokyo_bataiju_judges_horse_weight_by_it() -> None:
+    """調教後馬体重を指定した場合は、馬体重の項目だけその値で判定し、表の下に注記する。"""
+    horses = pd.DataFrame({"waku": [1, 2], "umaban": [1, 3], "bamei": ["A", "B"]})
+    mock_item = _build_with_chokyo_bataiju(horses, {"A": 480, "B": 502, "取消馬": 450})
+
+    weight_call, gate_call = mock_item.call_args_list
+    assert weight_call[0][0].config["note"] == "※調教後馬体重"
+    assert weight_call[0][3] == {1: "480", 3: "502"}
+    assert "note" not in gate_call[0][0].config
+    assert gate_call[0][3] is None
+
+
+# 準正常系
+def test_build_trend_sections_with_invalid_table_config_raises() -> None:
+    """table.yml に trends.yml に無いカテゴリがある場合は ValueError になる。"""
+    with pytest.raises(ValueError):
+        _build_with_entries({"存在しないカテゴリ": ["枠順"]})
+
+
+def test_build_trend_sections_with_entries_propagates_missing_entries_error() -> None:
+    """出馬表が DB に無い場合は、取得元の例外をそのまま送出する。"""
+    context = MagicMock(race_name="スプリンターズステークス", kyori=1200)
+    with (
+        patch(f"{_SECTION}.load_trend_catalog", return_value={}),
+        patch(f"{_SECTION}.build_race_context", return_value=context),
+        patch(f"{_SECTION}.build_trend_categories", return_value=_make_categories()),
+        patch(f"{_SECTION}.fetch_entry_horses", side_effect=MykeibaDBError("出走馬なし")),
+        pytest.raises(MykeibaDBError),
+    ):
+        build_trend_sections(
+            pd.DataFrame(),
+            "スプリンターズS",
+            {},
+            "configs/trends",
+            EntrySettings("2026092706040911", {"基本項目": ["枠順"]}),
+        )
+
+
+def test_build_trend_sections_with_chokyo_bataiju_missing_horse_raises() -> None:
+    """調教後馬体重に載っていない出走馬がいる場合は ValueError になる。"""
+    horses = pd.DataFrame({"waku": [1, 2], "umaban": [1, 3], "bamei": ["A", "B"]})
+    with pytest.raises(ValueError, match=r"\['B'\]"):
+        _build_with_chokyo_bataiju(horses, {"A": 480})
+
+
 def _build_with_chokyo_bataiju(
     horses: pd.DataFrame, chokyo_bataiju: dict[str, int]
 ) -> MagicMock:
@@ -247,48 +292,3 @@ def _build_with_chokyo_bataiju(
             ),
         )
     return mock_item
-
-
-def test_build_trend_sections_with_chokyo_bataiju_judges_horse_weight_by_it() -> None:
-    """調教後馬体重を指定した場合は、馬体重の項目だけその値で判定し、表の下に注記する。"""
-    horses = pd.DataFrame({"waku": [1, 2], "umaban": [1, 3], "bamei": ["A", "B"]})
-    mock_item = _build_with_chokyo_bataiju(horses, {"A": 480, "B": 502, "取消馬": 450})
-
-    weight_call, gate_call = mock_item.call_args_list
-    assert weight_call[0][0].config["note"] == "※調教後馬体重"
-    assert weight_call[0][3] == {1: "480", 3: "502"}
-    assert "note" not in gate_call[0][0].config
-    assert gate_call[0][3] is None
-
-
-# 準正常系
-def test_build_trend_sections_with_invalid_table_config_raises() -> None:
-    """table.yml に trends.yml に無いカテゴリがある場合は ValueError になる。"""
-    with pytest.raises(ValueError):
-        _build_with_entries({"存在しないカテゴリ": ["枠順"]})
-
-
-def test_build_trend_sections_with_entries_propagates_missing_entries_error() -> None:
-    """出馬表が DB に無い場合は、取得元の例外をそのまま送出する。"""
-    context = MagicMock(race_name="スプリンターズステークス", kyori=1200)
-    with (
-        patch(f"{_SECTION}.load_trend_catalog", return_value={}),
-        patch(f"{_SECTION}.build_race_context", return_value=context),
-        patch(f"{_SECTION}.build_trend_categories", return_value=_make_categories()),
-        patch(f"{_SECTION}.fetch_entry_horses", side_effect=MykeibaDBError("出走馬なし")),
-        pytest.raises(MykeibaDBError),
-    ):
-        build_trend_sections(
-            pd.DataFrame(),
-            "スプリンターズS",
-            {},
-            "configs/trends",
-            EntrySettings("2026092706040911", {"基本項目": ["枠順"]}),
-        )
-
-
-def test_build_trend_sections_with_chokyo_bataiju_missing_horse_raises() -> None:
-    """調教後馬体重に載っていない出走馬がいる場合は ValueError になる。"""
-    horses = pd.DataFrame({"waku": [1, 2], "umaban": [1, 3], "bamei": ["A", "B"]})
-    with pytest.raises(ValueError, match=r"\['B'\]"):
-        _build_with_chokyo_bataiju(horses, {"A": 480})
