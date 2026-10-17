@@ -260,14 +260,14 @@ def test_generate_trend_with_entries_and_tokubetsu_raises(public_dir: str) -> No
         generate_trend("2026101808040711", with_entries=True, tokubetsu_kyoso_bango="0018")
 
 
-def test_generate_trend_chokyo_bataiju_without_entries_raises(public_dir: str) -> None:
-    """--chokyo-bataiju を --with-entries なしで指定した場合は ValueError。
+def test_generate_trend_tojitsu_bataiju_without_entries_raises(public_dir: str) -> None:
+    """--tojitsu-bataiju を --with-entries なしで指定した場合は ValueError。
 
     Args:
         public_dir (str): public ディレクトリパス。
     """
     with pytest.raises(ValueError, match="--with-entries と一緒に指定してください"):
-        generate_trend("2026101808040711", chokyo_bataiju=True)
+        generate_trend("2026101808040711", tojitsu_bataiju=True)
 
 
 # --- _build_trend_sections ---
@@ -309,19 +309,25 @@ def test_build_trend_sections_without_entries_does_not_read_table_yml(config_dir
 def test_build_trend_sections_with_entries_reads_table_yml(config_dir: Path) -> None:
     """--with-entries の場合は、table.yml を読み込んで出走馬の設定を渡す。
 
+    --tojitsu-bataiju を付けているため、調教後馬体重は取得しない。
+
     Args:
         config_dir (Path): レースの設定ファイルのディレクトリ。
     """
     (config_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
     with (
         patch("scripts.gen_trend.check_race_entries") as mock_check,
+        patch("scripts.gen_trend.JraChokyoBataijuScraper") as mock_scraper,
         patch(
             "scripts.gen_trend.build_trend_sections",
             return_value=TrendSections(scope_note="", sections={}),
         ) as mock_build,
     ):
-        _build_trend_sections("天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True)
+        _build_trend_sections(
+            "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True, True
+        )
     mock_check.assert_called_once_with("2026013105010110")
+    mock_scraper.assert_not_called()
     assert mock_build.call_args[0][4] == EntrySettings(
         race_code="2026013105010110", table_config={"基本項目": ["人気"]}
     )
@@ -372,7 +378,7 @@ def test_build_trend_sections_with_entries_without_entries_raises(tmp_path: Path
 
 
 def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Path) -> None:
-    """--chokyo-bataiju の場合は、race.yml の G1 特設ページから取得した調教後馬体重を渡す。
+    """--with-entries の場合は、race.yml の G1 特設ページから取得した調教後馬体重を渡す。
 
     計量日がレース日（2026-05-03）の7日前から前日までなら今回の開催の値として使う。
 
@@ -398,7 +404,7 @@ def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Pat
     ):
         mock_scraper.return_value.get_chokyo_bataiju.return_value = weights
         _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True, True
+            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True
         )
     mock_scraper.assert_called_once_with("tenno_haru")
     assert mock_build.call_args[0][4] == EntrySettings(
@@ -411,7 +417,7 @@ def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Pat
 def test_build_trend_sections_with_chokyo_bataiju_without_race_yml_raises(
     config_dir: Path,
 ) -> None:
-    """--chokyo-bataiju で race.yml が無い場合は FileNotFoundError になる。
+    """--with-entries で、--tojitsu-bataiju が無く race.yml も無い場合は FileNotFoundError になる。
 
     Args:
         config_dir (Path): レースの設定ファイルのディレクトリ。
@@ -423,7 +429,7 @@ def test_build_trend_sections_with_chokyo_bataiju_without_race_yml_raises(
         pytest.raises(FileNotFoundError),
     ):
         _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True, True
+            "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True
         )
 
 
@@ -451,6 +457,6 @@ def test_build_trend_sections_with_chokyo_bataiju_of_other_meeting_raises(
     ):
         mock_scraper.return_value.get_chokyo_bataiju.return_value = weights
         _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True, True
+            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True
         )
     mock_build.assert_not_called()

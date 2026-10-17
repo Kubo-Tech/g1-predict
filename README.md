@@ -8,7 +8,7 @@ JRA-VAN のデータと TARGET frontier JV の自作メモをもとに、**JRA G
 
 | スクリプト | 生成物 | 概要 |
 | --- | --- | --- |
-| `scripts/gen_trend.py` | `public/{年}/{race_code}_{レース名}/過去の傾向.md` | 過去10年（G1になってから10年に満たないレースはG1になった年から）の着度数・回収率から傾向分析記事を生成する。`--with-entries` で、今回の出走馬が当たる行の列と出走馬の比較表の画像も載せる。`--chokyo-bataiju` で、馬体重の該当馬を JRA が発表する調教後馬体重で判定する |
+| `scripts/gen_trend.py` | `public/{年}/{race_code}_{レース名}/過去の傾向.md` | 過去10年（G1になってから10年に満たないレースはG1になった年から）の着度数・回収率から傾向分析記事を生成する。`--with-entries` で、今回の出走馬が当たる行の列と出走馬の比較表の画像も載せる。馬体重の該当馬は JRA が発表する調教後馬体重で判定し、`--tojitsu-bataiju` を付けると当日の馬体重で判定する |
 | `scripts/gen_dynamics_history.py` | `.../過去の展開.md` | 同じG1の過去の開催の展開を年ごとにまとめた記事を生成する。差し有利度・外枠有利度・外有利度の推移をまとめた折れ線グラフと、年ごとの勝ちタイム・1000m通過・標準化散布図・展開評価値の棒グラフを載せる |
 | `scripts/gen_past_race_dynamics.py` | `.../出走馬の過去走の展開評価.md` | 出走馬の過去5走の展開評価を馬ごとの折りたたみで並べた記事を生成する |
 | `scripts/gen_prev_day_trend.py` | `.../前日の傾向.md` | 前日の同競馬場・同芝ダの結果から前日の傾向記事を生成する |
@@ -34,8 +34,8 @@ pip install -e .
 
 # 4. 実行（race_code は16桁の JRA-VAN レースコード）
 python -m scripts.gen_trend          --race-code 2026061409030411
-python -m scripts.gen_trend          --race-code 2026061409030411 --with-entries  # 出走馬の確定後
-python -m scripts.gen_trend          --race-code 2026061409030411 --with-entries --chokyo-bataiju  # 調教後馬体重の発表後
+python -m scripts.gen_trend          --race-code 2026061409030411 --with-entries  # 出走馬の確定後（調教後馬体重の発表後）
+python -m scripts.gen_trend          --race-code 2026061409030411 --with-entries --tojitsu-bataiju  # 当日の馬体重の発表後
 python -m scripts.gen_dynamics_history --race-code 2026061409030411
 python -m scripts.gen_prev_day_trend --race-code 2026061409030411
 python -m scripts.gen_race_day_trend --race-code 2026061409030411

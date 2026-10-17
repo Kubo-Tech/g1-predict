@@ -8,7 +8,7 @@
 configs/{特別競走番号}_{レース名}/
 ├── trends.yml   # gen_trend が使う項目名と開催条件（省略可。無ければ見出しだけの記事になる）
 ├── table.yml    # gen_trend の --with-entries が使う比較表の定義（--with-entries を使うなら必須）
-└── race.yml     # gen_trend の --chokyo-bataiju が使う JRA の G1 特設ページ名（--chokyo-bataiju を使うなら必須）
+└── race.yml     # gen_trend の --with-entries が調教後馬体重の取得に使う JRA の G1 特設ページ名（--tojitsu-bataiju を付けずに --with-entries を使うなら必須）
 ```
 
 - ディレクトリ名は、4桁の特別競走番号とレース名を `_` でつないだもの（例: `configs/0009_宝塚記念/`）。G1 の特別競走番号は [scripts.md](scripts.md) の表にある。スクリプトはレースコードから引いた特別競走番号とレース名でディレクトリを探す（`--tokubetsu-kyoso-bango` を指定した場合はその番号）。
@@ -346,7 +346,7 @@ display_map:
 - `dynamic` の項目（前走レース・騎手・生産者・種牡馬など）で、表に出ている行のどれにも当たらない馬は「その他」行に入る。
 - `boolean_multi`（父実績）は、出走馬の父がその行の条件を満たす種牡馬なら当たる。1頭が複数の行に当たることがある。
 - 値が求まらない馬はどの行にも入らない。
-- 今走の結果で決まる項目（脚質・4角通過順位・上がり3F順位）はレース前に値が無いため、該当馬は求めない。馬体重のように当日に決まる値は、DB に入る前は空になる。馬体重は `--chokyo-bataiju` を付けると、JRA が発表する調教後馬体重で判定し、表の下に「※該当馬は調教後馬体重」と注記する（[race.yml](#raceyml--jra-の-g1-特設ページ)）。
+- 今走の結果で決まる項目（脚質・4角通過順位・上がり3F順位）はレース前に値が無いため、該当馬は求めない。馬体重のように当日に決まる値は、DB に入る前は空になる。馬体重は、JRA が発表する調教後馬体重で判定し、表の下に「※該当馬は調教後馬体重」と注記する（[race.yml](#raceyml--jra-の-g1-特設ページ)）。`--tojitsu-bataiju` を付けると DB にある当日の馬体重で判定する。
 - 項目に開催条件を注入していても、出走馬の判定には条件を使わない。条件は過去の集計対象を絞るためのもの。
 
 ## color_rules — セルの色付け
@@ -368,7 +368,7 @@ display_map:
 
 # race.yml — JRA の G1 特設ページ
 
-`gen_trend` の `--chokyo-bataiju` が、調教後馬体重を取得する JRA の G1 特設ページを指定する。
+`gen_trend` の `--with-entries` が、調教後馬体重を取得する JRA の G1 特設ページを指定する。`--tojitsu-bataiju` を付ける場合は使わない。
 
 ```yaml
 jra_g1_page: shuka
