@@ -64,12 +64,14 @@ def _make_categories() -> list[TrendCategory]:
 def _build_with_entries(
     table_config: dict[str, object],
     informative: bool = True,
+    comparison_exists: bool = True,
 ) -> tuple[TrendSections, MagicMock, MagicMock]:
     """出走馬の確定後の設定で build_trend_sections を実行する。
 
     Args:
         table_config (dict[str, object]): table.yml の内容。
         informative (bool): 各項目の表を記事に載せる判定にするか。
+        comparison_exists (bool): 比較表が作られる（Figureが返る）か。Falseなら None を返す。
 
     Returns:
         TrendSections: 生成結果。
@@ -94,7 +96,10 @@ def _build_with_entries(
             f"{_SECTION}.build_category_section",
             side_effect=lambda category, *_args, **_kwargs: f"## {category.name}",
         ) as mock_section,
-        patch(f"{_SECTION}.make_comparison_table", return_value=Figure()) as mock_table,
+        patch(
+            f"{_SECTION}.make_comparison_table",
+            return_value=Figure() if comparison_exists else None,
+        ) as mock_table,
     ):
         result = build_trend_sections(
             pd.DataFrame(),
@@ -301,3 +306,11 @@ def _build_with_entry_weights(weights: EntryWeights) -> tuple[MagicMock, MagicMo
             ),
         )
     return mock_resolve, mock_item
+
+
+def test_build_trend_sections_without_marked_columns_has_no_comparison_section() -> None:
+    """比較表が作られなかった場合は、比較表の画像もセクションも付けない。"""
+    result, _, mock_table = _build_with_entries({"基本項目": ["枠順"]}, comparison_exists=False)
+    mock_table.assert_called_once()
+    assert result.images == {}
+    assert "比較表" not in result.sections

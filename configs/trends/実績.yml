@@ -106,3 +106,36 @@ items:
   稍重以上好走実績:
     source: {type: soft_baba_top3_count}
     rows: *top3_count_rows
+  牡馬混合好走実績:
+    column_name: 好走回数
+    source:
+      type: past_race_top_n_count
+      top_n: 3
+      filters:
+        - {field: 牝馬限定, op: "==", value: なし}
+    rows: *top3_count_rows
+  牡馬混合重賞好走実績:
+    column_name: 好走回数
+    source:
+      type: past_race_top_n_count
+      grade_codes: ["A", "B", "C"]
+      top_n: 3
+      filters:
+        - {field: 牝馬限定, op: "==", value: なし}
+    rows: *top3_count_rows
+  右回り好走実績:
+    column_name: 好走回数
+    source:
+      type: past_race_top_n_count
+      top_n: 3
+      filters:
+        - {field: 回り, op: "==", value: 右}
+    rows: *top3_count_rows
+  左回り好走実績:
+    column_name: 好走回数
+    source:
+      type: past_race_top_n_count
+      top_n: 3
+      filters:
+        - {field: 回り, op: "==", value: 左}
+    rows: *top3_count_rows

@@ -112,6 +112,28 @@ def build_prev_distance_diff_expr(race_codes: list[str]) -> str:
     return _history_lookup_expr(race_codes, select_sql)
 
 
+def build_prev_interval_weeks_expr(race_codes: list[str]) -> str:
+    """前走からの間隔を「中n週」の n で返す式を組み立てる。
+
+    前走は、実際に出走した直近の過去走（出走取消・発走除外・競走除外を除き、競走中止は含む）。
+    n は（集計対象レースの開催日 - 前走の開催日）の日数を7で割って切り捨てた値から1を引いた値で、
+    翌週の出走（7〜13日後）は 0（連闘）になる。
+
+    Args:
+        race_codes (list[str]): 集計対象レースのレースコード。
+
+    Returns:
+        str: 中n週の n（連闘は 0）を返す SQL 式。前走が無い出走は NULL。
+    """
+    select_sql = (
+        "SELECT DISTINCT ON (ketto, rc) rc || ketto AS k, "
+        "((TO_DATE(d3, 'YYYYMMDD') - TO_DATE(d2, 'YYYYMMDD')) / 7) - 1 AS v "
+        f"FROM hist WHERE {_STARTED_RUN_SQL} "
+        "ORDER BY ketto, rc, d2 DESC"
+    )
+    return _history_lookup_expr(race_codes, select_sql)
+
+
 def build_prev_race_class_expr(race_codes: list[str]) -> str:
     """前走のクラスを返す式を組み立てる。
 
@@ -279,7 +301,7 @@ def _history_lookup_expr(race_codes: list[str], select_sql: str) -> str:
     )
     hist_cte = (
         "hist AS ("
-        "SELECT t.ketto, t.rc, t.kyori3, r2.kaisai_nen || r2.kaisai_gappi AS d2, "
+        "SELECT t.ketto, t.rc, t.kyori3, t.d3, r2.kaisai_nen || r2.kaisai_gappi AS d2, "
         "r2.keibajo_code, r2.grade_code, "
         f"{_JOKEN_SQL} AS joken, "
         "NULLIF(TRIM(r2.kyori), '')::INTEGER AS kyori2, "

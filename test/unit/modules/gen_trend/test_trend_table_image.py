@@ -43,15 +43,16 @@ def _make_table(
     )
 
 
-def _cells(figure: Figure) -> tuple[list[str], list[str]]:
+def _cells(figure: Figure | None) -> tuple[list[str], list[str]]:
     """描かれたセルの文字と塗りの色を、見出し行から順に返す。"""
+    assert figure is not None
     ax = figure.axes[0]
     texts = [text.get_text() for text in ax.texts]
     fills = [to_hex(patch.get_facecolor()).upper() for patch in ax.patches]
     return texts, fills
 
 
-def _draw(tables: list[ItemTable], columns: list[TableColumn]) -> Figure:
+def _draw(tables: list[ItemTable], columns: list[TableColumn]) -> Figure | None:
     """列と同じ名前の項目の表を組にして、比較表を描く。"""
     table_map = {table.item.name: table for table in tables}
     return make_comparison_table(
@@ -61,16 +62,17 @@ def _draw(tables: list[ItemTable], columns: list[TableColumn]) -> Figure:
 
 _GOOD = RowStats(first=2, second=1, third=0, fourth_plus=7, total=10)
 _BAD = RowStats(fourth_plus=10, total=10)
+_YELLOW = MetricRule(color="yellow", metric="複勝率", op=">=", value=30)
 
 
 # 正常系
 def test_make_comparison_table_has_fixed_columns_then_item_columns() -> None:
     """先頭に枠・馬番・馬名・好データの列を置き、続けて項目の列を columns の順に置く。"""
     tables = [
-        _make_table("所属", {"栗東": _GOOD}, {}),
-        _make_table("性別", {"牡": _GOOD}, {}),
+        _make_table("所属", {"栗東": _GOOD}, {1: ["栗東"]}),
+        _make_table("性別", {"牡": _GOOD}, {1: ["牡"]}),
     ]
-    columns = [TableColumn("性別", ()), TableColumn("所属", ())]
+    columns = [TableColumn("性別", (_YELLOW,)), TableColumn("所属", (_YELLOW,))]
     figure = _draw(tables, columns)
     texts, _ = _cells(figure)
     assert texts[:6] == ["枠", "馬番", "馬名", "好データ", "性別", "所属"]
@@ -79,12 +81,12 @@ def test_make_comparison_table_has_fixed_columns_then_item_columns() -> None:
 def test_make_comparison_table_rows_follow_horse_order_and_waku_color() -> None:
     """行は出走馬の順に並び、枠の列は枠の色で塗る。"""
     tables = [_make_table("所属", {"栗東": _GOOD}, {1: ["栗東"], 3: ["栗東"], 16: ["栗東"]})]
-    figure = _draw(tables, [TableColumn("所属", ())])
+    figure = _draw(tables, [TableColumn("所属", (_YELLOW,))])
     texts, fills = _cells(figure)
     # 各行は5セル（枠・馬番・馬名・好データ・項目）で、先頭の1行が見出し
-    assert texts[5:10] == ["1", "1", "アルファ", "0", "栗東"]
-    assert texts[10:15] == ["2", "3", "ベータ", "0", "栗東"]
-    assert texts[15:20] == ["8", "16", "ガンマ", "0", "栗東"]
+    assert texts[5:10] == ["1", "1", "アルファ", "1", "栗東"]
+    assert texts[10:15] == ["2", "3", "ベータ", "1", "栗東"]
+    assert texts[15:20] == ["8", "16", "ガンマ", "1", "栗東"]
     assert [fills[5], fills[10], fills[15]] == ["#FFFFFF", "#444444", "#EF8FA0"]
     assert fills[:5] == ["#D9D9D9"] * 5
 
@@ -93,7 +95,7 @@ def test_make_comparison_table_cell_text_uses_display_name_and_joins_rows() -> N
     """セルには当たる行の表示名を書き、複数の行は「・」でつなぐ。"""
     stats = {"継続": _GOOD, "乗り戻り": _BAD}
     tables = [_make_table("継続騎乗", stats, {1: ["継続", "乗り戻り"]}, {"継続": "同じ騎手"})]
-    figure = _draw(tables, [TableColumn("継続騎乗", ())])
+    figure = _draw(tables, [TableColumn("継続騎乗", (_YELLOW,))])
     texts, _ = _cells(figure)
     assert texts[9] == "同じ騎手・乗り戻り"
 
@@ -101,7 +103,7 @@ def test_make_comparison_table_cell_text_uses_display_name_and_joins_rows() -> N
 def test_make_comparison_table_fixed_item_shows_first_hit_row_only() -> None:
     """fixed の項目で複数の行に当たる馬は、表の先頭に近い行だけを書き、その行の色で塗る。"""
     stats = {"前年3着以内": _BAD, "前年5着以内": _GOOD}
-    rule = MetricRule(color="green", metric="複勝率", op=">=", value=30)
+    rule = MetricRule(color="gray", metric="複勝率", op="<", value=30)
     tables = [
         _make_table(
             "リピーター", stats, {1: ["前年3着以内", "前年5着以内"]}, rows_type="fixed"
@@ -110,13 +112,13 @@ def test_make_comparison_table_fixed_item_shows_first_hit_row_only() -> None:
     figure = _draw(tables, [TableColumn("リピーター", (rule,))])
     texts, fills = _cells(figure)
     assert texts[9] == "前年3着以内"
-    assert fills[9] == "#FFFFFF"
+    assert fills[9] == "#BFBFBF"
 
 
 def test_make_comparison_table_horse_without_row_shows_hyphen() -> None:
     """当たる行が無い馬のセルは「-」と書く。"""
     tables = [_make_table("前走レース", {"安田記念": _GOOD}, {1: ["安田記念"]})]
-    figure = _draw(tables, [TableColumn("前走レース", ())])
+    figure = _draw(tables, [TableColumn("前走レース", (_YELLOW,))])
     texts, _ = _cells(figure)
     assert [texts[9], texts[14], texts[19]] == ["安田記念", "-", "-"]
 
@@ -160,49 +162,68 @@ def test_make_comparison_table_fills_by_metric_rule() -> None:
 
 def test_make_comparison_table_fills_by_labels_rule_using_display_name() -> None:
     """行の名前のルールは、表示名で判定して塗る。"""
-    rule = LabelsRule(color="blue", labels=("内枠",))
+    rule = LabelsRule(color="yellow", labels=("内枠",))
     tables = [_make_table("枠順", {"1-4枠": _GOOD}, {1: ["1-4枠"]}, {"1-4枠": "内枠"})]
     figure = _draw(tables, [TableColumn("枠順", (rule,))])
     _, fills = _cells(figure)
-    assert fills[9] == "#9DC3E6"
+    assert fills[9] == "#FFEB9C"
 
 
 def test_make_comparison_table_first_matching_rule_wins() -> None:
     """先頭から評価し、最初に当てはまったルールの色で塗る。"""
     rules = (
-        LabelsRule(color="orange", labels=("1枠",)),
+        LabelsRule(color="gray", labels=("1枠",)),
         MetricRule(color="yellow", metric="複勝率", op=">=", value=30),
     )
     tables = [_make_table("枠順", {"1枠": _GOOD}, {1: ["1枠"]})]
     figure = _draw(tables, [TableColumn("枠順", rules)])
     _, fills = _cells(figure)
-    assert fills[9] == "#FFC000"
+    assert fills[9] == "#BFBFBF"
 
 
 def test_make_comparison_table_metric_rule_skips_row_without_horses() -> None:
-    """頭数が0の行には指標のルールを当てはめない。"""
+    """頭数が0の行には指標のルールを当てはめないため、塗られず列も載らない。"""
     rule = MetricRule(color="gray", metric="複勝率", op="==", value=0)
     tables = [_make_table("枠順", {"1枠": RowStats()}, {1: ["1枠"]})]
-    figure = _draw(tables, [TableColumn("枠順", (rule,))])
-    _, fills = _cells(figure)
-    assert fills[9] == "#FFFFFF"
+    assert _draw(tables, [TableColumn("枠順", (rule,))]) is None
 
 
 def test_make_comparison_table_multiple_rows_use_first_row_matching_a_rule() -> None:
     """複数の行に当たる馬は、先にルールに当てはまった行の色で塗る。"""
-    rule = MetricRule(color="green", metric="複勝率", op=">=", value=30)
+    rule = MetricRule(color="yellow", metric="複勝率", op=">=", value=30)
     tables = [_make_table("継続騎乗", {"継続": _BAD, "乗り戻り": _GOOD}, {1: ["継続", "乗り戻り"]})]
     figure = _draw(tables, [TableColumn("継続騎乗", (rule,))])
     _, fills = _cells(figure)
-    assert fills[9] == "#92D050"
+    assert fills[9] == "#FFEB9C"
 
 
-def test_make_comparison_table_without_rules_leaves_cells_white() -> None:
-    """色付けのルールが無い列は塗らない。"""
+def test_make_comparison_table_without_rules_returns_none() -> None:
+    """色付けのルールが無く、黄色にも灰色にも塗ったセルが無い場合は、表を作らない。"""
     tables = [_make_table("所属", {"栗東": _GOOD}, {1: ["栗東"]})]
-    figure = _draw(tables, [TableColumn("所属", ())])
-    _, fills = _cells(figure)
-    assert fills[9] == "#FFFFFF"
+    assert _draw(tables, [TableColumn("所属", ())]) is None
+
+
+def test_make_comparison_table_omits_columns_without_yellow_or_gray_cell() -> None:
+    """黄色にも灰色にも塗ったセルが無い列は載せず、枠・馬番・馬名・好データの列は残す。"""
+    green = MetricRule(color="green", metric="複勝率", op=">=", value=30)
+    gray = MetricRule(color="gray", metric="複勝率", op="<", value=30)
+    tables = [
+        _make_table("所属", {"栗東": _GOOD}, {1: ["栗東"]}),
+        _make_table("性別", {"牡": _GOOD}, {1: ["牡"]}),
+        _make_table("枠順", {"1枠": _BAD}, {1: ["1枠"]}),
+        _make_table("騎手", {"武豊": _GOOD}, {1: ["武豊"]}),
+    ]
+    columns = [
+        TableColumn("所属", (_YELLOW,)),
+        TableColumn("性別", (green,)),
+        TableColumn("枠順", (gray,)),
+        TableColumn("騎手", ()),
+    ]
+    figure = _draw(tables, columns)
+    texts, _ = _cells(figure)
+    assert texts[:6] == ["枠", "馬番", "馬名", "好データ", "所属", "枠順"]
+    # 見出しと3頭の各行が6セルずつ
+    assert len(texts) == 6 * 4
 
 
 def test_make_comparison_table_class_finish_column_prefixes_class_label() -> None:
@@ -248,9 +269,9 @@ def test_make_comparison_table_good_column_counts_yellow_cells() -> None:
         TableColumn("性別", (green,)),
     ]
     figure = _draw(tables, columns)
-    texts, fills = _cells(figure)
-    # 各行は7セル（枠・馬番・馬名・好データ・項目3列）で、先頭の1行が見出し
-    assert [texts[10], texts[17], texts[24]] == ["2", "1", "0"]
+    texts, _ = _cells(figure)
+    # 黄色のセルが無い性別の列は載らず、各行は6セル（枠・馬番・馬名・好データ・項目2列）
+    assert [texts[9], texts[15], texts[21]] == ["2", "1", "0"]
 
 
 def test_make_comparison_table_good_column_colors_top_three_with_ties() -> None:

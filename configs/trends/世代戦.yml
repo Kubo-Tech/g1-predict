@@ -65,3 +65,37 @@ items:
         - {label: "10月", op: "==", value: 10}
         - {label: "11月", op: "==", value: 11}
         - {label: "12月", op: "==", value: 12}
+  古馬混合好走実績:
+    column_name: 好走回数
+    source:
+      type: past_race_top_n_count
+      top_n: 3
+      filters:
+        - {field: 世代限定, op: "==", value: なし}
+    rows: &top3_count_rows
+      type: fixed
+      items:
+        - {label: "0回", op: "==", value: 0}
+        - {label: "1回", op: "==", value: 1}
+        - {label: "2回", op: "==", value: 2}
+        - {label: "3回以上", op: ">=", value: 3}
+  古馬混合重賞好走実績:
+    column_name: 好走回数
+    source:
+      type: past_race_top_n_count
+      grade_codes: ["A", "B", "C"]
+      top_n: 3
+      filters:
+        - {field: 世代限定, op: "==", value: なし}
+    rows: *top3_count_rows
+  スタンド前発走経験:
+    column_name: 経験
+    source:
+      type: past_race_top_n_count
+      filters:
+        - {field: スタンド前発走, op: "==", value: あり}
+    rows:
+      type: fixed
+      items:
+        - {label: "あり", op: ">=", value: 1}
+        - {label: "なし", op: "==", value: 0}
