@@ -376,7 +376,7 @@ jra_g1_page: shuka
 
 - `jra_g1_page` は G1 特設ページの URL `https://www.jra.go.jp/keiba/g1/{jra_g1_page}/` の部分（秋華賞なら `shuka`）。
 - 調教後馬体重は、レース週の木曜17時以降に発表される。keiba-scraping の `JraChokyoBataijuScraper` が、特設ページの「調教後馬体重」ボタンのリンク先のニュースから取得する。
-- 発表前、または特設ページの公開前は keiba-scraping の例外（`ChokyoBataijuUnavailableError` / `PageNotFoundError`）で停止する。出走馬のうち調教後馬体重に載っていない馬がいる場合は `ValueError` で停止する。
+- 発表前、または特設ページの公開前は keiba-scraping の例外（`ChokyoBataijuUnavailableError` / `PageNotFoundError`）で停止する。出走馬のうち調教後馬体重に載っていない馬がいる場合と、計量日がレース日の7日前から前日までに入らない馬がいる場合（別の開催の発表を拾った場合）は `ValueError` で停止する。
 
 ---
 
