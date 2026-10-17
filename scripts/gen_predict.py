@@ -34,7 +34,13 @@ _HATENA_CONFIG_PATH = os.path.join(_REPO_DIR, "configs", "hatena.yml")
 _DEFAULT_DATA_DIR = "/KeibaAI/repos/g1-predict/MY_DATA"
 
 # 関連記事に載せる記事ファイル名（拡張子を除く）。この順に並べる
-_RELATED_ARTICLE_NAMES = ["過去の傾向", "前日の傾向", "当日の傾向"]
+_RELATED_ARTICLE_NAMES = [
+    "過去の傾向",
+    "過去の展開",
+    "出走馬の過去走の展開評価",
+    "前日の傾向",
+    "当日の傾向",
+]
 _MARK_ORDER = ["◎", "○", "▲", "△", "◆", "☆", "注"]
 
 
