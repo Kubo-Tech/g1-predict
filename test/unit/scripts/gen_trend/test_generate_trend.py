@@ -3,12 +3,14 @@
 import datetime
 import os
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 from matplotlib.figure import Figure
 from mykeibadb.exceptions import MykeibaDBError
+from scraping import ChokyoBataijuUnavailableError, NetworkError, PageNotFoundError
 
 from g1_predict.modules.gen_trend.trend_section import EntrySettings, TrendSections
 from scripts.gen_trend import _build_trend_sections, generate_trend
@@ -182,7 +184,7 @@ def test_generate_trend_passes_with_entries_to_section_builder(public_dir: str) 
         ) as mock_build,
     ):
         generate_trend("2026013105010110", with_entries=True)
-    assert mock_build.call_args[0][3:] == ("2026013105010110", True, False)
+    assert mock_build.call_args[0][3:] == ("2026013105010110", True)
 
 
 def test_generate_trend_reads_config_dir_with_tokubetsu_kyoso_bango(public_dir: str) -> None:
@@ -260,16 +262,6 @@ def test_generate_trend_with_entries_and_tokubetsu_raises(public_dir: str) -> No
         generate_trend("2026101808040711", with_entries=True, tokubetsu_kyoso_bango="0018")
 
 
-def test_generate_trend_tojitsu_bataiju_without_entries_raises(public_dir: str) -> None:
-    """--tojitsu-bataiju を --with-entries なしで指定した場合は ValueError。
-
-    Args:
-        public_dir (str): public ディレクトリパス。
-    """
-    with pytest.raises(ValueError, match="--with-entries と一緒に指定してください"):
-        generate_trend("2026101808040711", tojitsu_bataiju=True)
-
-
 # --- _build_trend_sections ---
 
 
@@ -309,12 +301,13 @@ def test_build_trend_sections_without_entries_does_not_read_table_yml(config_dir
 def test_build_trend_sections_with_entries_reads_table_yml(config_dir: Path) -> None:
     """--with-entries の場合は、table.yml を読み込んで出走馬の設定を渡す。
 
-    --tojitsu-bataiju を付けているため、調教後馬体重は取得しない。
+    調教後馬体重がまだ発表されていない場合は、調教後馬体重を None にする。
 
     Args:
         config_dir (Path): レースの設定ファイルのディレクトリ。
     """
     (config_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
+    (config_dir / "race.yml").write_text("jra_g1_page: tenno_haru\n", encoding="utf-8")
     with (
         patch("scripts.gen_trend.check_race_entries") as mock_check,
         patch("scripts.gen_trend.JraChokyoBataijuScraper") as mock_scraper,
@@ -323,11 +316,11 @@ def test_build_trend_sections_with_entries_reads_table_yml(config_dir: Path) -> 
             return_value=TrendSections(scope_note="", sections={}),
         ) as mock_build,
     ):
-        _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True, True
+        mock_scraper.return_value.get_chokyo_bataiju.side_effect = ChokyoBataijuUnavailableError(
+            "未発表"
         )
+        _build_trend_sections("天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True)
     mock_check.assert_called_once_with("2026013105010110")
-    mock_scraper.assert_not_called()
     assert mock_build.call_args[0][4] == EntrySettings(
         race_code="2026013105010110", table_config={"基本項目": ["人気"]}
     )
@@ -403,9 +396,7 @@ def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Pat
         ) as mock_build,
     ):
         mock_scraper.return_value.get_chokyo_bataiju.return_value = weights
-        _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True
-        )
+        _build_trend_sections("天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True)
     mock_scraper.assert_called_once_with("tenno_haru")
     assert mock_build.call_args[0][4] == EntrySettings(
         race_code="2026050308030811",
@@ -417,7 +408,7 @@ def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Pat
 def test_build_trend_sections_with_chokyo_bataiju_without_race_yml_raises(
     config_dir: Path,
 ) -> None:
-    """--with-entries で、--tojitsu-bataiju が無く race.yml も無い場合は FileNotFoundError になる。
+    """--with-entries で race.yml が無い場合は FileNotFoundError になる。
 
     Args:
         config_dir (Path): レースの設定ファイルのディレクトリ。
@@ -428,35 +419,72 @@ def test_build_trend_sections_with_chokyo_bataiju_without_race_yml_raises(
         patch("scripts.gen_trend.build_trend_sections"),
         pytest.raises(FileNotFoundError),
     ):
-        _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True
-        )
+        _build_trend_sections("天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True)
 
 
 @pytest.mark.parametrize(
     "weigh_date",
     [datetime.date(2026, 4, 25), datetime.date(2026, 5, 3), datetime.date(2025, 4, 30)],
 )
-def test_build_trend_sections_with_chokyo_bataiju_of_other_meeting_raises(
+def test_build_trend_sections_with_chokyo_bataiju_of_other_meeting_is_none(
     config_dir: Path, weigh_date: datetime.date
 ) -> None:
-    """計量日がレース日（2026-05-03）の前の1週間に入らない調教後馬体重は ValueError になる。
+    """計量日がレース日（2026-05-03）の前の1週間に入らない調教後馬体重は、未発表として扱う。
 
     Args:
         config_dir (Path): レースの設定ファイルのディレクトリ。
         weigh_date (datetime.date): 計量日。
     """
+    weights = pd.DataFrame({"馬名": ["A"], "馬体重": [480], "計量日": [weigh_date]})
+    assert _build_with_scraper(config_dir, return_value=weights).chokyo_bataiju is None
+
+
+@pytest.mark.parametrize(
+    "error", [ChokyoBataijuUnavailableError("未発表"), PageNotFoundError("公開前")]
+)
+def test_build_trend_sections_with_chokyo_bataiju_unavailable_is_none(
+    config_dir: Path, error: Exception
+) -> None:
+    """調教後馬体重の発表前と、特設ページの公開前は、調教後馬体重を None にする。
+
+    Args:
+        config_dir (Path): レースの設定ファイルのディレクトリ。
+        error (Exception): スクレイパーが送出する例外。
+    """
+    assert _build_with_scraper(config_dir, side_effect=error).chokyo_bataiju is None
+
+
+def test_build_trend_sections_with_chokyo_bataiju_network_error_raises(config_dir: Path) -> None:
+    """通信の失敗で調教後馬体重を取得できない場合は、例外をそのまま送出する。
+
+    Args:
+        config_dir (Path): レースの設定ファイルのディレクトリ。
+    """
+    with pytest.raises(NetworkError):
+        _build_with_scraper(config_dir, side_effect=NetworkError("接続エラー"))
+
+
+def _build_with_scraper(config_dir: Path, **scraper_result: Any) -> EntrySettings:
+    """調教後馬体重の取得結果を差し替えて、出走馬の確定後の設定で _build_trend_sections を実行する。
+
+    Args:
+        config_dir (Path): レースの設定ファイルのディレクトリ。
+        **scraper_result (Any): get_chokyo_bataiju のモックに設定する return_value か side_effect。
+
+    Returns:
+        EntrySettings: build_trend_sections に渡した出走馬の設定。
+    """
     (config_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
     (config_dir / "race.yml").write_text("jra_g1_page: tenno_haru\n", encoding="utf-8")
-    weights = pd.DataFrame({"馬名": ["A"], "馬体重": [480], "計量日": [weigh_date]})
     with (
         patch("scripts.gen_trend.check_race_entries"),
         patch("scripts.gen_trend.JraChokyoBataijuScraper") as mock_scraper,
-        patch("scripts.gen_trend.build_trend_sections") as mock_build,
-        pytest.raises(ValueError, match="前の1週間に入らない"),
+        patch(
+            "scripts.gen_trend.build_trend_sections",
+            return_value=TrendSections(scope_note="", sections={}),
+        ) as mock_build,
     ):
-        mock_scraper.return_value.get_chokyo_bataiju.return_value = weights
-        _build_trend_sections(
-            "天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True
-        )
-    mock_build.assert_not_called()
+        mock_scraper.return_value.get_chokyo_bataiju.configure_mock(**scraper_result)
+        _build_trend_sections("天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True)
+    entries: EntrySettings = mock_build.call_args[0][4]
+    return entries

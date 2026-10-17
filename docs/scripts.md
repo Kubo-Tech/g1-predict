@@ -10,7 +10,7 @@
 
 | スクリプト | DB | TFJV | configs | templates | 出力 |
 | --- | --- | --- | --- | --- | --- |
-| `gen_trend` | ○ | − | `trends.yml`, `configs/trends/`, `table.yml`（`--with-entries` のみ）, `race.yml`（`--with-entries` で `--tojitsu-bataiju` が無い場合） | − | `過去の傾向.md`, `img/trend_table/比較表.png`（`--with-entries` のみ） |
+| `gen_trend` | ○ | − | `trends.yml`, `configs/trends/`, `table.yml`（`--with-entries` のみ）, `race.yml`（`--with-entries` のみ） | − | `過去の傾向.md`, `img/trend_table/比較表.png`（`--with-entries` のみ） |
 | `gen_dynamics_history` | ○ | − | − | − | `過去の展開.md`, `img/dynamics_history/*.png` |
 | `gen_prev_day_trend` | ○ | − | − | − | `前日の傾向.md` |
 | `gen_race_day_trend` | ○ | − | − | − | `当日の傾向.md` |
@@ -26,8 +26,7 @@
 
 ```bash
 python -m scripts.gen_trend --race-code 2026061409030411                 # 出走馬の確定前
-python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出走馬の確定後（調教後馬体重の発表後）
-python -m scripts.gen_trend --race-code 2026061409030411 --with-entries --tojitsu-bataiju  # 当日の馬体重の発表後
+python -m scripts.gen_trend --race-code 2026061409030411 --with-entries  # 出走馬の確定後
 python -m scripts.gen_trend --race-code 2026101808040711 --tokubetsu-kyoso-bango 0018  # レースが DB に入る前
 ```
 
@@ -42,7 +41,7 @@ python -m scripts.gen_trend --race-code 2026101808040711 --tokubetsu-kyoso-bango
 5. `# 【{レース名}{年}】傾向分析` を先頭に、集計対象の注記、カテゴリセクションを連結して書き出す。
 6. `--with-entries` を付けた場合は、手順2の後に `configs/{特別競走番号}_{レース名}/table.yml` も読み込み、各表に該当馬列を付け、記事の最後に `## 比較表` を足し、比較表の画像を作って `save_images()` で保存する。
 
-`--with-entries` では、馬体重の表の該当馬を調教後馬体重で判定する。`configs/{特別競走番号}_{レース名}/race.yml` の G1 特設ページ名から、keiba-scraping で JRA の調教後馬体重を取得し、表の下に「※該当馬は調教後馬体重」と注記する。調教後馬体重はレース週の木曜17時以降に発表されるため、それより前は取得できずに停止する。当日の馬体重が DB に入った後は `--tojitsu-bataiju` を付けて当日の馬体重で判定する。`--tojitsu-bataiju` を `--with-entries` なしで指定した場合は `ValueError` で停止する。
+`--with-entries` では、馬体重の表の該当馬を、当日の馬体重・調教後馬体重・前走の馬体重のうち手に入るもので判定し、表の下に使った馬体重を注記する（決め方は [config-reference.md](config-reference.md#出走馬が当たる行)）。調教後馬体重は、`configs/{特別競走番号}_{レース名}/race.yml` の G1 特設ページ名から keiba-scraping で取得する。
 
 `--tokubetsu-kyoso-bango` は、出馬表が出る前でレースがまだ DB に無いときに使う。距離・芝ダは直近の開催と同じとみなすため、今年から距離や芝ダが変わるレースには使えない。特別競走番号が4桁の数字でない場合と、今回の開催年より前に同じ特別競走番号のレースが無い場合は `ValueError` で停止する。出走馬が要る `--with-entries` とは同時に指定できない。
 

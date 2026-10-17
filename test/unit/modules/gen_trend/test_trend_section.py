@@ -8,6 +8,7 @@ from matplotlib.figure import Figure
 from mykeibadb.exceptions import MykeibaDBError
 
 from g1_predict.modules.gen_trend._trend_catalog import TrendCategory, TrendItem
+from g1_predict.modules.gen_trend._trend_entry_weights import EntryWeights
 from g1_predict.modules.gen_trend._trend_table_config import TableColumn
 from g1_predict.modules.gen_trend.trend_section import (
     EntrySettings,
@@ -83,6 +84,7 @@ def _build_with_entries(
         patch(f"{_SECTION}.build_trend_categories", return_value=_make_categories()),
         patch(f"{_SECTION}.format_scope_note", return_value="※注記"),
         patch(f"{_SECTION}.fetch_entry_horses", return_value=horses),
+        patch(f"{_SECTION}.resolve_entry_weights", return_value=EntryWeights({}, "")),
         patch(
             f"{_SECTION}.build_item_table",
             side_effect=lambda item, *_args: MagicMock(item=item),
@@ -171,6 +173,7 @@ def test_build_trend_sections_with_entries_drops_uninformative_tables() -> None:
         patch(f"{_SECTION}.build_trend_categories", return_value=_make_categories()),
         patch(f"{_SECTION}.format_scope_note", return_value="※注記"),
         patch(f"{_SECTION}.fetch_entry_horses", return_value=horses),
+        patch(f"{_SECTION}.resolve_entry_weights", return_value=EntryWeights({}, "")),
         patch(
             f"{_SECTION}.build_item_table",
             side_effect=lambda item, *_args: tables[item.name],
@@ -197,16 +200,29 @@ def test_build_trend_sections_with_entries_drops_uninformative_tables() -> None:
     assert [tables for _, tables in mock_table.call_args[0][1]] == [[kept]]
 
 
-def test_build_trend_sections_with_chokyo_bataiju_judges_horse_weight_by_it() -> None:
-    """調教後馬体重を指定した場合は、馬体重の項目だけその値で判定し、表の下に注記する。"""
-    horses = pd.DataFrame({"waku": [1, 2], "umaban": [1, 3], "bamei": ["A", "B"]})
-    mock_item = _build_with_chokyo_bataiju(horses, {"A": 480, "B": 502, "取消馬": 450})
+def test_build_trend_sections_judges_horse_weight_by_resolved_weights() -> None:
+    """馬体重の項目だけ、決めた馬体重で出走馬を判定し、表の下に注記する。"""
+    weights = EntryWeights({1: "480", 3: "502"}, "※該当馬は調教後馬体重")
+    mock_resolve, mock_item = _build_with_entry_weights(weights)
 
+    _, race_code, horses, chokyo_bataiju = mock_resolve.call_args[0]
+    assert race_code == "2026101808040711"
+    assert list(horses["umaban"]) == [1, 3]
+    assert chokyo_bataiju == {"A": 480, "B": 502}
     weight_call, gate_call = mock_item.call_args_list
     assert weight_call[0][0].config["note"] == "※該当馬は調教後馬体重"
     assert weight_call[0][3] == {1: "480", 3: "502"}
     assert "note" not in gate_call[0][0].config
     assert gate_call[0][3] is None
+
+
+def test_build_trend_sections_with_race_day_weights_adds_no_note() -> None:
+    """当日の馬体重で判定する場合は、馬体重の表に注記を付けない。"""
+    _, mock_item = _build_with_entry_weights(EntryWeights({1: "480", 3: "502"}, ""))
+
+    weight_call = mock_item.call_args_list[0]
+    assert "note" not in weight_call[0][0].config
+    assert weight_call[0][3] == {1: "480", 3: "502"}
 
 
 # 準正常系
@@ -235,28 +251,20 @@ def test_build_trend_sections_with_entries_propagates_missing_entries_error() ->
         )
 
 
-def test_build_trend_sections_with_chokyo_bataiju_missing_horse_raises() -> None:
-    """調教後馬体重に載っていない出走馬がいる場合は ValueError になる。"""
-    horses = pd.DataFrame({"waku": [1, 2], "umaban": [1, 3], "bamei": ["A", "B"]})
-    with pytest.raises(ValueError, match=r"\['B'\]"):
-        _build_with_chokyo_bataiju(horses, {"A": 480})
-
-
-def _build_with_chokyo_bataiju(
-    horses: pd.DataFrame, chokyo_bataiju: dict[str, int]
-) -> MagicMock:
-    """調教後馬体重を指定して build_trend_sections を実行する。
+def _build_with_entry_weights(weights: EntryWeights) -> tuple[MagicMock, MagicMock]:
+    """出走馬の判定に使う馬体重を差し替えて build_trend_sections を実行する。
 
     項目は、馬体重（source.type が horse_weight）と枠順の2つ。
 
     Args:
-        horses (pd.DataFrame): 今回の出走馬。
-        chokyo_bataiju (dict[str, int]): 馬名 -> 調教後馬体重。
+        weights (EntryWeights): resolve_entry_weights が返す馬体重と注記。
 
     Returns:
+        MagicMock: resolve_entry_weights のモック。
         MagicMock: build_item_table のモック。
     """
     context = MagicMock(race_name="秋華賞", kyori=2000)
+    horses = pd.DataFrame({"waku": [1, 2], "umaban": [1, 3], "bamei": ["A", "B"]})
     categories = [
         TrendCategory(
             name="基本項目",
@@ -272,6 +280,7 @@ def _build_with_chokyo_bataiju(
         patch(f"{_SECTION}.build_trend_categories", return_value=categories),
         patch(f"{_SECTION}.format_scope_note", return_value="※注記"),
         patch(f"{_SECTION}.fetch_entry_horses", return_value=horses),
+        patch(f"{_SECTION}.resolve_entry_weights", return_value=weights) as mock_resolve,
         patch(
             f"{_SECTION}.build_item_table",
             side_effect=lambda item, *_args: MagicMock(item=item),
@@ -288,7 +297,7 @@ def _build_with_chokyo_bataiju(
             EntrySettings(
                 race_code="2026101808040711",
                 table_config={"基本項目": ["馬体重"]},
-                chokyo_bataiju=chokyo_bataiju,
+                chokyo_bataiju={"A": 480, "B": 502},
             ),
         )
-    return mock_item
+    return mock_resolve, mock_item
