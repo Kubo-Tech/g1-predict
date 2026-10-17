@@ -219,10 +219,10 @@ def _load_state(state_path: Path) -> dict[str, dict[str, str]]:
         state_path (Path): 状態ファイルのパス
 
     Returns:
-        dict[str, dict[str, str]]: entries と images を含む状態dict
+        dict[str, dict[str, str]]: entries・images・image_hashes を含む状態dict
     """
     if not state_path.exists():
-        return {"entries": {}, "images": {}}
+        return {"entries": {}, "images": {}, "image_hashes": {}}
     with open(state_path, encoding="utf-8") as f:
         return json.load(f)
 
@@ -283,7 +283,7 @@ def _upload_image(img_path: Path, config: HatenaConfig, logger: logging.Logger) 
     return imageurl_elem.text
 
 
-def _replace_image_paths(
+def replace_image_paths(
     content: str,
     md_path: Path,
     public_dir: Path,
@@ -293,20 +293,27 @@ def _replace_image_paths(
 ) -> str:
     """Markdown内の相対画像パスをFotolife URLに置換する
 
+    状態ファイルに記録した画像と中身（SHA-256）が同じ画像は、記録したURLを使う。
+    記録が無い画像と、中身が変わった画像はアップロードし直し、URLとハッシュを記録する。
+
     Args:
         content (str): Markdownコンテンツ
         md_path (Path): Markdownファイルの絶対パス
         public_dir (Path): publicディレクトリの絶対パス
-        state (dict[str, dict[str, str]]): 状態dict（images キーを更新する）
+        state (dict[str, dict[str, str]]): 状態dict（images・image_hashes キーを更新する）
         config (HatenaConfig): はてなAPI接続設定
         logger (logging.Logger): ロガー
 
     Returns:
         str: 画像パスをFotolife URLに置換したMarkdownコンテンツ
+
+    Raises:
+        FileNotFoundError: 画像ファイルが存在しない場合
     """
     image_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
     md_dir = md_path.parent
     images_state: dict[str, str] = state.setdefault("images", {})
+    hashes_state: dict[str, str] = state.setdefault("image_hashes", {})
 
     def replace_match(match: re.Match[str]) -> str:
         alt = match.group(1)
@@ -322,15 +329,17 @@ def _replace_image_paths(
         except ValueError:
             return match.group(0)
 
-        if img_key not in images_state:
-            if not img_abs.exists():
-                logger.error("画像ファイルが存在しません: %s", img_abs)
-                raise FileNotFoundError(f"画像ファイルが存在しません: {img_abs}")
-            fotolife_url = _upload_image(img_abs, config, logger)
-            images_state[img_key] = fotolife_url
-            logger.info("画像URL取得: %s", img_key)
-        else:
+        if not img_abs.exists():
+            logger.error("画像ファイルが存在しません: %s", img_abs)
+            raise FileNotFoundError(f"画像ファイルが存在しません: {img_abs}")
+        img_hash = hashlib.sha256(img_abs.read_bytes()).hexdigest()
+
+        if img_key in images_state and hashes_state.get(img_key) == img_hash:
             logger.info("画像URLキャッシュ使用: %s", img_key)
+        else:
+            images_state[img_key] = _upload_image(img_abs, config, logger)
+            hashes_state[img_key] = img_hash
+            logger.info("画像URL取得: %s", img_key)
 
         return f"![{alt}]({images_state[img_key]})"
 
@@ -465,7 +474,7 @@ def _publish_md(
     categories = load_categories(config_path, md_path)
     content_without_h1 = _remove_h1(content)
 
-    content_with_urls = _replace_image_paths(
+    content_with_urls = replace_image_paths(
         content_without_h1, md_path, public_dir, state, config, logger
     )
     _save_state(state_path, state)
