@@ -9,6 +9,7 @@ python -m scripts.gen_trend --race-code <16桁 race_code> --tokubetsu-kyoso-bang
 import argparse
 import datetime
 import os
+from typing import Any
 
 import pandas as pd
 import yaml
@@ -127,17 +128,18 @@ def _build_trend_sections(
         ScrapingError: with_entries が True で、調教後馬体重の取得が通信の失敗などで
             できなかった場合。
     """
-    # 出走馬の確定後の情報に必要な table.yml と出走馬は、trends.yml の有無によらず先に確かめる
-    entries: EntrySettings | None = None
-    if with_entries:
-        table_path = os.path.join(config_dir, "table.yml")
+    # table.yml は、出走馬の確定前は有れば読み、確定後は必須とする。
+    # 確定後に必要な table.yml と出走馬は、trends.yml の有無によらず先に確かめる
+    table_path = os.path.join(config_dir, "table.yml")
+    table_config: dict[str, Any] | None = None
+    if with_entries or os.path.isfile(table_path):
         with open(table_path, encoding="utf-8") as f:
             table_config = yaml.safe_load(f)
+    entries: EntrySettings | None = None
+    if with_entries:
         check_race_entries(race_code)
         weights = _fetch_chokyo_bataiju(config_dir, race_code)
-        entries = EntrySettings(
-            race_code=race_code, table_config=table_config, chokyo_bataiju=weights
-        )
+        entries = EntrySettings(race_code=race_code, chokyo_bataiju=weights)
     config_path = os.path.join(config_dir, "trends.yml")
     if not os.path.isfile(config_path):
         return TrendSections(scope_note="", sections={})
@@ -145,7 +147,9 @@ def _build_trend_sections(
         trends_config = yaml.safe_load(f)
     if not trends_config:
         return TrendSections(scope_note="", sections={})
-    return build_trend_sections(race_info, race_label, trends_config, _TRENDS_DIR, entries)
+    return build_trend_sections(
+        race_info, race_label, trends_config, _TRENDS_DIR, entries, table_config
+    )
 
 
 def _fetch_chokyo_bataiju(config_dir: str, race_code: str) -> dict[str, int] | None:

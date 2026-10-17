@@ -139,3 +139,14 @@ items:
       filters:
         - {field: 回り, op: "==", value: 左}
     rows: *top3_count_rows
+  上がり最速経験回数:
+    column_name: 回数
+    source: {type: agari_3f_top_n_count, top_n: 1}
+    rows:
+      type: fixed
+      items:
+        - {label: "0回", op: "==", value: 0}
+        - {label: "1回", op: "==", value: 1}
+        - {label: "2回", op: "==", value: 2}
+        - {label: "3回", op: "==", value: 3}
+        - {label: "4回以上", op: ">=", value: 4}

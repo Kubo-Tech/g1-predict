@@ -14,17 +14,8 @@ from g1_predict.modules.utils.race_dynamics import TOP_RANK_COLORS
 
 from ._trend_models import RowStats
 from ._trend_renderer import ItemTable
-from ._trend_table_config import TableColumn
+from ._trend_table_config import FILL_COLORS, TableColumn
 
-# 色の名前 -> 塗りの色
-_FILL_COLORS: dict[str, str] = {
-    "green": "#92D050",
-    "yellow": "#FFEB9C",
-    "blue": "#9DC3E6",
-    "red": "#FF9999",
-    "orange": "#FFC000",
-    "gray": "#BFBFBF",
-}
 _HEADER_COLOR = "#D9D9D9"
 _BODY_COLOR = "#FFFFFF"
 _GRID_COLOR = "#000000"
@@ -33,11 +24,16 @@ _DARK_TEXT_WAKU = (1, 5, 7, 8)
 _NO_ROW_TEXT = "-"
 _ROW_SEPARATOR = "・"
 _FIXED_HEADERS = ("枠", "馬番", "馬名")
-# 右端に置く、黄色で塗ったセルの数を書く列
-_GOOD_HEADER = "好データ"
-_GOOD_COLOR = "yellow"
-# 黄色と同様に、見比べる材料として列を残す灰色
+# 馬名の右に置く、黄色で塗ったセルの数を書く列
+_PLUS_HEADER = "＋データ"
+_PLUS_COLOR = "yellow"
+# 灰色で塗ったセルの数を書く列。灰色のセルがある項目は、黄色と同様に見比べる材料として列を残す
+_MINUS_HEADER = "－データ"
 _MINUS_COLOR = "gray"
+# －データの数の順位の色（＋データの順位の色を HLS 色空間で彩度だけ半分にした色）
+_MINUS_RANK_COLORS: dict[int, str] = {1: "#DFD8A0", 2: "#D9E2F2", 3: "#DCC8B4"}
+# 馬名の右に置く、＋データ・－データの列の数
+_COUNT_COLUMNS = 2
 _FONT = FontProperties(family="Noto Sans CJK JP", size=10)
 _BOLD_FONT = FontProperties(family="Noto Sans CJK JP", size=10, weight="bold")
 # セルの寸法（インチ）
@@ -73,19 +69,22 @@ def make_comparison_table(
 ) -> Figure | None:
     """今回の出走馬を項目ごとに見比べる表を、画像にするためのFigureとして生成する。
 
-    行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名・好データの列を置き、続けて shown の順に
-    項目の列を置く。各セルには、その馬の値（display_map があれば表示名）を書く。dynamic の項目で
-    記事の表では「その他」にまとめた値も、騎手名などの値そのものを書く。
+    行は出走馬を馬番順に並べる。先頭に枠・馬番・馬名・＋データ・－データの列を置き、続けて
+    shown の順に項目の列を置く。各セルには、その馬の値（display_map があれば表示名）を書く。
+    dynamic の項目で記事の表では「その他」にまとめた値も、騎手名などの値そのものを書く。
     複数の行に当たる場合は「・」でつなぎ、当たる行が無い場合は「-」と書く。ただし fixed の項目
     （前年3着以内・前年5着以内のように行の範囲が重なる項目）は、当たる行のうち表の先頭に近い行だけを書く。
     「前走クラス着順」の列は、まとめた項目の値の前にクラスの略称を付けて「G1 1着」のように書く。
     セルは、値のうち先に色付けのルールに当てはまった値の色で塗る。行の名前のルールはセルに書く値で、
     指標のルールは値が当たる記事の表の行の集計値で判定する。
-    黄色にも灰色にも塗ったセルが無い項目の列は載せない。枠・馬番・馬名・好データの列は常に載せる。
-    「好データ」の列には、その馬の項目の列のうち黄色で塗ったセルの数を書く。
-    好データの数が多い順に1位から3位までを、展開評価値のグラフの順位と同じ色
+    黄色にも灰色にも塗ったセルが無い項目の列は載せない。枠・馬番・馬名・＋データ・－データの列は
+    常に載せる。
+    「＋データ」の列には、その馬の項目の列のうち黄色で塗ったセルの数を書く。
+    ＋データの数が多い順に1位から3位までを、展開評価値のグラフの順位と同じ色
     （netkeiba の人気・上がり順位の色）で塗る。同じ数の馬は同じ順位とし、次の数を次の順位とする
     （7・5・5・4 なら 7 が1位、5 が2位、4 が3位）。0 は塗らない。
+    「－データ」の列には、灰色で塗ったセルの数を書き、同じ順位付けで、＋データの順位の色の
+    彩度を半分にした色で塗る。
 
     Args:
         horses (pd.DataFrame): 馬番順の出走馬。
@@ -98,12 +97,13 @@ def make_comparison_table(
     """
     header = [
         _Cell(text, _HEADER_COLOR, bold=True, centered=True)
-        for text in (*_FIXED_HEADERS, _GOOD_HEADER)
+        for text in (*_FIXED_HEADERS, _PLUS_HEADER, _MINUS_HEADER)
     ]
-    marked_fills = {_FILL_COLORS[_GOOD_COLOR], _FILL_COLORS[_MINUS_COLOR]}
+    marked_fills = {FILL_COLORS[_PLUS_COLOR], FILL_COLORS[_MINUS_COLOR]}
     column_marked = [False] * len(shown)
     body: list[list[_Cell]] = []
-    good_counts: list[int] = []
+    plus_counts: list[int] = []
+    minus_counts: list[int] = []
     for horse in horses.to_dict("records"):
         waku = int(horse["waku"])
         umaban = int(horse["umaban"])
@@ -113,53 +113,63 @@ def make_comparison_table(
             _Cell(str(umaban), _BODY_COLOR, centered=True),
             _Cell(str(horse["bamei"]), _BODY_COLOR),
         ]
-        good_count = 0
+        plus_count = 0
+        minus_count = 0
         for index, (column, tables) in enumerate(shown):
             entries = [
                 entry for table in tables for entry in _cell_entries(column, table, umaban)
             ]
             names = _ROW_SEPARATOR.join(text for text, _ in entries)
             fill = _find_fill_color(column, entries)
-            if fill == _FILL_COLORS[_GOOD_COLOR]:
-                good_count += 1
+            if fill == FILL_COLORS[_PLUS_COLOR]:
+                plus_count += 1
+            if fill == FILL_COLORS[_MINUS_COLOR]:
+                minus_count += 1
             if fill in marked_fills:
                 column_marked[index] = True
             row.append(_Cell(names or _NO_ROW_TEXT, fill))
         body.append(row)
-        good_counts.append(good_count)
+        plus_counts.append(plus_count)
+        minus_counts.append(minus_count)
     if not any(column_marked):
         return None
-    fixed_count = len(_FIXED_HEADERS) + 1
+    fixed_count = len(_FIXED_HEADERS) + _COUNT_COLUMNS
     kept = [True] * fixed_count + column_marked
     header.extend(
         _Cell(column.item_name, _HEADER_COLOR, bold=True, centered=True) for column, _ in shown
     )
     header = [cell for cell, keep in zip(header, kept, strict=True) if keep]
-    rank_colors = _good_rank_colors(good_counts)
-    for index, (row, good_count) in enumerate(zip(body, good_counts, strict=True)):
-        fill = rank_colors.get(good_count, _BODY_COLOR)
-        # 好データの列は馬名の右に置く
-        row.insert(len(_FIXED_HEADERS), _Cell(str(good_count), fill, centered=True))
+    plus_rank_colors = _rank_colors(plus_counts, TOP_RANK_COLORS)
+    minus_rank_colors = _rank_colors(minus_counts, _MINUS_RANK_COLORS)
+    for index, row in enumerate(body):
+        plus_fill = plus_rank_colors.get(plus_counts[index], _BODY_COLOR)
+        minus_fill = minus_rank_colors.get(minus_counts[index], _BODY_COLOR)
+        # ＋データ・－データの列は馬名の右に置く
+        row.insert(len(_FIXED_HEADERS), _Cell(str(plus_counts[index]), plus_fill, centered=True))
+        row.insert(
+            len(_FIXED_HEADERS) + 1, _Cell(str(minus_counts[index]), minus_fill, centered=True)
+        )
         body[index] = [cell for cell, keep in zip(row, kept, strict=True) if keep]
     return _draw_table(header, body)
 
 
-def _good_rank_colors(good_counts: list[int]) -> dict[int, str]:
-    """好データの数ごとの塗りの色を返す。
+def _rank_colors(counts: list[int], rank_colors: dict[int, str]) -> dict[int, str]:
+    """データの数ごとの塗りの色を返す。
 
     数が多い順に、同じ数は同じ順位として1位から3位までに色を割り当てる。0 には割り当てない。
 
     Args:
-        good_counts (list[int]): 出走馬ごとの好データの数。
+        counts (list[int]): 出走馬ごとのデータの数。
+        rank_colors (dict[int, str]): 順位 -> 塗りの色。
 
     Returns:
-        dict[int, str]: 好データの数 -> 塗りの色。3位までに入らない数は含まない。
+        dict[int, str]: データの数 -> 塗りの色。3位までに入らない数は含まない。
     """
-    ranked = sorted({count for count in good_counts if count > 0}, reverse=True)
+    ranked = sorted({count for count in counts if count > 0}, reverse=True)
     return {
-        count: TOP_RANK_COLORS[rank]
+        count: rank_colors[rank]
         for rank, count in enumerate(ranked, start=1)
-        if rank in TOP_RANK_COLORS
+        if rank in rank_colors
     }
 
 
@@ -205,7 +215,7 @@ def _find_fill_color(column: TableColumn, entries: list[tuple[str, RowStats]]) -
     for text, stats in entries:
         for rule in column.color_rules:
             if rule.matches(text, stats):
-                return _FILL_COLORS[rule.color]
+                return FILL_COLORS[rule.color]
     return _BODY_COLOR
 
 

@@ -249,6 +249,45 @@ def build_debut_month_expr(race_codes: list[str]) -> str:
     return _history_lookup_expr(race_codes, select_sql)
 
 
+def build_agari_3f_top_n_count_expr(race_codes: list[str], top_n: int) -> str:
+    """上がり3Fの順位が top_n 位以内だった回数を返す式を組み立てる。
+
+    上がり3Fの順位は、上がり3Fが数字で `000` でなく、着順が有効な出走だけで付ける。
+    同タイムは同じ順位とし、次の順位は同じ順位の頭数だけ飛ばす（1位が2頭なら次は3位）。
+    上がり3Fが無いレースの過去走は数えない。
+
+    Args:
+        race_codes (list[str]): 集計対象レースのレースコード。
+        top_n (int): 数える上がり3Fの順位の下限（この順位以内を数える）。
+
+    Returns:
+        str: 集計対象レースより前に、上がり3Fの順位が top_n 位以内だった回数を返す SQL 式。
+            該当する過去走が無い場合は 0。
+
+    Raises:
+        ValueError: top_n が1以上の整数でない場合。
+    """
+    if isinstance(top_n, bool) or not isinstance(top_n, int) or top_n < 1:
+        raise ValueError(f"top_n は1以上の整数で指定してください: {top_n!r}")
+    # 過去走のレースの全出走馬で順位を付ける。race_code にはインデックスがあるので絞り込む
+    rank_sql = (
+        "SELECT race_code AS arc, ketto_toroku_bango AS aketto, "
+        "RANK() OVER (PARTITION BY race_code ORDER BY TRIM(kohan_3f)::NUMERIC) AS rnk "
+        "FROM umagoto_race_joho "
+        "WHERE race_code IN (SELECT DISTINCT prc FROM hist) "
+        "AND TRIM(kohan_3f) ~ '^[0-9]+$' AND TRIM(kohan_3f) != '000' "
+        f"AND {_VALID_RUN_SQL}"
+    )
+    select_sql = (
+        "SELECT rc || ketto AS k, COUNT(*) AS v "
+        f"FROM hist JOIN ({rank_sql}) a ON a.arc = hist.prc AND a.aketto = hist.ketto "
+        f"WHERE a.rnk <= {top_n} "
+        "GROUP BY ketto, rc"
+    )
+    lookup = _history_lookup_expr(race_codes, select_sql)
+    return f"COALESCE(({lookup})::INTEGER, 0)"
+
+
 def _build_baba_top3_count_expr(race_codes: list[str], baba_codes: tuple[str, ...]) -> str:
     """指定した馬場状態での3着以内の回数を返す式を組み立てる。
 
@@ -306,7 +345,7 @@ def _history_lookup_expr(race_codes: list[str], select_sql: str) -> str:
         f"{_JOKEN_SQL} AS joken, "
         "NULLIF(TRIM(r2.kyori), '')::INTEGER AS kyori2, "
         f"{_BABA_SQL} AS baba, "
-        "u2.kakutei_chakujun, u2.corner4_juni, "
+        "u2.race_code AS prc, u2.kakutei_chakujun, u2.corner4_juni, "
         "u2.tozai_shozoku_code AS tozai, u2.ijo_kubun_code AS ijo_kubun "
         "FROM tgt t "
         "JOIN umagoto_race_joho u2 ON u2.ketto_toroku_bango = t.ketto "

@@ -99,3 +99,14 @@ items:
       items:
         - {label: "あり", op: ">=", value: 1}
         - {label: "なし", op: "==", value: 0}
+  クラシック出走:
+    column_name: クラシック
+    source:
+      type: past_race_top_n_count
+      filters:
+        - {field: 特別競走番号, op: in, value: ["0001", "0002", "0003", "0004", "0005", "0018"]}
+    rows:
+      type: fixed
+      items:
+        - {label: "出走", op: ">=", value: 1}
+        - {label: "未出走", op: "==", value: 0}

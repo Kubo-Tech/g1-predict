@@ -19,8 +19,15 @@ from g1_predict.modules.gen_trend._trend_renderer import (
     build_category_section,
     build_comparison_section,
     build_item_table,
+    find_row_colors,
     format_condition_note,
     format_scope_note,
+)
+from g1_predict.modules.gen_trend._trend_table_config import (
+    FILL_COLORS,
+    LabelsRule,
+    MetricRule,
+    TableColumn,
 )
 from g1_predict.modules.utils.race_history import TrendContext
 
@@ -315,7 +322,7 @@ def test_build_comparison_section_has_heading_description_and_image() -> None:
     assert build_comparison_section("img/trend_table/比較表.png") == (
         "## 比較表\n\n複勝率に差が出る項目を並べて比較した表。  \n"
         "黄色はプラスデータ、灰色はマイナスデータ。  \n"
-        "「好データ」はプラスデータの該当数を数えたもの。\n\n"
+        "「＋データ」はプラスデータ、「－データ」はマイナスデータの該当数を数えたもの。\n\n"
         "![比較表](img/trend_table/比較表.png)"
     )
 
@@ -710,3 +717,145 @@ def test_build_metric_section_condition_note_precedes_item_note() -> None:
         result = _render_item(item, context)
 
     assert result.endswith("\n\n※4日目のみ\n\n※補足")
+
+
+# --- find_row_colors ---
+
+
+def _color_table(
+    item: TrendItem | None = None, stats: dict[str, RowStats] | None = None
+) -> ItemTable:
+    """行ごとの集計値を持つテスト用 ItemTable を生成する。"""
+    stats = stats or {
+        "1-4枠": RowStats(first=2, second=1, third=0, fourth_plus=7, total=10),
+        "5-8枠": RowStats(fourth_plus=10, total=10),
+        OTHER_LABEL: RowStats(first=1, fourth_plus=1, total=2),
+    }
+    return ItemTable(
+        item=item or _make_item(),
+        rows=list(stats),
+        stats=stats,
+        entry_rows={},
+        entry_values={},
+    )
+
+
+def test_find_row_colors_judges_metric_rule_by_row_stats() -> None:
+    """指標のルールは、行の集計値で判定する。当てはまらない行は含まない。"""
+    column = TableColumn("枠番", (MetricRule("yellow", "複勝率", ">=", 30),))
+    colors = find_row_colors(column, _color_table())
+    assert colors == {"1-4枠": FILL_COLORS["yellow"], OTHER_LABEL: FILL_COLORS["yellow"]}
+
+
+def test_find_row_colors_judges_labels_rule_by_display_name() -> None:
+    """行の名前のルールは、display_map があれば表示名で判定する。"""
+    item = _make_item(display_map={"1-4枠": "内枠"})
+    column = TableColumn("枠番", (LabelsRule("gray", ("内枠",)),))
+    assert find_row_colors(column, _color_table(item)) == {"1-4枠": FILL_COLORS["gray"]}
+
+
+def test_find_row_colors_uses_first_matching_rule() -> None:
+    """ルールは先頭から評価し、最初に当てはまったルールの色にする。"""
+    column = TableColumn(
+        "枠番",
+        (LabelsRule("gray", ("1-4枠",)), MetricRule("yellow", "複勝率", ">=", 30)),
+    )
+    colors = find_row_colors(column, _color_table())
+    assert colors["1-4枠"] == FILL_COLORS["gray"]
+    assert colors[OTHER_LABEL] == FILL_COLORS["yellow"]
+
+
+def test_find_row_colors_judges_other_row_by_rules() -> None:
+    """「その他」行も、行の名前「その他」と「その他」行の集計値でルールを判定する。"""
+    column = TableColumn("枠番", (LabelsRule("blue", (OTHER_LABEL,)),))
+    assert find_row_colors(column, _color_table()) == {OTHER_LABEL: FILL_COLORS["blue"]}
+
+
+def test_find_row_colors_prefixes_class_label_for_class_finish_column() -> None:
+    """前走クラス着順の列は、クラスの略称を付けた「G1 1着」の名前で判定する。"""
+    item = TrendItem(name="前走G1着順", config={}, condition=None, class_label="G1")
+    stats = {"1着": RowStats(first=1, total=1), "2着": RowStats(second=1, total=1)}
+    column = TableColumn(
+        "前走クラス着順", (LabelsRule("yellow", ("G1 1着",)),), parts=("前走G1着順",)
+    )
+    assert find_row_colors(column, _color_table(item, stats)) == {"1着": FILL_COLORS["yellow"]}
+
+
+def test_find_row_colors_without_rules_returns_empty() -> None:
+    """色付けのルールが無い列では、塗る行は無い。"""
+    assert find_row_colors(TableColumn("枠番", ()), _color_table()) == {}
+
+
+# --- 行の色がある表の出力 ---
+
+
+def _colored_section(**item_options: Any) -> str:
+    """1-4枠だけを黄色に塗る列で、表を出力する。"""
+    table = _color_table(_make_item(**item_options))
+    return _format_item_section(table, False, row_colors={"1-4枠": "#FFEB9C"})
+
+
+def test_format_item_section_with_row_colors_outputs_html_table() -> None:
+    """塗る行がある表は HTML の表で出力し、塗る行のすべての td に背景色を付ける。"""
+    lines = _colored_section().split("\n")
+    assert lines[:4] == ["### 枠番", "", "<table>", "<thead>"]
+    assert lines[4] == (
+        "<tr><th>枠番</th><th>着度数</th><th>勝率</th><th>複率</th><th>単回</th>"
+        "<th>複回</th></tr>"
+    )
+    assert lines[5:7] == ["</thead>", "<tbody>"]
+    colored = '<td style="background-color:#FFEB9C">'
+    assert lines[7].startswith(f"<tr>{colored}1-4枠</td>")
+    assert lines[7].count(colored) == 6
+    assert lines[8] == (
+        "<tr><td>5-8枠</td><td>0-0-0-10</td><td>0%</td><td>0%</td><td>0%</td><td>0%</td></tr>"
+    )
+    assert lines[-2:] == ["</tbody>", "</table>"]
+
+
+def test_format_item_section_with_row_colors_has_no_blank_line_inside_table() -> None:
+    """HTML の表の途中に空行を入れない。"""
+    section = _colored_section()
+    table = section[section.index("<table>") : section.index("</table>")]
+    assert "\n\n" not in table
+
+
+def test_format_item_section_with_row_colors_uses_strong_and_escapes_text() -> None:
+    """回収率の太字は strong で書き、セルの文字は html.escape する。"""
+    stats = {"A&B": RowStats(first=1, fourth_plus=1, total=2, tansho_kaishuu=150.0)}
+    table = _color_table(stats=stats)
+    section = _format_item_section(table, True, row_colors={"A&B": "#FFEB9C"})
+    assert "<strong>150%</strong>" in section
+    assert "**" not in section
+    assert "A&amp;B" in section
+    assert "<th>該当馬</th>" in section
+
+
+def test_format_item_section_with_row_colors_keeps_notes_as_markdown_below_table() -> None:
+    """表の下の注記は、HTML の表の後ろに Markdown で書く。"""
+    section = _colored_section(note="※注記")
+    assert section.endswith("</table>\n\n※注記")
+
+
+@pytest.mark.parametrize("row_colors", [None, {}])
+def test_format_item_section_without_row_colors_outputs_markdown_table(
+    row_colors: dict[str, str] | None,
+) -> None:
+    """塗る行が無い表は Markdown の表で出力する。"""
+    section = _format_item_section(_color_table(), False, row_colors=row_colors)
+    assert "<table>" not in section
+    assert "| 枠番 | 着度数 | 勝率 | 複率 | 単回 | 複回 |" in section
+
+
+def test_build_category_section_colors_only_items_with_table_columns() -> None:
+    """table_columns に列がある項目だけ、行を塗る。塗る行が無い項目は Markdown の表のまま。"""
+    items = [_make_item("枠順"), _make_item("人気")]
+    category = _make_category(items)
+    tables = [_color_table(item) for item in items]
+    columns = {"枠順": TableColumn("枠順", (MetricRule("yellow", "複勝率", ">=", 30),))}
+    result = build_category_section(
+        category, _make_context(), tables, table_columns=columns
+    )
+    html_part, markdown_part = result.split("### 人気")
+    assert "<table>" in html_part
+    assert "<table>" not in markdown_part

@@ -1,4 +1,4 @@
-"""比較表の定義（table.yml）を読み込んで検証するモジュール。"""
+"""色付けと比較表の定義（table.yml）を読み込んで検証するモジュール。"""
 
 import operator
 from collections.abc import Callable
@@ -8,7 +8,16 @@ from typing import Any
 from ._trend_catalog import TrendCategory
 from ._trend_models import RowStats
 
-COLOR_NAMES = frozenset({"green", "yellow", "blue", "red", "orange", "gray"})
+# 色の名前 -> 塗りの色
+FILL_COLORS: dict[str, str] = {
+    "green": "#92D050",
+    "yellow": "#FFEB9C",
+    "blue": "#9DC3E6",
+    "red": "#FF9999",
+    "orange": "#FFC000",
+    "gray": "#BFBFBF",
+}
+COLOR_NAMES = frozenset(FILL_COLORS)
 _OPERATORS: dict[str, Callable[[float, float], bool]] = {
     ">=": operator.ge,
     "<=": operator.le,

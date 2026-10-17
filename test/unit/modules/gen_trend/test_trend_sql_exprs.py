@@ -8,6 +8,7 @@ from g1_predict.modules.gen_trend._trend_sql_exprs import (
     BIRTH_MONTH_EXPR,
     CORNER4_JUNI_EXPR,
     HORSE_WEIGHT_EXPR,
+    build_agari_3f_top_n_count_expr,
     build_debut_month_expr,
     build_good_baba_top3_count_expr,
     build_prev_corner4_juni_expr,
@@ -122,7 +123,38 @@ def test_baba_top3_count_exprs_use_baba_codes() -> None:
     assert "baba IN ('2', '3', '4')" in build_soft_baba_top3_count_expr(_RACE_CODES)
 
 
+def test_agari_3f_top_n_count_expr_ranks_each_past_race_and_compares_with_top_n() -> None:
+    """過去走のレースごとに上がり3Fの順位を付け、top_n 以内を数えて、無ければ0にする。"""
+    expr = build_agari_3f_top_n_count_expr(_RACE_CODES, 3)
+    assert "'2024092906040911', '2025092806040911'" in expr
+    assert "RANK() OVER (PARTITION BY race_code ORDER BY TRIM(kohan_3f)::NUMERIC)" in expr
+    assert "TRIM(kohan_3f) ~ '^[0-9]+$' AND TRIM(kohan_3f) != '000'" in expr
+    assert "kakutei_chakujun ~ '^[0-9]{2}$' AND kakutei_chakujun != '00'" in expr
+    assert "WHERE race_code IN (SELECT DISTINCT prc FROM hist)" in expr
+    assert "a.rnk <= 3" in expr
+    assert expr.startswith("COALESCE((") and expr.endswith(")::INTEGER, 0)")
+
+
+def test_agari_3f_top_n_count_expr_has_no_dangerous_token() -> None:
+    """式に analytics が拒否するトークンや、パラメータ置換と衝突する % を含まない。"""
+    expr = build_agari_3f_top_n_count_expr(_RACE_CODES, 1)
+    assert not any(token in expr for token in _DANGEROUS_TOKENS)
+
+
 # 準正常系
+@pytest.mark.parametrize("top_n", [0, -1, 1.5, "1", True, None])
+def test_agari_3f_top_n_count_expr_invalid_top_n_raises(top_n: object) -> None:
+    """top_n が1以上の整数でない場合は ValueError になる。"""
+    with pytest.raises(ValueError, match="top_n"):
+        build_agari_3f_top_n_count_expr(_RACE_CODES, top_n)  # type: ignore[arg-type]
+
+
+def test_agari_3f_top_n_count_expr_empty_race_codes_raises() -> None:
+    """レースコードが空の場合は ValueError になる。"""
+    with pytest.raises(ValueError, match="race_codes"):
+        build_agari_3f_top_n_count_expr([], 1)
+
+
 @pytest.mark.parametrize("builder", _HISTORY_BUILDERS)
 def test_history_expr_empty_race_codes_raises(builder: Callable[[list[str]], str]) -> None:
     """レースコードが空の場合は ValueError になる。"""
