@@ -230,6 +230,14 @@ def test_build_trend_sections_with_race_day_weights_adds_no_note() -> None:
     assert weight_call[0][3] == {1: "480", 3: "502"}
 
 
+def test_build_trend_sections_without_marked_columns_has_no_comparison_section() -> None:
+    """比較表が作られなかった場合は、比較表の画像もセクションも付けない。"""
+    result, _, mock_table = _build_with_entries({"基本項目": ["枠順"]}, comparison_exists=False)
+    mock_table.assert_called_once()
+    assert result.images == {}
+    assert "比較表" not in result.sections
+
+
 # 準正常系
 def test_build_trend_sections_with_invalid_table_config_raises() -> None:
     """table.yml に trends.yml に無いカテゴリがある場合は ValueError になる。"""
@@ -306,11 +314,3 @@ def _build_with_entry_weights(weights: EntryWeights) -> tuple[MagicMock, MagicMo
             ),
         )
     return mock_resolve, mock_item
-
-
-def test_build_trend_sections_without_marked_columns_has_no_comparison_section() -> None:
-    """比較表が作られなかった場合は、比較表の画像もセクションも付けない。"""
-    result, _, mock_table = _build_with_entries({"基本項目": ["枠順"]}, comparison_exists=False)
-    mock_table.assert_called_once()
-    assert result.images == {}
-    assert "比較表" not in result.sections
