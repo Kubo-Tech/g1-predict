@@ -89,6 +89,7 @@ _HIST_FILTER_FIELD_MAP: dict[str, str] = {
     "グレードコード": "grade_code",
     "競馬場コード": "keibajo_code",
     "距離": "kyori_int",
+    "芝ダ": "shiba_da",
     "脚質判定コード": "kyakushitsu_hantei",
     "特別競走番号": "tokubetsu_kyoso_bango",
 }
