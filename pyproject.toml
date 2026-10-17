@@ -24,11 +24,12 @@ classifiers = [
 ]
 
 dependencies = [
-    # keiba-data-interface / mykeibadb-python はPyPIに無いkeiba-domainを要求するため、
+    # keiba-data-interface / mykeibadb-python / keiba-scraping はPyPIに無いkeiba-domainを要求するため、
     # keiba-domain自身もgit参照で明示する。書かないと依存解決に失敗する。
     "keiba-domain @ git+https://github.com/KeibaAI-developer/keiba-domain.git",
     "keiba-data-interface @ git+https://github.com/KeibaAI-developer/keiba-data-interface.git",
     "mykeibadb-python @ git+https://github.com/KeibaAI-developer/mykeibadb-python.git@develop",
+    "keiba-scraping @ git+https://github.com/KeibaAI-developer/keiba-scraping.git@develop",
     "race-data @ git+https://github.com/KeibaAI-developer/race-data.git",
     # race-dynamics-evaluationが要求するが、PyPIに無いため明示する。
     "feature-value-utils @ git+https://github.com/KeibaAI-developer/feature-value-utils.git",
