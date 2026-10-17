@@ -4,7 +4,7 @@
         - {labels: [差し], color: yellow}
   - 前走4角通過順位:
       color_rules:
-        - {labels: [6-9番手, 10番手以下], color: yellow}
+        - {labels: [5-7番手, 8-10番手, 11番手以下], color: yellow}
   - 前走上がり3F順位:
       color_rules:
         - {labels: [1位, 2位], color: yellow}
@@ -14,6 +14,9 @@
   - 馬体重:
       color_rules:
         - {labels: [500-519kg, 520kg以上], color: gray}
+  - 輸送:
+      color_rules:
+        - {labels: [初輸送], color: gray}
 前走:
   - 前走レース:
       color_rules:
@@ -26,15 +29,13 @@
   - 勝利数:
       color_rules:
         - {labels: [3勝以上], color: yellow}
-        - {labels: [1勝], color: gray}
+        - {labels: [0勝, 1勝], color: gray}
   - 重賞勝利数:
       color_rules:
         - {labels: [2勝以上], color: yellow}
-世代戦:
-  - デビュー競馬場:
+  - 芝2000m以上経験:
       color_rules:
-        - {labels: [京都], color: yellow}
-        - {labels: [中山], color: gray}
+        - {labels: [なし], color: gray}
 同年/前年レース実績:
   - 桜花賞着順:
       color_rules:
@@ -42,6 +43,17 @@
   - オークス着順:
       color_rules:
         - {labels: [1着, 2着, 3着, 4着, 5着], color: yellow}
+世代戦:
+  - デビュー競馬場:
+      color_rules:
+        - {labels: [京都], color: yellow}
+        - {labels: [中山], color: gray}
+  - キャリア:
+      color_rules:
+        - {labels: [2戦以下, 3戦], color: gray}
+  - 誕生月:
+      color_rules:
+        - {labels: [1月, 2月], color: yellow}
 馬以外の属性:
   - 騎手:
       color_rules:
