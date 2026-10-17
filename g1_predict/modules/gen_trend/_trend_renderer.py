@@ -1,5 +1,7 @@
 """傾向データから Markdown セクションを生成するモジュール。"""
 
+import html
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from keiba_domain import baba_from_code, keibajo_from_code
@@ -13,6 +15,7 @@ from ._trend_condition import apply_trend_condition
 from ._trend_entries import find_entry_rows
 from ._trend_models import OTHER_LABEL, RowStats, TrendCondition
 from ._trend_stats import compute_stats, get_juusho_race_names
+from ._trend_table_config import FILL_COLORS, TableColumn
 
 # 行のラベルがレース名になる source.type（表では短い表記にする）
 _RACE_NAME_SOURCE_TYPE = "prev_race_name"
@@ -21,7 +24,7 @@ COMPARISON_HEADING = "比較表"
 _COMPARISON_DESCRIPTION = (
     "複勝率に差が出る項目を並べて比較した表。  \n"
     "黄色はプラスデータ、灰色はマイナスデータ。  \n"
-    "「好データ」はプラスデータの該当数を数えたもの。"
+    "「＋データ」はプラスデータ、「－データ」はマイナスデータの該当数を数えたもの。"
 )
 
 
@@ -211,12 +214,39 @@ def is_entry_table_informative(table: ItemTable, horse_count: int) -> bool:
     return not (len(hit_rows) == 1 and len(table.horse_nums(hit_rows[0])) == horse_count)
 
 
+def find_row_colors(column: TableColumn, table: ItemTable) -> dict[str, str]:
+    """記事の表の行ごとに、色付けのルールで塗る色を返す。
+
+    行ごとにルールを先頭から評価し、最初に当てはまったルールの色にする。
+    行の名前のルールは行の表示名で、指標のルールは行の集計値で判定する。
+    「その他」行もほかの行と同じように判定する。
+    「前走クラス着順」の列では、表示名の前にクラスの略称を付けて「G1 1着」のように判定する。
+
+    Args:
+        column (TableColumn): 項目の列。色付けのルールを持つ。
+        table (ItemTable): 項目の表。
+
+    Returns:
+        dict[str, str]: 行のラベル -> 塗りの色（16進数のカラーコード）。塗らない行は含まない。
+    """
+    prefix = f"{table.item.class_label} " if column.parts else ""
+    colors: dict[str, str] = {}
+    for label in table.rows:
+        name = prefix + table.display_name(label)
+        for rule in column.color_rules:
+            if rule.matches(name, table.stats[label]):
+                colors[label] = FILL_COLORS[rule.color]
+                break
+    return colors
+
+
 def build_category_section(
     category: TrendCategory,
     context: TrendContext,
     tables: list[ItemTable],
     with_entries: bool = False,
     horse_count: int = 0,
+    table_columns: dict[str, TableColumn] | None = None,
 ) -> str:
     """1カテゴリ分の傾向セクション文字列を生成する。
 
@@ -224,6 +254,8 @@ def build_category_section(
     with_entries が True の場合は、各テーブルの右端に今回の出走馬のうち行に当たる馬の馬番を
     書く「該当馬」列を付ける。ただし、今走の結果で値が決まる項目と hide_entry_column の項目には
     付けない。
+    table_columns に項目の列がある表は、色付けのルールに当てはまる行を塗る。塗る行が1つ以上ある表は
+    HTML の表で、無い表は Markdown の表で出力する。
 
     Args:
         category (TrendCategory): 出力するカテゴリ。
@@ -231,18 +263,24 @@ def build_category_section(
         tables (list[ItemTable]): カテゴリの各項目の表（表を出さない項目は含めない）。
         with_entries (bool): 該当馬列を付けるか。
         horse_count (int): 今回の出走馬の頭数。
+        table_columns (dict[str, TableColumn] | None): 項目名 -> 色付けのルールを持つ列
+            （table.yml）。None の場合は行を塗らない。
 
     Returns:
         str: ## ヘッダーから始まる Markdown セクション文字列。
     """
     header = f"## {category.name}"
 
-    sections = [
-        _format_item_section(
-            table, with_entries and table.item.shows_entry_column, horse_count
+    columns = table_columns or {}
+    sections = []
+    for table in tables:
+        column = columns.get(table.item.name)
+        row_colors = find_row_colors(column, table) if column is not None else None
+        sections.append(
+            _format_item_section(
+                table, with_entries and table.item.shows_entry_column, horse_count, row_colors
+            )
         )
-        for table in tables
-    ]
     return header + "\n\n" + "\n\n".join(sections)
 
 
@@ -351,10 +389,16 @@ def _assign_entry_rows(
     return entry_rows
 
 
-def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int = 0) -> str:
+def _format_item_section(
+    table: ItemTable,
+    with_entries: bool,
+    horse_count: int = 0,
+    row_colors: dict[str, str] | None = None,
+) -> str:
     """1項目分の h3 テーブルセクション文字列を生成する。
 
-    各行の集計値から Markdown テーブルを生成する。
+    各行の集計値から表を生成する。row_colors に塗る行がある場合は HTML の表、無い場合は
+    Markdown の表にする。
     出走馬の全頭がいずれかの行に当たる表で、該当馬が他の行より抜けて多い行は、該当馬列に馬番を
     並べず「その他」と書く。
     項目に開催条件が注入されている場合は、表の直下に開催条件の注記を出力する。
@@ -365,9 +409,10 @@ def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int 
         table (ItemTable): 出力する項目の表。
         with_entries (bool): 該当馬列を付けるか。
         horse_count (int): 今回の出走馬の頭数。
+        row_colors (dict[str, str] | None): 行のラベル -> 塗りの色。塗る行が無い場合は None か空。
 
     Returns:
-        str: ### ヘッダーから始まる Markdown テーブル文字列。
+        str: ### ヘッダーから始まる表の文字列。
     """
     item = table.item
     # 表の1列目の見出しは column_name があればそれを使い、無ければ項目名にする
@@ -375,20 +420,40 @@ def _format_item_section(table: ItemTable, with_entries: bool, horse_count: int 
     header_cells = [column_name, "着度数", "勝率", "複率", "単回", "複回"]
     if with_entries:
         header_cells.append("該当馬")
-    lines = [
-        f"### {item.name}",
-        "",
-        "| " + " | ".join(header_cells) + " |",
-        "| " + " | ".join(["---"] * len(header_cells)) + " |",
-    ]
+    colors = row_colors or {}
+    use_html = bool(colors)
     crowded_row = _find_crowded_row(table, horse_count) if with_entries else None
+    body: list[tuple[str, str | None]] = []
     for label in table.rows:
         horses: str | None = None
         if label == crowded_row:
             horses = OTHER_LABEL
         elif with_entries:
             horses = ", ".join(str(num) for num in table.horse_nums(label))
-        lines.append(_format_table_row(table.display_name(label), table.stats[label], horses))
+        body.append((label, horses))
+
+    if use_html:
+        lines = [f"### {item.name}", "", "<table>", "<thead>"]
+        lines.append(_html_row("th", [html.escape(cell) for cell in header_cells], None))
+        lines += ["</thead>", "<tbody>"]
+        for label, horses in body:
+            cells = _row_cells(
+                html.escape(table.display_name(label)),
+                table.stats[label],
+                None if horses is None else html.escape(horses),
+                _html_bold,
+            )
+            lines.append(_html_row("td", cells, colors.get(label)))
+        lines += ["</tbody>", "</table>"]
+    else:
+        lines = [
+            f"### {item.name}",
+            "",
+            "| " + " | ".join(header_cells) + " |",
+            "| " + " | ".join(["---"] * len(header_cells)) + " |",
+        ]
+        for label, horses in body:
+            lines.append(_format_table_row(table.display_name(label), table.stats[label], horses))
 
     notes = [format_condition_note(item.condition), item.config.get("note", "")]
     for note in notes:
@@ -522,14 +587,61 @@ def _format_table_row(label: str, s: RowStats, horses: str | None = None) -> str
         str: | label | 着度数 | 勝率 | 複率 | 単回 | 複回 | 形式の文字列。
             horses がある場合は末尾に該当馬の列が付く。単回・複回は100%を超えると太字にする。
     """
-    win_str = _format_percent(s.first, s.total)
-    place_str = _format_percent(s.first + s.second + s.third, s.total)
-    tansho_str = _format_kaishuu(s.tansho_kaishuu, s.total)
-    fukusho_str = _format_kaishuu(s.fukusho_kaishuu, s.total)
-    cells = [label, _format_chakudo(s), win_str, place_str, tansho_str, fukusho_str]
+    return "| " + " | ".join(_row_cells(label, s, horses, _markdown_bold)) + " |"
+
+
+def _row_cells(
+    label: str, s: RowStats, horses: str | None, bold: Callable[[str], str]
+) -> list[str]:
+    """表の1行のセルの文字列を生成する。
+
+    Args:
+        label (str): 行ラベル（1列目に表示する文字列）。
+        s (RowStats): 行の集計値。
+        horses (str | None): 該当馬列に書く馬番。None の場合は該当馬列を付けない。
+        bold (Callable[[str], str]): 文字列を太字の記法に変換する関数。
+
+    Returns:
+        list[str]: ラベル・着度数・勝率・複率・単回・複回（・該当馬）のセル。
+    """
+    cells = [
+        label,
+        _format_chakudo(s),
+        _format_percent(s.first, s.total),
+        _format_percent(s.first + s.second + s.third, s.total),
+        _format_kaishuu(s.tansho_kaishuu, s.total, bold),
+        _format_kaishuu(s.fukusho_kaishuu, s.total, bold),
+    ]
     if horses is not None:
         cells.append(horses)
-    return "| " + " | ".join(cells) + " |"
+    return cells
+
+
+def _markdown_bold(text: str) -> str:
+    """文字列を Markdown の太字にする。"""
+    return f"**{text}**"
+
+
+def _html_bold(text: str) -> str:
+    """文字列を HTML の太字にする。"""
+    return f"<strong>{text}</strong>"
+
+
+def _html_row(tag: str, cells: list[str], color: str | None) -> str:
+    """HTML の表の1行を生成する。
+
+    塗る行は、ブログのテーマの CSS にセルの背景色を隠されないよう、すべてのセルに style を付ける。
+
+    Args:
+        tag (str): セルのタグ名（th または td）。
+        cells (list[str]): エスケープ済みのセルの文字列。
+        color (str | None): 塗りの色。塗らない場合は None。
+
+    Returns:
+        str: <tr>...</tr> の1行の文字列。
+    """
+    attr = "" if color is None else f' style="background-color:{color}"'
+    return "<tr>" + "".join(f"<{tag}{attr}>{cell}</{tag}>" for cell in cells) + "</tr>"
 
 
 def _format_chakudo(s: RowStats) -> str:
@@ -562,7 +674,9 @@ def _format_percent(count: int, total: int) -> str:
     return f"{round(count / total * 100)}%"
 
 
-def _format_kaishuu(kaishuu: float, total: int) -> str:
+def _format_kaishuu(
+    kaishuu: float, total: int, bold: Callable[[str], str] = _markdown_bold
+) -> str:
     """回収率を百分率文字列に変換する。
 
     total が 0 の場合はデータなしを示す "-" を返す。
@@ -571,11 +685,12 @@ def _format_kaishuu(kaishuu: float, total: int) -> str:
     Args:
         kaishuu (float): 回収率（%）。
         total (int): 行の頭数。
+        bold (Callable[[str], str]): 文字列を太字の記法に変換する関数。
 
     Returns:
-        str: "N%" 形式の文字列。100%を超える場合は "**N%**"、total が 0 の場合は "-"。
+        str: "N%" 形式の文字列。100%を超える場合は太字、total が 0 の場合は "-"。
     """
     if total == 0:
         return "-"
     rounded = round(kaishuu)
-    return f"**{rounded}%**" if rounded > 100 else f"{rounded}%"
+    return bold(f"{rounded}%") if rounded > 100 else f"{rounded}%"

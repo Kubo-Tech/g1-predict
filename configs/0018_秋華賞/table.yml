@@ -24,7 +24,7 @@
   - 前走クラス着順:
       color_rules:
         - {labels: [G1 1着, G1 2着, G1 3着], color: yellow}
-        - {labels: [G2 6-9着, G2 10着以下, G3 6-9着, G3 10着以下, 非重賞 1着, 非重賞 2着, 非重賞 3着, 非重賞 4着, 非重賞 5着, 非重賞 6-9着, 非重賞 10着以下], color: gray}
+        - {labels: [G2 10着以下, G3 6-9着, G3 10着以下, 非重賞 2着, 非重賞 3着, 非重賞 4着, 非重賞 5着, 非重賞 6-9着, 非重賞 10着以下], color: gray}
 実績:
   - 勝利数:
       color_rules:
@@ -39,6 +39,9 @@
   - 右回り好走実績:
       color_rules:
         - {labels: [0回, 1回], color: gray}
+  - 上がり最速経験回数:
+      color_rules:
+        - {labels: [3回, 4回以上], color: yellow}
 同年/前年レース実績:
   - 桜花賞着順:
       color_rules:
@@ -60,6 +63,9 @@
   - スタンド前発走経験:
       color_rules:
         - {labels: [なし], color: gray}
+  - クラシック出走:
+      color_rules:
+        - {labels: [出走], color: yellow}
 馬以外の属性:
   - 騎手:
       color_rules:
@@ -74,3 +80,4 @@
   - 種牡馬:
       color_rules:
         - {metric: 3着内数, op: ">=", value: 2, color: yellow}
+        - {labels: [キズナ], color: gray}

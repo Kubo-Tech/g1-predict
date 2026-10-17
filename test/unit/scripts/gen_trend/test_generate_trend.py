@@ -281,8 +281,8 @@ def config_dir(tmp_path: Path) -> Path:
     return race_dir
 
 
-def test_build_trend_sections_without_entries_does_not_read_table_yml(config_dir: Path) -> None:
-    """--with-entries が無い場合は、table.yml が無くても生成できる。
+def test_build_trend_sections_without_entries_does_not_require_table_yml(config_dir: Path) -> None:
+    """--with-entries が無い場合は、table.yml が無くても生成でき、table.yml を渡さない。
 
     Args:
         config_dir (Path): レースの設定ファイルのディレクトリ。
@@ -296,10 +296,35 @@ def test_build_trend_sections_without_entries_does_not_read_table_yml(config_dir
         )
     assert result is expected
     assert mock_build.call_args[0][4] is None
+    assert mock_build.call_args[0][5] is None
+
+
+def test_build_trend_sections_without_entries_reads_table_yml_if_exists(
+    config_dir: Path,
+) -> None:
+    """--with-entries が無い場合でも、table.yml があれば読み込んで渡す。
+
+    Args:
+        config_dir (Path): レースの設定ファイルのディレクトリ。
+    """
+    (config_dir / "table.yml").write_text("基本項目:\n  - 人気\n", encoding="utf-8")
+    with (
+        patch("scripts.gen_trend.check_race_entries") as mock_check,
+        patch(
+            "scripts.gen_trend.build_trend_sections",
+            return_value=TrendSections(scope_note="", sections={}),
+        ) as mock_build,
+    ):
+        _build_trend_sections(
+            "天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", False
+        )
+    mock_check.assert_not_called()
+    assert mock_build.call_args[0][4] is None
+    assert mock_build.call_args[0][5] == {"基本項目": ["人気"]}
 
 
 def test_build_trend_sections_with_entries_reads_table_yml(config_dir: Path) -> None:
-    """--with-entries の場合は、table.yml を読み込んで出走馬の設定を渡す。
+    """--with-entries の場合は、table.yml を読み込み、出走馬の設定とともに渡す。
 
     調教後馬体重がまだ発表されていない場合は、調教後馬体重を None にする。
 
@@ -321,9 +346,8 @@ def test_build_trend_sections_with_entries_reads_table_yml(config_dir: Path) -> 
         )
         _build_trend_sections("天皇賞春", str(config_dir), pd.DataFrame(), "2026013105010110", True)
     mock_check.assert_called_once_with("2026013105010110")
-    assert mock_build.call_args[0][4] == EntrySettings(
-        race_code="2026013105010110", table_config={"基本項目": ["人気"]}
-    )
+    assert mock_build.call_args[0][4] == EntrySettings(race_code="2026013105010110")
+    assert mock_build.call_args[0][5] == {"基本項目": ["人気"]}
 
 
 def test_build_trend_sections_with_entries_without_table_yml_raises(config_dir: Path) -> None:
@@ -399,9 +423,7 @@ def test_build_trend_sections_with_chokyo_bataiju_passes_weights(config_dir: Pat
         _build_trend_sections("天皇賞春", str(config_dir), pd.DataFrame(), "2026050308030811", True)
     mock_scraper.assert_called_once_with("tenno_haru")
     assert mock_build.call_args[0][4] == EntrySettings(
-        race_code="2026050308030811",
-        table_config={"基本項目": ["人気"]},
-        chokyo_bataiju={"A": 480, "B": 502},
+        race_code="2026050308030811", chokyo_bataiju={"A": 480, "B": 502}
     )
 
 

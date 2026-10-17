@@ -25,6 +25,7 @@ from ._trend_sql_exprs import (
     BIRTH_MONTH_EXPR,
     CORNER4_JUNI_EXPR,
     HORSE_WEIGHT_EXPR,
+    build_agari_3f_top_n_count_expr,
     build_debut_month_expr,
     build_good_baba_top3_count_expr,
     build_prev_corner4_juni_expr,
@@ -74,6 +75,9 @@ _HISTORY_EXPR_BUILDERS: dict[str, Callable[[list[str]], str]] = {
     "soft_baba_top3_count": build_soft_baba_top3_count_expr,
     "debut_month": build_debut_month_expr,
 }
+
+# 集計対象レースの出走馬の過去走から値を求めるが、source の引数も取る source.type
+_ARGUMENT_HISTORY_TYPES = frozenset({"prev_race_finish_by_class", "agari_3f_top_n_count"})
 
 # prev_race_grade / prev_race_finish / prev_race_finish_by_grade -> prev_race_col の column名
 _PREV_RACE_COL_TYPES: dict[str, str] = {
@@ -307,12 +311,13 @@ def _build_race_col_expr(
         str | None: SQL 式。race_col で集計しない source.type の場合は None。
 
     Raises:
-        ValueError: prev_race_finish_by_class に race_class が無い場合。
+        ValueError: prev_race_finish_by_class に race_class が無い場合、
+            agari_3f_top_n_count に top_n が無い場合。
     """
     src_type = src.get("type", "")
     if src_type in _RACE_COL_MAP:
         return _RACE_COL_MAP[src_type]
-    if src_type not in _HISTORY_EXPR_BUILDERS and src_type != "prev_race_finish_by_class":
+    if src_type not in _HISTORY_EXPR_BUILDERS and src_type not in _ARGUMENT_HISTORY_TYPES:
         return None
 
     race_codes = race_codes_loader()
@@ -320,6 +325,10 @@ def _build_race_col_expr(
         if "race_class" not in src:
             raise ValueError("prev_race_finish_by_class には race_class が必要です。")
         return build_prev_race_finish_by_class_expr(race_codes, src["race_class"])
+    if src_type == "agari_3f_top_n_count":
+        if "top_n" not in src:
+            raise ValueError("agari_3f_top_n_count には top_n が必要です。")
+        return build_agari_3f_top_n_count_expr(race_codes, src["top_n"])
     return _HISTORY_EXPR_BUILDERS[src_type](race_codes)
 
 

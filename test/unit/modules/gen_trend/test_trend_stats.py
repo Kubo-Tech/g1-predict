@@ -812,6 +812,7 @@ def _make_past_races_manager(race_codes: list[str]) -> MagicMock:
         {"type": "good_baba_top3_count"},
         {"type": "soft_baba_top3_count"},
         {"type": "debut_month"},
+        {"type": "agari_3f_top_n_count", "top_n": 1},
     ],
 )
 def test_compute_stats_history_expr_embeds_race_codes_in_race_col(src: dict[str, Any]) -> None:
@@ -842,6 +843,18 @@ def test_compute_stats_prev_race_finish_by_class_without_race_class_raises() -> 
         "rows": {"type": "dynamic"},
     }
     with pytest.raises(ValueError, match="race_class"):
+        compute_stats(
+            metric_cfg, _make_past_races_manager(["2025092806040911"]), _make_condition(), []
+        )
+
+
+def test_compute_stats_agari_3f_top_n_count_without_top_n_raises() -> None:
+    """agari_3f_top_n_count に top_n が無い場合は ValueError になる。"""
+    metric_cfg = {
+        "source": {"type": "agari_3f_top_n_count"},
+        "rows": {"type": "fixed", "items": [{"label": "0回", "op": "==", "value": 0}]},
+    }
+    with pytest.raises(ValueError, match="top_n"):
         compute_stats(
             metric_cfg, _make_past_races_manager(["2025092806040911"]), _make_condition(), []
         )

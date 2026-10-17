@@ -82,7 +82,7 @@ g1-predict/
 │   ├── trends/                     # 傾向表の項目の共有定義（カテゴリごとに1ファイル）
 │   └── {レース名}/
 │       ├── trends.yml              # 傾向表に使う項目名と開催条件
-│       └── table.yml               # 出走馬の比較表に載せる項目と色付けの基準
+│       └── table.yml               # 記事の表の色付けと出走馬の比較表に載せる項目の基準
 ├── g1_predict/modules/
 │   ├── constants.py                # 複数機能で共有する定数（トラックコード → 芝/ダ、グレード表示）
 │   ├── gen_trend/                  # 傾向分析の生成ロジック
@@ -92,9 +92,9 @@ g1-predict/
 │   │   ├── _trend_sql_exprs.py     # 過去走などから値を求める集計項目の SQL 式
 │   │   ├── _trend_stats.py         # source.type → GroupBy と行の割り当て（集計と出走馬の判定で共有）、集計
 │   │   ├── _trend_entries.py       # 今回の出走馬が各項目のどの行に当たるか
-│   │   ├── _trend_table_config.py  # table.yml の読み込みと検証
+│   │   ├── _trend_table_config.py  # table.yml の読み込みと検証、色の名前 -> 塗りの色
 │   │   ├── _trend_table_image.py   # 出走馬の比較表の画像
-│   │   ├── _trend_renderer.py      # 集計結果 → Markdown テーブル、該当馬列、注記
+│   │   ├── _trend_renderer.py      # 集計結果 → Markdown / HTML テーブル、行の色、該当馬列、注記
 │   │   └── trend_section.py        # 傾向セクション群の公開 API
 │   ├── gen_dynamics_history/       # 過去の展開記事の生成ロジック
 │   │   └── dynamics_history.py     # 勝ちタイム・1000m通過、推移の節と年ごとの節、画像

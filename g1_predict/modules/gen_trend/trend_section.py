@@ -49,13 +49,11 @@ class EntrySettings:
 
     Attributes:
         race_code (str): 今回のレースの16桁のレースコード。
-        table_config (dict[str, Any]): 比較表の定義（table.yml）の内容。
         chokyo_bataiju (dict[str, int] | None): 馬名 -> 調教後馬体重（kg）。発表前で
             手に入らない場合は None。
     """
 
     race_code: str
-    table_config: dict[str, Any]
     chokyo_bataiju: dict[str, int] | None = None
 
 
@@ -81,11 +79,15 @@ def build_trend_sections(
     trends_config: dict[str, Any],
     trends_dir: str,
     entries: EntrySettings | None = None,
+    table_config: dict[str, Any] | None = None,
 ) -> TrendSections:
     """傾向セクション群を生成する。
 
+    table_config を指定した場合は、table.yml の色付けのルールに当てはまる行を塗る。
+    塗る行がある表は HTML の表で出力する。
     entries を指定した場合は、各表に今回の出走馬が当たる行を「該当馬」列として書き、
     最後に table.yml の項目を並べた出走馬の比較表の画像を載せるセクションを足す。
+    entries を指定する場合は table_config も指定する。
     比較表には黄色にも灰色にも塗ったセルが無い項目の列を載せず、項目の列が1つも残らない場合は
     比較表の画像もセクションも足さない。
     馬体重の項目の出走馬は、当日の馬体重・調教後馬体重・前走の馬体重のうち手に入るもので判定し、
@@ -100,12 +102,15 @@ def build_trend_sections(
         trends_dir (str): 項目の共有定義のディレクトリ（`configs/trends`）。
         entries (EntrySettings | None): 出走馬の確定後に載せる情報の設定。
             None の場合は、該当馬列も比較表も載せない。
+        table_config (dict[str, Any] | None): 色付けと比較表の定義（table.yml）の内容。
+            None の場合は、行を塗らない。
 
     Returns:
         TrendSections: 集計対象の注記と、見出し -> Markdownセクション文字列、比較表の画像。
 
     Raises:
-        ValueError: 調教後馬体重に載っていない出走馬がいる場合。
+        ValueError: 調教後馬体重に載っていない出走馬がいる場合、
+            entries を指定して table_config を指定しなかった場合。
     """
     catalog = load_trend_catalog(trends_dir)
     context = build_race_context(race_info)
@@ -114,9 +119,12 @@ def build_trend_sections(
     entry_race_code: str | None = None
     horses = pd.DataFrame()
     table_columns: dict[str, list[TableColumn]] = {}
+    if table_config is not None:
+        table_columns = parse_table_config(table_config, categories)
     if entries is not None:
+        if table_config is None:
+            raise ValueError("entries を指定する場合は table_config も指定してください。")
         entry_race_code = entries.race_code
-        table_columns = parse_table_config(entries.table_config, categories)
         horses = fetch_entry_horses(context.manager, entries.race_code)
     weights: EntryWeights | None = None
     if entries is not None:
@@ -138,7 +146,12 @@ def build_trend_sections(
         ]
         category_tables[category.name] = {table.item.name: table for table in tables}
         sections[category.name] = build_category_section(
-            category, context, tables, entries is not None, horse_count=len(horses)
+            category,
+            context,
+            tables,
+            entries is not None,
+            horse_count=len(horses),
+            table_columns=_item_columns(table_columns.get(category.name, [])),
         )
 
     images: dict[str, Figure] = {}
@@ -152,7 +165,7 @@ def build_trend_sections(
             ]
             if tables:
                 shown.append((column, tables))
-    comparison_table = make_comparison_table(horses, shown) if shown else None
+    comparison_table = make_comparison_table(horses, shown) if entries and shown else None
     if comparison_table is not None:
         images[_TABLE_IMAGE_PATH] = comparison_table
         sections[COMPARISON_HEADING] = build_comparison_section(_TABLE_IMAGE_PATH)
@@ -161,6 +174,24 @@ def build_trend_sections(
         sections=sections,
         images=images,
     )
+
+
+def _item_columns(columns: list[TableColumn]) -> dict[str, TableColumn]:
+    """カテゴリの項目名から、その項目の表に適用する列を引く対応を作る。
+
+    「前走クラス着順」の列は、まとめた各項目に同じ列を対応させる。
+
+    Args:
+        columns (list[TableColumn]): カテゴリの table.yml の列。
+
+    Returns:
+        dict[str, TableColumn]: 項目名 -> 列。
+    """
+    item_columns: dict[str, TableColumn] = {}
+    for column in columns:
+        for name in column.source_names:
+            item_columns[name] = column
+    return item_columns
 
 
 def _apply_entry_weights(

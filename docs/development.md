@@ -64,7 +64,7 @@ test/unit/
 2. 済まない場合、追加する `source.type` の仕様（入力・出力・エラー時の挙動・行ラベル）を決める。
 3. 実装する。
    - 傾向表（trends）: `g1_predict/modules/gen_trend/_trend_stats.py` の `compute_stats()` に分岐を追加する。過去走から値を求める `race_col` 系の SQL 式は `_trend_sql_exprs.py` に置く。項目の共有定義は `configs/trends/`、行の出し方を変える場合は `_trend_renderer.py`、集計範囲を変える場合は `utils/race_history.py`、開催条件の絞り込みを変える場合は `_trend_condition.py`。
-   - 出走馬の判定は `build_item_grouping()` を共有するので追加の実装は要らない。比較表の色付けのルールを変える場合は `_trend_table_config.py`、画像の見た目を変える場合は `_trend_table_image.py`。
+   - 出走馬の判定は `build_item_grouping()` を共有するので追加の実装は要らない。記事の表と比較表の色付けのルールを変える場合は `_trend_table_config.py`、記事の表の行の色の決め方と表の出力形式を変える場合は `_trend_renderer.py`、画像の見た目を変える場合は `_trend_table_image.py`。
 4. 単体テストを追加する。
 5. `configs/{特別競走番号}_{レース名}/` の YAML を更新し、実データで生成して表が欠損なく出ることを確認する。**動作確認で生成した記事や画像はコミットしない**。
 6. [config-reference.md](config-reference.md) の一覧に追記する。
