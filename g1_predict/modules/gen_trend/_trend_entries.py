@@ -47,10 +47,12 @@ def find_entry_rows(
     item: TrendItem,
     context: TrendContext,
     race_code: str,
+    entry_group_values: dict[int, str] | None = None,
 ) -> dict[int, list[str]]:
     """今回の出走馬が、項目の集計と同じ割り当てでどの行に当たるかを返す。
 
     集計と同じ GroupBy で出走馬のグループの値を求め、集計と同じ割り当てで行に変換する。
+    entry_group_values を指定した場合は、DB の値の代わりにその値を行に割り当てる。
     項目に注入された開催条件は集計対象を絞るためのものなので、判定には使わない。
     今走の結果で値が決まる項目は、レース前に値が無いため空を返す。
 
@@ -58,6 +60,8 @@ def find_entry_rows(
         item (TrendItem): 判定する項目。
         context (TrendContext): 対象レースと集計対象の情報。
         race_code (str): 今回のレースの16桁のレースコード。
+        entry_group_values (dict[int, str] | None): 馬番 -> 出走馬のグループの値。
+            DB に無い値（調教後馬体重など）で判定する場合に指定する。
 
     Returns:
         dict[int, list[str]]: 馬番 -> 当たる行のラベル。値が求まらない馬は含まない。
@@ -71,7 +75,11 @@ def find_entry_rows(
     grouping = build_item_grouping(
         item.config, context.manager, context.condition, lambda: [race_code]
     )
-    groups = get_race_entry_groups(context.manager, race_code, grouping.group_by)
+    groups: dict[int, str | None] = (
+        dict(entry_group_values)
+        if entry_group_values is not None
+        else get_race_entry_groups(context.manager, race_code, grouping.group_by)
+    )
     return {
         horse_num: grouping.assign_rows(group)
         for horse_num, group in groups.items()
