@@ -2,7 +2,7 @@
 
 コマンド:
 cd path/to/g1-predict
-python -m scripts.gen_trend --race-code <16桁 race_code> [--with-entries]
+python -m scripts.gen_trend --race-code <16桁 race_code> [--with-entries [--chokyo-bataiju]]
 python -m scripts.gen_trend --race-code <16桁 race_code> --tokubetsu-kyoso-bango <4桁>
 """
 
@@ -12,6 +12,7 @@ import os
 import pandas as pd
 import yaml
 from dotenv import find_dotenv, load_dotenv
+from scraping import JraChokyoBataijuScraper
 
 from g1_predict.modules.gen_trend.trend_section import (
     EntrySettings,
@@ -36,11 +37,13 @@ def generate_trend(
     race_code: str,
     with_entries: bool = False,
     tokubetsu_kyoso_bango: str | None = None,
+    chokyo_bataiju: bool = False,
 ) -> None:
     """指定レースの傾向分析記事を生成する。
 
     with_entries が True の場合は、出走馬が当たる行を書いた「該当馬」列と、
     出走馬の比較表の画像を載せる。
+    chokyo_bataiju が True の場合は、馬体重の項目の出走馬を、JRA が発表する調教後馬体重で判定する。
     tokubetsu_kyoso_bango を指定した場合は、今回のレースを DB から引かず、同じ特別競走番号の
     直近の開催から競走名・距離・トラックを、race_code から開催年・開催月日・競馬場を取る。
 
@@ -48,14 +51,18 @@ def generate_trend(
         race_code (str): 16桁 JRA-VAN 形式の race_code。
         with_entries (bool): 出走馬の確定後の情報を載せるか。
         tokubetsu_kyoso_bango (str | None): 今回のレースが DB に入る前に生成する場合の特別競走番号。
+        chokyo_bataiju (bool): 馬体重の項目の出走馬を調教後馬体重で判定するか。
 
     Raises:
         ValueError: with_entries と tokubetsu_kyoso_bango を両方指定した場合。
+            chokyo_bataiju を with_entries なしで指定した場合。
             tokubetsu_kyoso_bango を指定せず、今回のレースが DB に無い場合。
     """
     validate_race_code(race_code)
     if tokubetsu_kyoso_bango is not None and with_entries:
         raise ValueError("--with-entries と --tokubetsu-kyoso-bango は同時に指定できません")
+    if chokyo_bataiju and not with_entries:
+        raise ValueError("--chokyo-bataiju は --with-entries と一緒に指定してください")
     race_shosai = load_race_info(race_code, tokubetsu_kyoso_bango)
     race_name = str(race_shosai["kyosomei_hondai"].iloc[0]).strip()
     race_label = to_race_label(race_name)
@@ -64,7 +71,7 @@ def generate_trend(
     config_dir = os.path.join(_CONFIGS_DIR, to_config_dir_name(tokubetsu, race_label))
 
     trend_sections = _build_trend_sections(
-        race_label, config_dir, race_shosai, race_code, with_entries
+        race_label, config_dir, race_shosai, race_code, with_entries, chokyo_bataiju
     )
     content = _render_trend_content(race_label, year, trend_sections)
 
@@ -90,8 +97,15 @@ def main() -> None:
         "--tokubetsu-kyoso-bango",
         help="今回のレースが DB に入る前に生成する場合の特別競走番号（4桁）",
     )
+    parser.add_argument(
+        "--chokyo-bataiju",
+        action="store_true",
+        help="馬体重の項目の出走馬を、JRA が発表する調教後馬体重で判定する",
+    )
     args = parser.parse_args()
-    generate_trend(args.race_code, args.with_entries, args.tokubetsu_kyoso_bango)
+    generate_trend(
+        args.race_code, args.with_entries, args.tokubetsu_kyoso_bango, args.chokyo_bataiju
+    )
 
 
 def _build_trend_sections(
@@ -100,15 +114,17 @@ def _build_trend_sections(
     race_info: pd.DataFrame,
     race_code: str,
     with_entries: bool,
+    chokyo_bataiju: bool = False,
 ) -> TrendSections:
     """傾向セクション群を生成する。
 
     Args:
         race_label (str): 記事に出力するレース名。
-        config_dir (str): レースの trends.yml・table.yml を置くディレクトリのパス。
+        config_dir (str): レースの trends.yml・table.yml・race.yml を置くディレクトリのパス。
         race_info (pd.DataFrame): レース基本情報DataFrame。
         race_code (str): 16桁 JRA-VAN 形式の race_code。
         with_entries (bool): 出走馬の確定後の情報を載せるか。
+        chokyo_bataiju (bool): 馬体重の項目の出走馬を調教後馬体重で判定するか。
 
     Returns:
         TrendSections: 集計対象の注記と、カテゴリ名 -> Markdownセクション文字列、比較表の画像。
@@ -116,15 +132,21 @@ def _build_trend_sections(
 
     Raises:
         FileNotFoundError: with_entries が True で table.yml が無い場合。
+            chokyo_bataiju が True で race.yml が無い場合。
         MykeibaDBError: with_entries が True で出走馬が DB に無い場合。
+        ScrapingError: chokyo_bataiju が True で調教後馬体重を取得できない場合。
     """
     # 出走馬の確定後の情報に必要な table.yml と出走馬は、trends.yml の有無によらず先に確かめる
     entries: EntrySettings | None = None
     if with_entries:
         table_path = os.path.join(config_dir, "table.yml")
         with open(table_path, encoding="utf-8") as f:
-            entries = EntrySettings(race_code=race_code, table_config=yaml.safe_load(f))
+            table_config = yaml.safe_load(f)
         check_race_entries(race_code)
+        weights = _fetch_chokyo_bataiju(config_dir) if chokyo_bataiju else None
+        entries = EntrySettings(
+            race_code=race_code, table_config=table_config, chokyo_bataiju=weights
+        )
     config_path = os.path.join(config_dir, "trends.yml")
     if not os.path.isfile(config_path):
         return TrendSections(scope_note="", sections={})
@@ -133,6 +155,25 @@ def _build_trend_sections(
     if not trends_config:
         return TrendSections(scope_note="", sections={})
     return build_trend_sections(race_info, race_label, trends_config, _TRENDS_DIR, entries)
+
+
+def _fetch_chokyo_bataiju(config_dir: str) -> dict[str, int]:
+    """race.yml の G1 特設ページ名から、出走馬の調教後馬体重を取得する。
+
+    Args:
+        config_dir (str): レースの race.yml を置くディレクトリのパス。
+
+    Returns:
+        dict[str, int]: 馬名 -> 調教後馬体重（kg）。
+
+    Raises:
+        FileNotFoundError: race.yml が無い場合。
+        ScrapingError: 調教後馬体重を取得できない場合。
+    """
+    with open(os.path.join(config_dir, "race.yml"), encoding="utf-8") as f:
+        race_config = yaml.safe_load(f)
+    weights = JraChokyoBataijuScraper(race_config["jra_g1_page"]).get_chokyo_bataiju()
+    return dict(zip(weights["馬名"], weights["馬体重"].astype(int), strict=True))
 
 
 def _render_trend_content(

@@ -7,7 +7,8 @@
 ```
 configs/{特別競走番号}_{レース名}/
 ├── trends.yml   # gen_trend が使う項目名と開催条件（省略可。無ければ見出しだけの記事になる）
-└── table.yml    # gen_trend の --with-entries が使う比較表の定義（--with-entries を使うなら必須）
+├── table.yml    # gen_trend の --with-entries が使う比較表の定義（--with-entries を使うなら必須）
+└── race.yml     # gen_trend の --chokyo-bataiju が使う JRA の G1 特設ページ名（--chokyo-bataiju を使うなら必須）
 ```
 
 - ディレクトリ名は、4桁の特別競走番号とレース名を `_` でつないだもの（例: `configs/0009_宝塚記念/`）。G1 の特別競走番号は [scripts.md](scripts.md) の表にある。スクリプトはレースコードから引いた特別競走番号とレース名でディレクトリを探す（`--tokubetsu-kyoso-bango` を指定した場合はその番号）。
@@ -345,7 +346,7 @@ display_map:
 - `dynamic` の項目（前走レース・騎手・生産者・種牡馬など）で、表に出ている行のどれにも当たらない馬は「その他」行に入る。
 - `boolean_multi`（父実績）は、出走馬の父がその行の条件を満たす種牡馬なら当たる。1頭が複数の行に当たることがある。
 - 値が求まらない馬はどの行にも入らない。
-- 今走の結果で決まる項目（脚質・4角通過順位・上がり3F順位）はレース前に値が無いため、該当馬は求めない。馬体重のように当日に決まる値は、DB に入る前は空になる。
+- 今走の結果で決まる項目（脚質・4角通過順位・上がり3F順位）はレース前に値が無いため、該当馬は求めない。馬体重のように当日に決まる値は、DB に入る前は空になる。馬体重は `--chokyo-bataiju` を付けると、JRA が発表する調教後馬体重で判定し、表の下に「※調教後馬体重」と注記する（[race.yml](#raceyml--jra-の-g1-特設ページ)）。
 - 項目に開催条件を注入していても、出走馬の判定には条件を使わない。条件は過去の集計対象を絞るためのもの。
 
 ## color_rules — セルの色付け
@@ -362,6 +363,20 @@ display_map:
 - `min_total` は行の頭数の下限（1以上の整数）。頭数が少なく率が当てにならない行を塗らないために使う（例: `{metric: 複勝率, op: ">=", value: 30, min_total: 10, color: yellow}` は、頭数10頭以上で複勝率30%以上の行だけを塗る）。
 - 使える `color`: `green` / `yellow` / `blue` / `red` / `orange` / `gray`
 - 複数の行に当たる馬は、当たった行のうち先にルールに当てはまった行の色で塗る。
+
+---
+
+# race.yml — JRA の G1 特設ページ
+
+`gen_trend` の `--chokyo-bataiju` が、調教後馬体重を取得する JRA の G1 特設ページを指定する。
+
+```yaml
+jra_g1_page: shuka
+```
+
+- `jra_g1_page` は G1 特設ページの URL `https://www.jra.go.jp/keiba/g1/{jra_g1_page}/` の部分（秋華賞なら `shuka`）。
+- 調教後馬体重は、レース週の木曜17時以降に発表される。keiba-scraping の `JraChokyoBataijuScraper` が、特設ページの「調教後馬体重」ボタンのリンク先のニュースから取得する。
+- 発表前、または特設ページの公開前は keiba-scraping の例外（`ChokyoBataijuUnavailableError` / `PageNotFoundError`）で停止する。出走馬のうち調教後馬体重に載っていない馬がいる場合は `ValueError` で停止する。
 
 ---
 

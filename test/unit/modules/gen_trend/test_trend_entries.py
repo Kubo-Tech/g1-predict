@@ -108,6 +108,26 @@ def test_find_entry_rows_excludes_horses_without_value() -> None:
     assert _find(item, {1: "逃げ", 2: None}) == {1: ["逃げ"]}
 
 
+def test_find_entry_rows_with_group_values_uses_them_instead_of_db() -> None:
+    """出走馬のグループの値を渡した場合は、DB の値を引かずにその値を行に割り当てる。"""
+    item = _make_item(
+        {
+            "source": {"type": "horse_weight"},
+            "rows": {
+                "type": "fixed",
+                "items": [
+                    {"label": "479kg以下", "op": "<=", "value": 479},
+                    {"label": "480kg以上", "op": ">=", "value": 480},
+                ],
+            },
+        }
+    )
+    with patch(f"{_ENTRIES}.get_race_entry_groups") as mock_groups:
+        rows = find_entry_rows(item, _make_context(), _RACE_CODE, {1: "478", 2: "480"})
+    mock_groups.assert_not_called()
+    assert rows == {1: ["479kg以下"], 2: ["480kg以上"]}
+
+
 # --- find_entry_rows: dynamic ---
 
 

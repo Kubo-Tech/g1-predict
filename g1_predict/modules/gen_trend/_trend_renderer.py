@@ -91,6 +91,7 @@ def build_item_table(
     item: TrendItem,
     context: TrendContext,
     entry_race_code: str | None = None,
+    entry_group_values: dict[int, str] | None = None,
 ) -> ItemTable | None:
     """1項目分の表の行と集計値を求める。
 
@@ -98,7 +99,8 @@ def build_item_table(
     ある場合と、表に出ていない値の出走馬がいる場合に、最後に「その他」行を追加する。ただし、
     表に出ていない値の集計が0頭で、今回の出走馬も当たらない場合は「その他」行を追加しない。
     項目に開催条件が注入されている場合は、開催条件で絞り込んで集計する。
-    entry_race_code を指定した場合は、今回の出走馬が当たる行も求める。
+    entry_race_code を指定した場合は、今回の出走馬が当たる行も求める。entry_group_values を指定した
+    場合は、出走馬の値に DB の値の代わりにそれを使う。
     hide_empty の項目でも、今回の出走馬が当たる行は隠さない。
     hide_if_empty の項目は、集計対象にも今回の出走馬にも該当馬が1頭もいない場合は None を返す。
 
@@ -107,6 +109,8 @@ def build_item_table(
         context (TrendContext): 対象レースと集計対象の情報。
         entry_race_code (str | None): 今回のレースの16桁のレースコード。
             None の場合は出走馬の判定をしない。
+        entry_group_values (dict[int, str] | None): 馬番 -> 出走馬のグループの値。DB に無い値で
+            出走馬を判定する場合に指定する。
 
     Returns:
         ItemTable | None: 表の行と集計値。隠す指定により表を出さない場合は None。
@@ -121,7 +125,7 @@ def build_item_table(
     stats_map = compute_stats(metric_cfg, context.manager, metric_condition, filters)
     entry_groups: dict[int, list[str]] = {}
     if entry_race_code is not None:
-        entry_groups = find_entry_rows(item, context, entry_race_code)
+        entry_groups = find_entry_rows(item, context, entry_race_code, entry_group_values)
 
     source_cfg = metric_cfg.get("source", {})
     allowed_values: list[str] | None = source_cfg.get("allowed_values")

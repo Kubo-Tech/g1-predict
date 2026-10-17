@@ -1,6 +1,6 @@
 """過去の傾向記事のカテゴリセクションを生成するモジュール。"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import pandas as pd
@@ -10,7 +10,7 @@ from mykeibadb.connection import ConnectionManager
 
 from g1_predict.modules.utils.race_history import build_race_context
 
-from ._trend_catalog import build_trend_categories, load_trend_catalog
+from ._trend_catalog import TrendItem, build_trend_categories, load_trend_catalog
 from ._trend_entries import fetch_entry_horses
 from ._trend_renderer import (
     COMPARISON_HEADING,
@@ -26,6 +26,9 @@ from ._trend_table_image import make_comparison_table
 
 # 比較表の画像の、記事ディレクトリからの相対パス
 _TABLE_IMAGE_PATH = "img/trend_table/比較表.png"
+# 調教後馬体重で出走馬を判定する項目の source.type と、その表の下に書く注記
+_HORSE_WEIGHT_SOURCE_TYPE = "horse_weight"
+_CHOKYO_BATAIJU_NOTE = "※調教後馬体重"
 
 
 def check_race_entries(race_code: str) -> None:
@@ -47,10 +50,13 @@ class EntrySettings:
     Attributes:
         race_code (str): 今回のレースの16桁のレースコード。
         table_config (dict[str, Any]): 比較表の定義（table.yml）の内容。
+        chokyo_bataiju (dict[str, int] | None): 馬名 -> 調教後馬体重（kg）。指定した場合は、
+            馬体重の項目の出走馬を当日の馬体重ではなく調教後馬体重で判定する。
     """
 
     race_code: str
     table_config: dict[str, Any]
+    chokyo_bataiju: dict[str, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -80,6 +86,8 @@ def build_trend_sections(
 
     entries を指定した場合は、各表に今回の出走馬が当たる行を「該当馬」列として書き、
     最後に table.yml の項目を並べた出走馬の比較表の画像を載せるセクションを足す。
+    entries に調教後馬体重がある場合は、馬体重の項目の出走馬を調教後馬体重で判定し、
+    表の下に調教後馬体重である旨を注記する。
     今回の出走馬が1頭も当たらない表と、全頭が同じ1つの行だけに当たる表は、記事にも比較表にも
     載せない。
 
@@ -93,6 +101,9 @@ def build_trend_sections(
 
     Returns:
         TrendSections: 集計対象の注記と、見出し -> Markdownセクション文字列、比較表の画像。
+
+    Raises:
+        ValueError: 調教後馬体重に載っていない出走馬がいる場合。
     """
     catalog = load_trend_catalog(trends_dir)
     context = build_race_context(race_info)
@@ -105,14 +116,20 @@ def build_trend_sections(
         entry_race_code = entries.race_code
         table_columns = parse_table_config(entries.table_config, categories)
         horses = fetch_entry_horses(context.manager, entries.race_code)
+    weight_values: dict[int, str] | None = None
+    if entries is not None and entries.chokyo_bataiju is not None:
+        weight_values = _to_entry_weight_values(horses, entries.chokyo_bataiju)
 
     sections: dict[str, str] = {}
     category_tables: dict[str, dict[str, ItemTable]] = {}
     for category in categories:
         tables = [
             table
-            for item in category.items
-            if (table := build_item_table(item, context, entry_race_code)) is not None
+            for item, group_values in (
+                _apply_entry_weights(item, weight_values) for item in category.items
+            )
+            if (table := build_item_table(item, context, entry_race_code, group_values))
+            is not None
             and (entries is None or is_entry_table_informative(table, len(horses)))
         ]
         category_tables[category.name] = {table.item.name: table for table in tables}
@@ -139,3 +156,46 @@ def build_trend_sections(
         sections=sections,
         images=images,
     )
+
+
+def _to_entry_weight_values(horses: pd.DataFrame, weights: dict[str, int]) -> dict[int, str]:
+    """馬名ごとの馬体重を、馬番ごとの馬体重の項目のグループの値にする。
+
+    Args:
+        horses (pd.DataFrame): 今回の出走馬。umaban（馬番）・bamei（馬名）の列を持つ。
+        weights (dict[str, int]): 馬名 -> 馬体重（kg）。
+
+    Returns:
+        dict[int, str]: 馬番 -> 馬体重（kg）の文字列。
+
+    Raises:
+        ValueError: weights に載っていない出走馬がいる場合。
+    """
+    missing = [name for name in horses["bamei"] if name not in weights]
+    if missing:
+        raise ValueError(f"調教後馬体重が見つからない出走馬がいます: {missing}")
+    return {
+        int(umaban): str(weights[name])
+        for umaban, name in zip(horses["umaban"], horses["bamei"], strict=True)
+    }
+
+
+def _apply_entry_weights(
+    item: TrendItem, weight_values: dict[int, str] | None
+) -> tuple[TrendItem, dict[int, str] | None]:
+    """馬体重の項目に、出走馬の判定に使う馬体重と注記を付ける。
+
+    Args:
+        item (TrendItem): 項目。
+        weight_values (dict[int, str] | None): 馬番 -> 調教後馬体重（kg）の文字列。
+            None の場合は項目をそのまま返す。
+
+    Returns:
+        tuple[TrendItem, dict[int, str] | None]: 項目と、出走馬の判定に使うグループの値。
+            馬体重の項目でない場合、または weight_values が None の場合は、元の項目と None。
+    """
+    source_type = item.config.get("source", {}).get("type")
+    if weight_values is None or source_type != _HORSE_WEIGHT_SOURCE_TYPE:
+        return item, None
+    note = "\n\n".join(filter(None, [_CHOKYO_BATAIJU_NOTE, item.config.get("note", "")]))
+    return replace(item, config={**item.config, "note": note}), weight_values
