@@ -10,7 +10,7 @@ from mykeibadb.connection import ConnectionManager
 
 from g1_predict.modules.utils.race_history import build_race_context
 
-from ._trend_catalog import TrendCategory, TrendItem, build_trend_categories, load_trend_catalog
+from ._trend_catalog import TrendItem, build_trend_categories, load_trend_catalog
 from ._trend_entries import fetch_entry_horses
 from ._trend_entry_weights import EntryWeights, resolve_entry_weights
 from ._trend_renderer import (
@@ -151,7 +151,7 @@ def build_trend_sections(
             tables,
             entries is not None,
             horse_count=len(horses),
-            table_columns=_item_columns(table_columns.get(category.name, []), category),
+            table_columns=_item_columns(table_columns.get(category.name, [])),
         )
 
     images: dict[str, Figure] = {}
@@ -176,14 +176,13 @@ def build_trend_sections(
     )
 
 
-def _item_columns(columns: list[TableColumn], category: TrendCategory) -> dict[str, TableColumn]:
+def _item_columns(columns: list[TableColumn]) -> dict[str, TableColumn]:
     """カテゴリの項目名から、その項目の表に適用する列を引く対応を作る。
 
     「前走クラス着順」の列は、まとめた各項目に同じ列を対応させる。
 
     Args:
         columns (list[TableColumn]): カテゴリの table.yml の列。
-        category (TrendCategory): 列が属する trends.yml のカテゴリ。
 
     Returns:
         dict[str, TableColumn]: 項目名 -> 列。
