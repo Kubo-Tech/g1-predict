@@ -51,9 +51,10 @@ items:
       type: fixed
       items:
         - {label: "1番手", op: "==", value: 1}
-        - {label: "2-5番手", op: between, value: [2, 5]}
-        - {label: "6-9番手", op: between, value: [6, 9]}
-        - {label: "10番手以下", op: ">=", value: 10}
+        - {label: "2-4番手", op: between, value: [2, 4]}
+        - {label: "5-7番手", op: between, value: [5, 7]}
+        - {label: "8-10番手", op: between, value: [8, 10]}
+        - {label: "11番手以下", op: ">=", value: 11}
   前走4角通過順位:
     column_name: 通過
     conditionable: true
